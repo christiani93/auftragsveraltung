@@ -6,8 +6,10 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-echo "=== git pull ==="
-git pull --ff-only
+echo "=== Sync mit origin/main (force) ==="
+git fetch origin
+git reset --hard origin/main
+chmod +x deploy/*.sh 2>/dev/null || true
 
 echo "=== Venv-Pruefung ==="
 if [ ! -d ".venv" ]; then
