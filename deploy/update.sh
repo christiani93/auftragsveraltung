@@ -22,10 +22,12 @@ pip install --upgrade pip --quiet
 pip install -r requirements.txt --quiet
 
 echo "=== Service neu starten ==="
+# HostPoint's hpservices/supervisord setzt seine Config in der interactive
+# Login-Shell (via .bashrc / .profile). In Skripten muessen wir das
+# explizit triggern damit supervisorctl seinen Socket findet.
 if command -v supervisorctl >/dev/null 2>&1; then
-    # HostPoint FlexServer: supervisord via hpservices
-    supervisorctl restart auftragsverwaltung 2>&1 || \
-        echo "Hinweis: supervisorctl restart fehlgeschlagen — Service erstmalig anlegen via 'hpservices supervisord add auftragsverwaltung'?"
+    bash -lc 'supervisorctl restart auftragsverwaltung' 2>&1 || \
+        echo "Hinweis: Restart fehlgeschlagen. Manuell pruefen: 'supervisorctl status'"
 elif command -v systemctl >/dev/null && systemctl is-enabled auftragsverwaltung >/dev/null 2>&1; then
     sudo systemctl restart auftragsverwaltung
     sleep 1
