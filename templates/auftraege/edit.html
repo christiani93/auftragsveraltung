@@ -103,19 +103,21 @@
   </div>
   {% endif %}
 
-  <div class="d-flex gap-2 justify-content-between">
+  <div class="d-flex gap-2 justify-content-between flex-wrap">
     <div class="d-flex gap-2">
       <button type="submit" class="btn btn-primary">Speichern</button>
       <a class="btn btn-outline-secondary" href="{{ url_for('auftraege.list_auftraege') }}">Abbrechen</a>
     </div>
-    {% if not neu %}
+    {% if not neu and current_user.is_admin %}
     <button type="button" class="btn btn-outline-danger"
-            onclick="if(confirm('Auftrag löschen?')) document.getElementById('delete-form').submit();">Löschen</button>
+            onclick="if(confirm('Auftrag „{{ (auftrag.titel or '')|e }}“ wirklich löschen?\n\nZeitbuchungen und hochgeladene Bilder werden mitgelöscht. Diese Aktion kann nicht rückgängig gemacht werden.')) document.getElementById('delete-form').submit();">
+      Löschen (Admin)
+    </button>
     {% endif %}
   </div>
 </form>
 
-{% if not neu %}
+{% if not neu and current_user.is_admin %}
 <form id="delete-form" method="post" action="{{ url_for('auftraege.delete_auftrag', auftrag_id=auftrag.id) }}" class="d-none"></form>
 {% endif %}
 {% endblock %}

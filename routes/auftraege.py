@@ -244,17 +244,26 @@ def delete_zeitbuchung(zeitbuchung_id: str):
 
 @bp.route("/<auftrag_id>/loeschen", methods=["POST"])
 def delete_auftrag(auftrag_id: str):
+    # Nur Admins duerfen Auftraege loeschen — verhindert versehentlichen Datenverlust
+    if not getattr(current_user, "is_admin", False):
+        flash("Nur Admins dürfen Aufträge löschen.", "danger")
+        return redirect(url_for("auftraege.detail", auftrag_id=auftrag_id))
     auftrag = auftraege.get(auftrag_id)
     if not auftrag:
         abort(404)
+    # Zugehoerige Zeitbuchungen mitloeschen
+    geloeschte_zb = 0
     for z in zeitbuchungen_fuer_auftrag(auftrag_id):
         zeitbuchungen.delete(z["id"])
-    # Bilderordner aufräumen
+        geloeschte_zb += 1
+    # Bilderordner aufraeumen
+    geloeschte_bilder = 0
     bild_dir = config.DATA_DIR / "auftrag_bilder" / auftrag_id
     if bild_dir.exists():
         for f in bild_dir.iterdir():
             try:
                 f.unlink()
+                geloeschte_bilder += 1
             except OSError:
                 pass
         try:
@@ -262,7 +271,12 @@ def delete_auftrag(auftrag_id: str):
         except OSError:
             pass
     auftraege.delete(auftrag_id)
-    flash(f"Auftrag „{auftrag['titel']}“ gelöscht.", "info")
+    parts = [f"Auftrag „{auftrag['titel']}“ gelöscht"]
+    if geloeschte_zb:
+        parts.append(f"{geloeschte_zb} Zeitbuchung(en)")
+    if geloeschte_bilder:
+        parts.append(f"{geloeschte_bilder} Bild(er)")
+    flash(" — ".join(parts) + ".", "info")
     return redirect(url_for("auftraege.list_auftraege"))
 
 
