@@ -37,6 +37,44 @@
   </div>
 </div>
 
+{% set kontakte = kunde.kontaktpersonen or [] %}
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <h2 class="h5 m-0">Kontaktpersonen ({{ kontakte|length }})</h2>
+  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('customers.edit_customer', kunde_id=kunde.id) }}#kontakte-container">+ / bearbeiten</a>
+</div>
+{% if kontakte %}
+<div class="card mb-4">
+  <div class="table-responsive">
+    <table class="table table-sm table-kompakt m-0">
+      <thead class="table-light">
+        <tr>
+          <th>Name</th>
+          <th>Funktion</th>
+          <th>Telefon</th>
+          <th>E-Mail</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for k in kontakte %}
+        <tr>
+          <td>{{ k.name or '—' }}</td>
+          <td class="text-muted">{{ k.funktion or '' }}</td>
+          <td>
+            {% if k.telefon %}<a href="tel:{{ k.telefon }}">📞 {{ k.telefon }}</a>{% else %}—{% endif %}
+          </td>
+          <td>
+            {% if k.email %}<a href="mailto:{{ k.email }}">{{ k.email }}</a>{% else %}—{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="alert alert-light border mb-4">Noch keine Kontaktpersonen erfasst. <a href="{{ url_for('customers.edit_customer', kunde_id=kunde.id) }}#kontakte-container">Jetzt hinzufügen</a></div>
+{% endif %}
+
 <div class="d-flex justify-content-between align-items-center mb-2">
   <h2 class="h5 m-0">Anlagen ({{ anlagen|length }})</h2>
   <a class="btn btn-sm btn-primary" href="{{ url_for('installations.new_installation', kunde_id=kunde.id) }}">+ Neue Anlage</a>

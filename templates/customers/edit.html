@@ -47,9 +47,88 @@
     </div>
   </div>
 
+  <hr class="my-4">
+
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h2 class="h5 m-0">Kontaktpersonen</h2>
+    <button type="button" class="btn btn-sm btn-outline-primary" id="btn-add-kontakt">+ Kontaktperson</button>
+  </div>
+  <div class="text-muted small mb-2">Telefonnummern, Funktionen und E-Mails von Ansprechpartnern beim Kunden.</div>
+
+  <div id="kontakte-container">
+    {% set kontakte = kunde.kontaktpersonen or [] %}
+    {% for k in kontakte %}
+    <div class="row g-2 mb-2 align-items-end kontakt-zeile">
+      <div class="col-md-3">
+        <label class="form-label small mb-0">Name</label>
+        <input type="text" name="kontakt_name[]" class="form-control form-control-sm" value="{{ k.name or '' }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small mb-0">Funktion</label>
+        <input type="text" name="kontakt_funktion[]" class="form-control form-control-sm" value="{{ k.funktion or '' }}" placeholder="z.B. Hauswart">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small mb-0">Telefon</label>
+        <input type="tel" name="kontakt_telefon[]" class="form-control form-control-sm" value="{{ k.telefon or '' }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small mb-0">E-Mail</label>
+        <input type="email" name="kontakt_email[]" class="form-control form-control-sm" value="{{ k.email or '' }}">
+      </div>
+      <div class="col-md-1 text-end">
+        <button type="button" class="btn btn-sm btn-outline-danger btn-remove-kontakt" title="Entfernen">×</button>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <template id="kontakt-template">
+    <div class="row g-2 mb-2 align-items-end kontakt-zeile">
+      <div class="col-md-3">
+        <label class="form-label small mb-0">Name</label>
+        <input type="text" name="kontakt_name[]" class="form-control form-control-sm">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small mb-0">Funktion</label>
+        <input type="text" name="kontakt_funktion[]" class="form-control form-control-sm" placeholder="z.B. Hauswart">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small mb-0">Telefon</label>
+        <input type="tel" name="kontakt_telefon[]" class="form-control form-control-sm">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small mb-0">E-Mail</label>
+        <input type="email" name="kontakt_email[]" class="form-control form-control-sm">
+      </div>
+      <div class="col-md-1 text-end">
+        <button type="button" class="btn btn-sm btn-outline-danger btn-remove-kontakt" title="Entfernen">×</button>
+      </div>
+    </div>
+  </template>
+
   <div class="mt-4 d-flex gap-2">
     <button type="submit" class="btn btn-primary">Speichern</button>
     <a class="btn btn-outline-secondary" href="{{ url_for('customers.list_customers') }}">Abbrechen</a>
   </div>
 </form>
+
+<script>
+(function() {
+  const container = document.getElementById('kontakte-container');
+  const template = document.getElementById('kontakt-template');
+  const addBtn = document.getElementById('btn-add-kontakt');
+
+  addBtn.addEventListener('click', function() {
+    const clone = template.content.cloneNode(true);
+    container.appendChild(clone);
+  });
+
+  container.addEventListener('click', function(ev) {
+    const btn = ev.target.closest('.btn-remove-kontakt');
+    if (!btn) return;
+    const row = btn.closest('.kontakt-zeile');
+    if (row) row.remove();
+  });
+})();
+</script>
 {% endblock %}

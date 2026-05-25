@@ -12,6 +12,28 @@ from models.repos import (
 bp = Blueprint("customers", __name__)
 
 
+def _form_to_kontaktpersonen(form) -> list[dict]:
+    namen = form.getlist("kontakt_name[]")
+    funktionen = form.getlist("kontakt_funktion[]")
+    telefone = form.getlist("kontakt_telefon[]")
+    emails = form.getlist("kontakt_email[]")
+    result: list[dict] = []
+    for i, name in enumerate(namen):
+        name = (name or "").strip()
+        funktion = (funktionen[i] if i < len(funktionen) else "").strip()
+        telefon = (telefone[i] if i < len(telefone) else "").strip()
+        email = (emails[i] if i < len(emails) else "").strip()
+        if not (name or funktion or telefon or email):
+            continue
+        result.append({
+            "name": name,
+            "funktion": funktion,
+            "telefon": telefon,
+            "email": email,
+        })
+    return result
+
+
 def _form_to_kunde(form) -> dict:
     return {
         "name": form.get("name", "").strip(),
@@ -23,6 +45,7 @@ def _form_to_kunde(form) -> dict:
         "ist_stammkunde": form.get("ist_stammkunde") == "on",
         "kontroll_intervall_monate": int(form.get("kontroll_intervall_monate") or 6),
         "notizen": form.get("notizen", "").strip(),
+        "kontaktpersonen": _form_to_kontaktpersonen(form),
     }
 
 
