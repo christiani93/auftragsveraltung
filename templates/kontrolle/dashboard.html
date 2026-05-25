@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Kontroll-Übersicht{% endblock %}
+{% block content %}
+<h1 class="h3 mb-3">Kontroll-Übersicht</h1>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card card-body text-center">
+      <div class="text-muted small">Kunden</div>
+      <div class="fs-3 fw-bold">{{ anzahl_kunden }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card card-body text-center">
+      <div class="text-muted small">Anlagen</div>
+      <div class="fs-3 fw-bold">{{ anzahl_anlagen }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card card-body text-center">
+      <div class="text-muted small">Messprotokolle</div>
+      <div class="fs-3 fw-bold">{{ anzahl_messprotokolle }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card card-body text-center">
+      <div class="text-muted small">Stammkunden</div>
+      <div class="fs-3 fw-bold">{{ stammkunden_rows|length }}</div>
+    </div>
+  </div>
+</div>
+
+<h2 class="h5 mb-2">Stammkunden — Kontrollbedarf</h2>
+{% if stammkunden_rows %}
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-kompakt table-hover m-0">
+      <thead class="table-light">
+        <tr>
+          <th>Kunde</th>
+          <th>Ort</th>
+          <th class="text-center">Total Teile</th>
+          <th class="text-center">Offen</th>
+          <th class="text-center">Mängel</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in stammkunden_rows %}
+        <tr>
+          <td class="fw-semibold">{{ r.kunde.name }}</td>
+          <td>{{ r.kunde.plz }} {{ r.kunde.ort }}</td>
+          <td class="text-center">{{ r.anzahl_total }}</td>
+          <td class="text-center">
+            {% if r.anzahl_offen %}<span class="badge bg-secondary">{{ r.anzahl_offen }}</span>{% else %}—{% endif %}
+          </td>
+          <td class="text-center">
+            {% if r.anzahl_maengel %}<span class="badge bg-danger">{{ r.anzahl_maengel }}</span>{% else %}—{% endif %}
+          </td>
+          <td class="text-end">
+            <a class="btn btn-sm btn-primary" href="{{ url_for('kontrolle.kunde_uebersicht', kunde_id=r.kunde.id) }}">Übersicht öffnen</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="alert alert-info">
+  Noch keine Stammkunden erfasst. <a href="{{ url_for('customers.new_customer') }}">Ersten Kunden anlegen →</a>
+</div>
+{% endif %}
+{% endblock %}

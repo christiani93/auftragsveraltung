@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Messprotokolle{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3 m-0">Messprotokolle</h1>
+  <a href="{{ url_for('protocols.new_protocol') }}" class="btn btn-primary">+ Neues Messprotokoll</a>
+</div>
+
+{% if rows %}
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-kompakt table-hover m-0">
+      <thead class="table-light">
+        <tr>
+          <th>Datum</th>
+          <th>Kunde</th>
+          <th>Anlage</th>
+          <th>Messpunkte</th>
+          <th>Monteur</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td>{{ r.protokoll.datum }}</td>
+          <td>{% if r.kunde %}{{ r.kunde.name }}{% else %}—{% endif %}</td>
+          <td>{% if r.anlage %}{{ r.anlage.bezeichnung }}{% else %}—{% endif %}</td>
+          <td>{{ r.protokoll.messungen|length }}</td>
+          <td>{{ r.protokoll.monteur or '—' }}</td>
+          <td class="text-end">
+            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('protocols.detail', protokoll_id=r.protokoll.id) }}">Öffnen</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="alert alert-info">Noch keine Messprotokolle.</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+
+# Secrets and local config
+.env
+.env.local
+data/.secret_key
+
+# Application data — gehoert nicht ins Repo, lebt auf jedem System einzeln
+data/
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Build artifacts (PyInstaller, Flutter, etc.)
+build/
+dist/
+*.spec
+
+# OS-Tools
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+logs/
+
+# Flutter-Projekt (separates Repo)
+*.dart_tool/

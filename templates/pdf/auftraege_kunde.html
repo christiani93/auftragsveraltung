@@ -1,0 +1,82 @@
+{% extends "pdf/_pdf_base.html" %}
+{% block title %}Auftragsliste – {{ kunde.name }}{% endblock %}
+{% block footer_left %}Aufträge {{ kunde.name }}{% endblock %}
+{% block heading %}Auftragsliste{% endblock %}
+{% block subheading %}
+  <strong>{{ kunde.name }}</strong>
+  {% if kunde.adresse %}<br>{{ kunde.adresse }}{% endif %}
+  {% if kunde.plz or kunde.ort %}<br>{{ kunde.plz }} {{ kunde.ort }}{% endif %}
+{% endblock %}
+
+{% block content %}
+<p>
+  <span class="label">Anzahl Aufträge:</span> {{ rows|length }}
+  &nbsp;·&nbsp;
+  <span class="label">Gesamtstunden:</span> <strong>{{ '%.2f'|format(gesamtstunden) }} h</strong>
+</p>
+
+{% if rows %}
+<table>
+  <thead>
+    <tr>
+      <th style="width: 75pt;">Datum</th>
+      <th>Titel / Beschreibung</th>
+      <th style="width: 80pt;">Erteilt von</th>
+      <th style="width: 50pt;">Status</th>
+      <th style="width: 50pt; text-align: right;">Stunden</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for r in rows %}
+    <tr>
+      <td>
+        {{ r.auftrag.erteilungsdatum }}
+        {% if r.auftrag.erledigt_am %}<div class="small">erl. {{ r.auftrag.erledigt_am }}</div>{% endif %}
+      </td>
+      <td>
+        <strong>{{ r.auftrag.titel }}</strong>
+        {% if r.auftrag.beschreibung %}<div class="small">{{ r.auftrag.beschreibung }}</div>{% endif %}
+        {% if r.anzahl_teile %}<div class="small">{{ r.anzahl_teile }} Anlagenteil(e) betroffen</div>{% endif %}
+      </td>
+      <td>{{ r.auftrag.erteilt_von or '—' }}</td>
+      <td><span class="badge badge-{{ r.auftrag.status }}">{{ r.auftrag.status }}</span></td>
+      <td style="text-align: right;"><strong>{{ '%.2f'|format(r.zeitsumme) }}</strong></td>
+    </tr>
+    {% if r.zeitbuchungen %}
+    <tr>
+      <td colspan="5" style="padding: 0; border-top: none;">
+        <table style="margin: 0; border: none;">
+          <tbody>
+            {% for z in r.zeitbuchungen %}
+            <tr style="background: #fafafa;">
+              <td style="width: 75pt; border: none; padding-left: 18pt; font-size: 9pt;">{{ z.datum }}</td>
+              <td style="border: none; font-size: 9pt;">{{ z.taetigkeit or '(ohne Tätigkeit)' }}{% if z.mitarbeiter %} <span class="small">– {{ z.mitarbeiter }}</span>{% endif %}</td>
+              <td style="width: 80pt; border: none; font-size: 9pt;">
+                {% if z.von_zeit and z.bis_zeit %}{{ z.von_zeit }}–{{ z.bis_zeit }}{% endif %}
+              </td>
+              <td style="width: 50pt; border: none;"></td>
+              <td style="width: 50pt; border: none; text-align: right; font-size: 9pt;">{{ '%.2f'|format(z.dauer_h) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </td>
+    </tr>
+    {% endif %}
+    {% endfor %}
+  </tbody>
+  <tfoot>
+    <tr>
+      <td colspan="4" style="text-align: right; font-weight: 600;">Total</td>
+      <td style="text-align: right; font-weight: 600;">{{ '%.2f'|format(gesamtstunden) }} h</td>
+    </tr>
+  </tfoot>
+</table>
+{% else %}
+<p><em>Keine Aufträge erfasst.</em></p>
+{% endif %}
+
+<div class="signature">
+  <div class="signature-line">Datum / Unterschrift</div>
+</div>
+{% endblock %}

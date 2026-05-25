@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Benutzerverwaltung{% endblock %}
+{% block content %}
+<h1 class="h3 mb-3">Benutzer</h1>
+
+<div class="card mb-4">
+  <div class="table-responsive">
+    <table class="table table-kompakt m-0">
+      <thead class="table-light">
+        <tr>
+          <th>Username</th>
+          <th>Name</th>
+          <th>Rolle</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in users %}
+        <tr>
+          <td><code>{{ u.username }}</code></td>
+          <td>{{ u.name }}</td>
+          <td>
+            {% if u.role == 'admin' %}<span class="badge bg-danger">{{ u.role }}</span>
+            {% else %}<span class="badge bg-secondary">{{ u.role }}</span>{% endif %}
+          </td>
+          <td class="text-end">
+            <form method="post" action="{{ url_for('auth.delete_user_route', username=u.username) }}"
+                  class="d-inline" onsubmit="return confirm('User „{{ u.username }}“ löschen?');">
+              <button type="submit" class="btn btn-sm btn-outline-danger">Löschen</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<h2 class="h5 mb-2">Neuer User</h2>
+<form method="post" action="{{ url_for('auth.new_user_route') }}" class="card card-body">
+  <div class="row g-3">
+    <div class="col-md-3">
+      <label class="form-label">Username *</label>
+      <input type="text" name="username" class="form-control" required>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Name</label>
+      <input type="text" name="name" class="form-control">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Passwort *</label>
+      <input type="text" name="password" class="form-control" required minlength="6">
+    </div>
+    <div class="col-md-2">
+      <label class="form-label">Rolle</label>
+      <select name="role" class="form-select">
+        {% for r in roles %}
+        <option value="{{ r }}">{{ r }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-12">
+      <button type="submit" class="btn btn-primary">+ User anlegen</button>
+    </div>
+  </div>
+</form>
+{% endblock %}

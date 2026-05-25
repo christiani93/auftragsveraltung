@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Kunden{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3 m-0">Kunden</h1>
+  <a href="{{ url_for('customers.new_customer') }}" class="btn btn-primary">+ Neuer Kunde</a>
+</div>
+
+{% if kunden %}
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-kompakt table-hover m-0">
+      <thead class="table-light">
+        <tr>
+          <th>Name</th>
+          <th>Ort</th>
+          <th>Telefon</th>
+          <th>Stammkunde</th>
+          <th class="text-end">Aktion</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for k in kunden %}
+        <tr>
+          <td><a href="{{ url_for('customers.detail', kunde_id=k.id) }}" class="fw-semibold text-decoration-none">{{ k.name }}</a></td>
+          <td>{{ k.plz }} {{ k.ort }}</td>
+          <td>{{ k.telefon }}</td>
+          <td>{% if k.ist_stammkunde %}<span class="badge bg-info">Stammkunde</span>{% endif %}</td>
+          <td class="text-end">
+            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('customers.detail', kunde_id=k.id) }}">Details</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="alert alert-info">
+  Noch keine Kunden erfasst. <a href="{{ url_for('customers.new_customer') }}">Ersten Kunden anlegen →</a>
+</div>
+{% endif %}
+{% endblock %}

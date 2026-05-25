@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}{{ "Neues Messgerät" if neu else "Messgerät bearbeiten" }}{% endblock %}
+{% block content %}
+<h1 class="h3 mb-3">{{ "Neues Messgerät" if neu else "Messgerät bearbeiten" }}</h1>
+
+<form method="post" class="card card-body">
+  <div class="row g-3">
+    <div class="col-md-8">
+      <label class="form-label">Bezeichnung *</label>
+      <input type="text" name="bezeichnung" class="form-control" value="{{ geraet.bezeichnung or '' }}" required autofocus
+             placeholder="z.B. Installationstester Metrel MI 3155">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Typ</label>
+      <input type="text" name="typ" class="form-control" value="{{ geraet.typ or '' }}"
+             placeholder="z.B. Installationstester">
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">Hersteller</label>
+      <input type="text" name="hersteller" class="form-control" value="{{ geraet.hersteller or '' }}">
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">Modell</label>
+      <input type="text" name="modell" class="form-control" value="{{ geraet.modell or '' }}">
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">Seriennummer</label>
+      <input type="text" name="seriennr" class="form-control" value="{{ geraet.seriennr or '' }}">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Kalibrierdatum</label>
+      <input type="date" name="kalibrierdatum" class="form-control" value="{{ geraet.kalibrierdatum or '' }}">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Nächste Kalibrierung</label>
+      <input type="date" name="naechste_kalibrierung" class="form-control" value="{{ geraet.naechste_kalibrierung or '' }}">
+    </div>
+    <div class="col-12">
+      <label class="form-label">Notizen</label>
+      <textarea name="notizen" class="form-control" rows="3">{{ geraet.notizen or '' }}</textarea>
+    </div>
+  </div>
+
+  <div class="mt-4 d-flex gap-2 justify-content-between">
+    <div class="d-flex gap-2">
+      <button type="submit" class="btn btn-primary">Speichern</button>
+      <a class="btn btn-outline-secondary" href="{{ url_for('messgeraete.list_devices') }}">Abbrechen</a>
+    </div>
+    {% if not neu %}
+    <button type="button" class="btn btn-outline-danger"
+            onclick="if(confirm('Messgerät löschen?')) document.getElementById('delete-form').submit();">Löschen</button>
+    {% endif %}
+  </div>
+</form>
+
+{% if not neu %}
+<form id="delete-form" method="post" action="{{ url_for('messgeraete.delete_device', geraet_id=geraet.id) }}" class="d-none"></form>
+{% endif %}
+{% endblock %}

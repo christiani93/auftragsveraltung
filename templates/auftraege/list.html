@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Aufträge{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3 m-0">Aufträge</h1>
+  <a href="{{ url_for('auftraege.new_auftrag') }}" class="btn btn-primary">+ Neuer Auftrag</a>
+</div>
+
+{% if rows %}
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-kompakt table-hover m-0">
+      <thead class="table-light">
+        <tr>
+          <th>Datum</th>
+          <th>Kunde</th>
+          <th>Titel</th>
+          <th>Erteilt von</th>
+          <th>Teile</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td>{{ r.auftrag.erteilungsdatum }}</td>
+          <td>{% if r.kunde %}<a href="{{ url_for('customers.detail', kunde_id=r.kunde.id) }}">{{ r.kunde.name }}</a>{% else %}—{% endif %}</td>
+          <td><a href="{{ url_for('auftraege.detail', auftrag_id=r.auftrag.id) }}" class="fw-semibold text-decoration-none">{{ r.auftrag.titel }}</a></td>
+          <td>{{ r.auftrag.erteilt_von or '—' }}</td>
+          <td>{{ r.auftrag.anlagenteil_ids|length }}</td>
+          <td>
+            {% if r.auftrag.status == 'offen' %}<span class="badge bg-secondary">{{ status_label[r.auftrag.status] }}</span>
+            {% elif r.auftrag.status == 'in_arbeit' %}<span class="badge bg-warning text-dark">{{ status_label[r.auftrag.status] }}</span>
+            {% elif r.auftrag.status == 'erledigt' %}<span class="badge bg-success">{{ status_label[r.auftrag.status] }}</span>
+            {% endif %}
+          </td>
+          <td class="text-end">
+            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('auftraege.detail', auftrag_id=r.auftrag.id) }}">Öffnen</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="alert alert-info">Noch keine Aufträge. <a href="{{ url_for('auftraege.new_auftrag') }}">Ersten Auftrag erfassen →</a></div>
+{% endif %}
+{% endblock %}

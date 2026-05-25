@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block title %}{{ "Neuer Anlagenteil" if neu else "Anlagenteil bearbeiten" }}{% endblock %}
+{% block content %}
+<h1 class="h3 mb-3">
+  {{ "Neuer Anlagenteil" if neu else "Anlagenteil bearbeiten" }}
+  {% if anlage %}<small class="text-muted">– {{ anlage.bezeichnung }}</small>{% endif %}
+</h1>
+
+<form method="post" class="card card-body">
+  <div class="row g-3">
+    <div class="col-md-5">
+      <label class="form-label">Typ</label>
+      <select name="typ" class="form-select" id="typ-select">
+        {% for t in typen %}
+        <option value="{{ t }}" {% if teil.typ == t %}selected{% endif %}>{{ t }}</option>
+        {% endfor %}
+      </select>
+      <div id="fi-hinweis" class="small mt-1">
+        {% if fi_erforderlich == True %}
+          <span class="badge bg-danger">FI / RCD erforderlich</span>
+          <span class="text-muted">— Endstromkreis mit Steckdosen nach NIN</span>
+        {% elif fi_erforderlich == False %}
+          <span class="badge bg-secondary">Kein FI / RCD zwingend</span>
+        {% endif %}
+      </div>
+    </div>
+    <div class="col-md-7">
+      <label class="form-label">Bezeichnung *</label>
+      <input type="text" name="bezeichnung" class="form-control" value="{{ teil.bezeichnung or '' }}" required>
+    </div>
+    <div class="col-12">
+      <label class="form-label">Beschreibung</label>
+      <input type="text" name="beschreibung" class="form-control" value="{{ teil.beschreibung or '' }}">
+    </div>
+
+    <hr class="mt-3 mb-1">
+
+    <div class="col-md-6">
+      <label class="form-label">Übergeordneter Anlagenteil</label>
+      <select name="parent_id" class="form-select">
+        <option value="">— keine (Wurzel der Anlage) —</option>
+        {% for v in eltern_optionen %}
+        <option value="{{ v.id }}" {% if teil.parent_id == v.id %}selected{% endif %}>
+          [{{ v.typ }}] {{ v.bezeichnung }}{% if v.beschreibung %} – {{ v.beschreibung }}{% endif %}
+        </option>
+        {% endfor %}
+      </select>
+      <small class="text-muted">Verteilungen, Verteil- und Anlagenstromkreise sind als übergeordneter Teil zulässig.</small>
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">Spannungssystem</label>
+      <select name="spannung" class="form-select">
+        <option value="">— nicht angegeben —</option>
+        {% for key, label in spannung_typen %}
+        <option value="{{ key }}" {% if teil.spannung == key %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="col-md-4">
+      <label class="form-label">Leistung [kW]</label>
+      <input type="text" inputmode="decimal" name="leistung_kw" class="form-control"
+             value="{{ teil.leistung_kw or '' }}" placeholder="z.B. 5.5">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Stromstärke [A]</label>
+      <input type="text" inputmode="decimal" name="stromstaerke_a" class="form-control"
+             value="{{ teil.stromstaerke_a or '' }}" placeholder="alternativ zu kW">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Gemessener Kurzschlussstrom Ik [A]</label>
+      <input type="text" inputmode="decimal" name="gemessen_ik_a" class="form-control"
+             value="{{ teil.gemessen_ik_a or '' }}" placeholder="optional">
+      <small class="text-muted">Wird als IKmax für nachgelagerte Teile übernommen.</small>
+    </div>
+
+    <hr class="mt-3 mb-1">
+    <div class="col-12">
+      <h6 class="text-muted small mb-0">Technische Daten (werden beim Messprotokoll vorausgefüllt)</h6>
+    </div>
+
+    <div class="col-md-4">
+      <label class="form-label">Sicherungsnr.</label>
+      <input type="text" name="sicherungsnr" class="form-control" value="{{ teil.sicherungsnr or '' }}" placeholder="z.B. F11">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Kabel (Typ + Querschnitt)</label>
+      <input type="text" name="kabel" class="form-control" value="{{ teil.kabel or '' }}" placeholder="z.B. 3x1.5mm²">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Sicherungstyp (LS / NH etc.)</label>
+      <input type="text" name="sicherungstyp" class="form-control" value="{{ teil.sicherungstyp or '' }}" placeholder="z.B. LS B16 / FI-LS">
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">FI Typ / I∆n [mA]</label>
+      <input type="text" name="fi_typ_ma" class="form-control" value="{{ teil.fi_typ_ma or '' }}" placeholder="z.B. A 30mA">
+    </div>
+
+    <hr class="mt-3 mb-1">
+
+    <div class="col-md-4">
+      <label class="form-label">Kontroll-Status</label>
+      <select name="kontroll_status" class="form-select">
+        {% for s in status_optionen %}
+        <option value="{{ s }}" {% if teil.kontroll_status == s %}selected{% endif %}>{{ status_label[s] }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Letzte Kontrolle</label>
+      <input type="date" name="letzte_kontrolle" class="form-control" value="{{ teil.letzte_kontrolle or '' }}">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Kontrolleur</label>
+      <input type="text" name="kontrolleur" class="form-control" value="{{ teil.kontrolleur or '' }}">
+    </div>
+
+    <div class="col-12">
+      <label class="form-label">Notizen</label>
+      <textarea name="notizen" class="form-control" rows="3">{{ teil.notizen or '' }}</textarea>
+    </div>
+  </div>
+
+  <div class="mt-4 d-flex gap-2 justify-content-between">
+    <div class="d-flex gap-2">
+      <button type="submit" class="btn btn-primary">Speichern</button>
+      {% if anlage %}
+      <a class="btn btn-outline-secondary" href="{{ url_for('installations.detail', anlage_id=anlage.id) }}">Abbrechen</a>
+      {% endif %}
+    </div>
+    {% if not neu %}
+    <button type="button" class="btn btn-outline-danger"
+            onclick="if(confirm('Anlagenteil löschen?')) document.getElementById('delete-form').submit();">
+      Löschen
+    </button>
+    {% endif %}
+  </div>
+</form>
+
+{% if not neu %}
+<form id="delete-form" method="post" action="{{ url_for('installations.delete_teil', teil_id=teil.id) }}" class="d-none"></form>
+{% endif %}
+
+<script>
+  // FI-Hinweis live aktualisieren wenn Typ geändert wird
+  document.getElementById("typ-select").addEventListener("change", (e) => {
+    const typ = e.target.value;
+    const box = document.getElementById("fi-hinweis");
+    if (typ === "Endstromkreis mit Steckdosen") {
+      box.innerHTML = '<span class="badge bg-danger">FI / RCD erforderlich</span> <span class="text-muted">— Endstromkreis mit Steckdosen nach NIN</span>';
+    } else if (typ === "Endstromkreis ohne Steckdosen") {
+      box.innerHTML = '<span class="badge bg-secondary">Kein FI / RCD zwingend</span>';
+    } else {
+      box.innerHTML = "";
+    }
+  });
+</script>
+{% endblock %}

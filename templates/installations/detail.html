@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}{{ anlage.bezeichnung }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+  <div>
+    <div class="text-muted small">
+      {% if kunde %}<a href="{{ url_for('customers.detail', kunde_id=kunde.id) }}">{{ kunde.name }}</a> ›{% endif %} Anlage
+    </div>
+    <h1 class="h3 m-0">{{ anlage.bezeichnung }}</h1>
+    <div class="text-muted">{{ anlage.standort or '' }}{% if anlage.baujahr %} · Baujahr {{ anlage.baujahr }}{% endif %}</div>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <a class="btn btn-outline-secondary" href="{{ url_for('installations.edit_installation', anlage_id=anlage.id) }}">Bearbeiten</a>
+    <a class="btn btn-outline-info" href="{{ url_for('installations.aufbau', anlage_id=anlage.id) }}">Aufbau / Last</a>
+    <a class="btn btn-primary" href="{{ url_for('protocols.new_protocol', anlage_id=anlage.id) }}">+ Messprotokoll</a>
+  </div>
+</div>
+
+{% if anlage.naechste_periodische_kontrolle %}
+<div class="alert alert-info">
+  Nächste periodische Kontrolle: <strong>{{ anlage.naechste_periodische_kontrolle }}</strong>
+</div>
+{% endif %}
+
+<div class="d-flex justify-content-between align-items-center mt-4 mb-2">
+  <h2 class="h5 m-0">Anlagenteile ({{ teile|length }})</h2>
+  <a class="btn btn-sm btn-primary" href="{{ url_for('installations.new_teil', anlage_id=anlage.id) }}">+ Anlagenteil</a>
+</div>
+
+{% if teile %}
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-kompakt table-hover m-0">
+      <thead class="table-light">
+        <tr>
+          <th>Typ</th>
+          <th>Bezeichnung</th>
+          <th>Ab Verteilung</th>
+          <th>Spannung</th>
+          <th class="text-end">Leistung / Strom</th>
+          <th>Status</th>
+          <th>Letzte Kontrolle</th>
+          <th class="text-end">Schnellaktion</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in teile %}
+        <tr>
+          <td><span class="badge bg-secondary">{{ t.typ }}</span></td>
+          <td>
+            <a href="{{ url_for('installations.edit_teil', teil_id=t.id) }}" class="text-decoration-none fw-semibold">{{ t.bezeichnung }}</a>
+            {% if fi_erforderlich(t.typ) == True %}<span class="badge bg-danger ms-1" title="FI/RCD nach NIN erforderlich">FI</span>{% endif %}
+            {% if t.beschreibung %}<div class="text-muted small">{{ t.beschreibung }}</div>{% endif %}
+          </td>
+          <td>
+            {% if t.parent_id and teile_by_id.get(t.parent_id) %}
+              <span class="small">{{ teile_by_id[t.parent_id].bezeichnung }}</span>
+            {% else %}
+              <span class="text-muted small">—</span>
+            {% endif %}
+          </td>
+          <td>{% if t.spannung %}<span class="badge bg-light text-dark border">{{ t.spannung }}</span>{% else %}<span class="text-muted">—</span>{% endif %}</td>
+          <td class="text-end small">
+            {% if t.leistung_kw %}{{ t.leistung_kw }} kW{% endif %}
+            {% if t.leistung_kw and t.stromstaerke_a %} · {% endif %}
+            {% if t.stromstaerke_a %}{{ t.stromstaerke_a }} A{% endif %}
+            {% if not t.leistung_kw and not t.stromstaerke_a %}<span class="text-muted">—</span>{% endif %}
+          </td>
+          <td><span class="badge badge-status-{{ t.kontroll_status }}">{{ kontroll_status_label[t.kontroll_status] }}</span></td>
+          <td>{{ t.letzte_kontrolle or '—' }}</td>
+          <td class="text-end">
+            <form method="post" action="{{ url_for('installations.set_teil_status', teil_id=t.id) }}" class="d-inline">
+              <input type="hidden" name="status" value="geprueft">
+              <button type="submit" class="btn btn-sm btn-outline-success" title="Als geprüft markieren (heute)">✓</button>
+            </form>
+            <form method="post" action="{{ url_for('installations.set_teil_status', teil_id=t.id) }}" class="d-inline">
+              <input type="hidden" name="status" value="maengel">
+              <button type="submit" class="btn btn-sm btn-outline-danger" title="Mängel">⚠</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="alert alert-light border">Noch keine Anlagenteile.</div>
+{% endif %}
+
+<div class="d-flex justify-content-between align-items-center mt-4 mb-2">
+  <h2 class="h5 m-0">Messprotokolle ({{ protokolle|length }})</h2>
+  <a class="btn btn-sm btn-primary" href="{{ url_for('protocols.new_protocol', anlage_id=anlage.id) }}">+ Neu</a>
+</div>
+
+{% if protokolle %}
+<div class="list-group">
+  {% for p in protokolle %}
+  <a class="list-group-item list-group-item-action d-flex justify-content-between" href="{{ url_for('protocols.detail', protokoll_id=p.id) }}">
+    <div>
+      <div class="fw-semibold">{{ p.datum }}</div>
+      <div class="text-muted small">{{ p.messungen|length }} Messpunkt(e){% if p.monteur %} · {{ p.monteur }}{% endif %}</div>
+    </div>
+    <div class="text-muted small align-self-center">›</div>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="alert alert-light border">Noch keine Messprotokolle.</div>
+{% endif %}
+
+<form method="post" action="{{ url_for('installations.delete_installation', anlage_id=anlage.id) }}"
+      class="mt-5" onsubmit="return confirm('Anlage und alle Anlagenteile wirklich löschen?');">
+  <button type="submit" class="btn btn-sm btn-outline-danger">Anlage löschen</button>
+</form>
+{% endblock %}

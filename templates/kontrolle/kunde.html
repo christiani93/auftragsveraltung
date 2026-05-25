@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Kontroll-Übersicht – {{ kunde.name }}{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+  <div>
+    <div class="text-muted small">
+      <a href="{{ url_for('customers.detail', kunde_id=kunde.id) }}">{{ kunde.name }}</a> › Kontroll-Übersicht
+    </div>
+    <h1 class="h3 m-0">Was muss noch geprüft werden?</h1>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-4">
+    <div class="card kontroll-card card-body">
+      <div class="text-muted small">Offen</div>
+      <div class="fs-3 fw-bold">{{ anzahl_offen }}</div>
+    </div>
+  </div>
+  <div class="col-4">
+    <div class="card kontroll-card warn card-body">
+      <div class="text-muted small">Mängel</div>
+      <div class="fs-3 fw-bold">{{ anzahl_maengel }}</div>
+    </div>
+  </div>
+  <div class="col-4">
+    <div class="card card-body">
+      <div class="text-muted small">Geprüft</div>
+      <div class="fs-3 fw-bold">{{ anzahl_geprueft }}</div>
+    </div>
+  </div>
+</div>
+
+{% if offen or maengel %}
+<h2 class="h5 mb-2">Beim nächsten Kontrolleur-Besuch noch zu prüfen</h2>
+<div class="card mb-4">
+  <div class="table-responsive">
+    <table class="table table-kompakt table-hover m-0">
+      <thead class="table-light">
+        <tr>
+          <th>Anlage</th>
+          <th>Anlagenteil</th>
+          <th>Typ</th>
+          <th>Status</th>
+          <th class="text-end">Aktion</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in (maengel + offen) %}
+        <tr>
+          <td><a href="{{ url_for('installations.detail', anlage_id=item.anlage.id) }}">{{ item.anlage.bezeichnung }}</a></td>
+          <td class="fw-semibold">{{ item.anlagenteil.bezeichnung }}</td>
+          <td><span class="badge bg-secondary">{{ item.anlagenteil.typ }}</span></td>
+          <td><span class="badge badge-status-{{ item.status }}">{{ kontroll_status_label[item.status] }}</span></td>
+          <td class="text-end">
+            <form method="post" action="{{ url_for('installations.set_teil_status', teil_id=item.anlagenteil.id) }}" class="d-inline">
+              <input type="hidden" name="status" value="geprueft">
+              <button type="submit" class="btn btn-sm btn-outline-success">✓ Geprüft</button>
+            </form>
+            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('installations.edit_teil', teil_id=item.anlagenteil.id) }}">Bearbeiten</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="alert alert-success">Alle Anlagenteile sind als geprüft markiert. ✓</div>
+{% endif %}
+
+{% if geprueft %}
+<h2 class="h5 mb-2">Bereits geprüft</h2>
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-kompakt table-sm m-0">
+      <thead class="table-light">
+        <tr>
+          <th>Anlage</th>
+          <th>Anlagenteil</th>
+          <th>Letzte Kontrolle</th>
+          <th>Kontrolleur</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in geprueft %}
+        <tr>
+          <td>{{ item.anlage.bezeichnung }}</td>
+          <td>{{ item.anlagenteil.bezeichnung }}</td>
+          <td>{{ item.anlagenteil.letzte_kontrolle or '—' }}</td>
+          <td>{{ item.anlagenteil.kontrolleur or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

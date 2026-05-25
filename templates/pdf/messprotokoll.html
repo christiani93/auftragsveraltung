@@ -1,0 +1,67 @@
+{% extends "pdf/_pdf_base.html" %}
+{% block title %}Messprotokoll {{ protokoll.datum }}{% endblock %}
+{% block footer_left %}Messprotokoll {{ kunde.name if kunde else '' }}{% endblock %}
+{% block heading %}Messprotokoll{% endblock %}
+{% block subheading %}
+  {% if kunde %}<strong>{{ kunde.name }}</strong> · {% endif %}
+  {% if anlage %}{{ anlage.bezeichnung }}{% if anlage.standort %} · {{ anlage.standort }}{% endif %}{% endif %}
+  <br>Datum: {{ protokoll.datum }} · Monteur: {{ protokoll.monteur or '—' }}
+{% endblock %}
+
+{% block content %}
+<table style="margin-bottom: 8pt;">
+  <tr>
+    <th style="width: 25%;">Messgerät</th>
+    <td colspan="3">
+      {% if geraet %}
+        <strong>{{ geraet.bezeichnung }}</strong>
+        {% if geraet.hersteller %} ({{ geraet.hersteller }}{% if geraet.modell %} {{ geraet.modell }}{% endif %}){% endif %}
+        {% if geraet.seriennr %} · Seriennr.: <code>{{ geraet.seriennr }}</code>{% endif %}
+        {% if geraet.kalibrierdatum or geraet.naechste_kalibrierung %}
+        <div class="small">
+          {% if geraet.kalibrierdatum %}Kalibriert am {{ geraet.kalibrierdatum }}{% endif %}
+          {% if geraet.kalibrierdatum and geraet.naechste_kalibrierung %} · {% endif %}
+          {% if geraet.naechste_kalibrierung %}Gültig bis {{ geraet.naechste_kalibrierung }}{% endif %}
+        </div>
+        {% endif %}
+      {% else %}<em>nicht angegeben</em>{% endif %}
+    </td>
+  </tr>
+  {% if auftrag %}
+  <tr>
+    <th>Zugehöriger Auftrag</th>
+    <td colspan="3">{{ auftrag.titel }} ({{ auftrag.erteilungsdatum }}{% if auftrag.erteilt_von %}, erteilt von {{ auftrag.erteilt_von }}{% endif %})</td>
+  </tr>
+  {% endif %}
+  {% if protokoll.bemerkungen %}
+  <tr>
+    <th>Bemerkungen</th>
+    <td colspan="3">{{ protokoll.bemerkungen }}</td>
+  </tr>
+  {% endif %}
+</table>
+
+<h3>Messpunkte ({{ protokoll.messungen|length }})</h3>
+<table style="font-size: 8.5pt;">
+  <thead>
+    <tr>
+      {% for f in messpunkt_felder %}
+      <th style="font-size: 8pt;">{{ f.label }}</th>
+      {% endfor %}
+    </tr>
+  </thead>
+  <tbody>
+    {% for m in protokoll.messungen %}
+    <tr>
+      {% for f in messpunkt_felder %}
+      <td style="font-size: 8.5pt;">{{ m.get(f.name, '') or '' }}</td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div class="signature">
+  <div class="signature-line">Datum / Unterschrift Prüfer</div>
+</div>
+{% endblock %}

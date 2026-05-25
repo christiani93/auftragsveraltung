@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block title %}{{ "Neues Messprotokoll" if neu else "Messprotokoll bearbeiten" }}{% endblock %}
+{% block content %}
+<h1 class="h3 mb-3">{{ "Neues Messprotokoll" if neu else "Messprotokoll bearbeiten" }}</h1>
+
+{% if auftrag %}
+<div class="alert alert-info">
+  Erstellt für Auftrag <a href="{{ url_for('auftraege.detail', auftrag_id=auftrag.id) }}" class="alert-link">{{ auftrag.titel }}</a>
+  (erteilt {{ auftrag.erteilungsdatum }}{% if auftrag.erteilt_von %} von {{ auftrag.erteilt_von }}{% endif %}).
+  Die Messpunkt-Zeilen wurden aus den betroffenen Anlagenteilen vorausgefüllt.
+</div>
+{% endif %}
+
+<form method="post">
+  {% if protokoll.auftrag_id %}<input type="hidden" name="auftrag_id" value="{{ protokoll.auftrag_id }}">{% endif %}
+  <div class="card card-body mb-3">
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label">Anlage *</label>
+        <select name="anlage_id" class="form-select" required>
+          <option value="">— wählen —</option>
+          {% for a in alle_anlagen %}
+          <option value="{{ a.id }}" {% if (anlage and anlage.id == a.id) or protokoll.anlage_id == a.id %}selected{% endif %}>
+            {{ a.bezeichnung }}{% if a.standort %} – {{ a.standort }}{% endif %}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Protokoll-Datum</label>
+        <input type="date" name="datum" class="form-control" value="{{ protokoll.datum or '' }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Monteur (Default für Prüfer-Spalte)</label>
+        <input type="text" name="monteur" class="form-control" value="{{ protokoll.monteur or '' }}">
+      </div>
+      <div class="col-12">
+        <label class="form-label">Messgerät <span class="text-muted small">(inkl. Seriennr. — wird auf dem Protokoll ausgewiesen)</span></label>
+        <select name="messgeraet_id" class="form-select">
+          <option value="">— keines —</option>
+          {% for g in alle_messgeraete %}
+          <option value="{{ g.id }}" {% if protokoll.messgeraet_id == g.id %}selected{% endif %}>
+            {{ g.bezeichnung }}{% if g.seriennr %} – SN {{ g.seriennr }}{% endif %}{% if g.naechste_kalibrierung %} (kal. bis {{ g.naechste_kalibrierung }}){% endif %}
+          </option>
+          {% endfor %}
+        </select>
+        <small class="text-muted">
+          Verwaltung unter <a href="{{ url_for('messgeraete.list_devices') }}">Messgeräte</a>.
+        </small>
+      </div>
+      <div class="col-12">
+        <label class="form-label">Bemerkungen (gesamt)</label>
+        <textarea name="bemerkungen" class="form-control" rows="2">{{ protokoll.bemerkungen or '' }}</textarea>
+      </div>
+    </div>
+  </div>
+
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h2 class="h5 m-0">Messpunkte</h2>
+    <button type="button" class="btn btn-sm btn-outline-primary" onclick="addRow()">+ Zeile</button>
+  </div>
+
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-sm table-kompakt m-0" id="messpunkte">
+        <thead class="table-light">
+          <tr>
+            {% for g in messpunkt_gruppen %}
+            <th colspan="{{ g.span }}" class="text-center border-start">{{ g.name }}</th>
+            {% endfor %}
+            <th></th>
+          </tr>
+          <tr>
+            {% for f in messpunkt_felder %}
+            <th class="small" style="min-width: {{ f.width }}px;">{{ f.label }}</th>
+            {% endfor %}
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in protokoll.messungen %}
+          <tr>
+            {% for f in messpunkt_felder %}
+            <td>
+              {% if f.input == 'io' %}
+                <select name="messpunkt_{{ f.name }}" class="form-select form-select-sm">
+                  {% for opt in io_optionen %}
+                  <option value="{{ opt }}" {% if (m.get(f.name) or '') == opt %}selected{% endif %}>{{ opt or '—' }}</option>
+                  {% endfor %}
+                </select>
+              {% else %}
+                <input type="text" name="messpunkt_{{ f.name }}" class="form-control form-control-sm"
+                       value="{{ m.get(f.name, '') }}" placeholder="{{ f.placeholder or '' }}">
+              {% endif %}
+            </td>
+            {% endfor %}
+            <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">×</button></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="mt-4 d-flex gap-2">
+    <button type="submit" class="btn btn-primary">Speichern</button>
+    <a class="btn btn-outline-secondary" href="{{ url_for('protocols.list_protocols') }}">Abbrechen</a>
+  </div>
+</form>
+
+<template id="row-template">
+  <tr>
+    {% for f in messpunkt_felder %}
+    <td>
+      {% if f.input == 'io' %}
+        <select name="messpunkt_{{ f.name }}" class="form-select form-select-sm">
+          {% for opt in io_optionen %}
+          <option value="{{ opt }}">{{ opt or '—' }}</option>
+          {% endfor %}
+        </select>
+      {% else %}
+        <input type="text" name="messpunkt_{{ f.name }}" class="form-control form-control-sm" placeholder="{{ f.placeholder or '' }}">
+      {% endif %}
+    </td>
+    {% endfor %}
+    <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">×</button></td>
+  </tr>
+</template>
+
+<script>
+  function addRow() {
+    const tpl = document.getElementById('row-template');
+    const clone = tpl.content.cloneNode(true);
+    // Datum & Prüfer vorausfüllen aus letzter Zeile, falls vorhanden
+    const tbody = document.querySelector('#messpunkte tbody');
+    const last = tbody.lastElementChild;
+    tbody.appendChild(clone);
+    if (last) {
+      const newRow = tbody.lastElementChild;
+      const lastInputs = last.querySelectorAll('input,select');
+      const newInputs = newRow.querySelectorAll('input,select');
+      // Erste (Datum) und letzte sinnvolle (Prüfer) übernehmen
+      ['messpunkt_datum', 'messpunkt_pruefer'].forEach(name => {
+        const src = last.querySelector(`[name="${name}"]`);
+        const dst = newRow.querySelector(`[name="${name}"]`);
+        if (src && dst) dst.value = src.value;
+      });
+    }
+  }
+</script>
+{% endblock %}

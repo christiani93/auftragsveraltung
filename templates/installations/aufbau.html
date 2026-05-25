@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}Aufbau – {{ anlage.bezeichnung }}{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+  <div>
+    <div class="text-muted small">
+      {% if kunde %}<a href="{{ url_for('customers.detail', kunde_id=kunde.id) }}">{{ kunde.name }}</a> ›{% endif %}
+      <a href="{{ url_for('installations.detail', anlage_id=anlage.id) }}">{{ anlage.bezeichnung }}</a> › Aufbau
+    </div>
+    <h1 class="h3 m-0">Aufbau und Last</h1>
+  </div>
+  <a class="btn btn-sm btn-primary" href="{{ url_for('installations.new_teil', anlage_id=anlage.id) }}">+ Anlagenteil</a>
+</div>
+
+<div class="alert alert-light border small mb-3">
+  <strong>Spalten-Erklärung:</strong>
+  <ul class="mb-0">
+    <li><strong>Eigene Last</strong>: Was du an diesem Knoten erfasst hast — exakt so wie eingegeben (kW oder A).</li>
+    <li><strong>Summe nachgelagert</strong>: Summe aller Lasten der Anlagenteile DAHINTER (Kinder &amp; Enkel), in kW.
+        Eingaben in A werden anhand der Spannung des jeweiligen Teils auf kW umgerechnet (cos φ = 1).
+        Der eigene Wert dieses Knotens wird <em>nicht</em> dazugezählt.</li>
+    <li><strong>IKmax</strong>: Eigener gemessener Kurzschlussstrom, oder geerbt von der nächsten gemessenen Verteilung weiter oben.</li>
+  </ul>
+</div>
+
+{% macro fmt_eigene(node) %}
+  {% if node.eingabe_kw is not none %}
+    {{ '%.2f'|format(node.eingabe_kw) }} kW
+  {% elif node.eingabe_a is not none %}
+    {{ '%.1f'|format(node.eingabe_a) }} A
+  {% else %}
+    <span class="text-muted">—</span>
+  {% endif %}
+{% endmacro %}
+
+{% macro render_node(node, depth) %}
+  {% set teil = node.teil %}
+  <tr>
+    <td>
+      <div style="padding-left: {{ depth * 24 }}px;">
+        {% if depth > 0 %}<span class="text-muted">└─ </span>{% endif %}
+        <span class="badge bg-secondary me-1">{{ teil.typ }}</span>
+        {% set fi = fi_erforderlich(teil.typ) %}
+        {% if fi == True %}<span class="badge bg-danger me-1" title="FI/RCD nach NIN erforderlich">FI</span>{% endif %}
+        <a href="{{ url_for('installations.edit_teil', teil_id=teil.id) }}" class="fw-semibold text-decoration-none">{{ teil.bezeichnung }}</a>
+        {% if teil.beschreibung %}<span class="text-muted small">– {{ teil.beschreibung }}</span>{% endif %}
+      </div>
+    </td>
+    <td>{% if teil.spannung %}<span class="badge bg-light text-dark border">{{ teil.spannung }}</span>{% else %}<span class="text-muted">—</span>{% endif %}</td>
+    <td class="text-end">{{ fmt_eigene(node) }}</td>
+    <td class="text-end fw-semibold">
+      {% if node.children %}
+        {% if node.summe_nachgelagert_kw is not none %}
+          {{ '%.2f'|format(node.summe_nachgelagert_kw) }} kW
+        {% else %}
+          <span class="text-muted">— nichts erfasst —</span>
+        {% endif %}
+      {% else %}
+        <span class="text-muted">— (Endpunkt)</span>
+      {% endif %}
+    </td>
+    <td class="text-end">
+      {% if node.effektiver_ikmax_a is not none %}
+        {{ '%.0f'|format(node.effektiver_ikmax_a) }} A
+        {% if node.ikmax_geerbt_von %}
+          <div class="text-muted small">geerbt von {{ node.ikmax_geerbt_von.bezeichnung }}</div>
+        {% endif %}
+      {% else %}
+        <span class="text-muted">—</span>
+      {% endif %}
+    </td>
+    <td class="text-end">
+      {% if teil.typ == 'Verteilung' %}
+      <a class="btn btn-sm btn-outline-primary" href="{{ url_for('installations.new_teil', anlage_id=anlage.id) }}?parent_id={{ teil.id }}" title="Teil unterhalb hinzufügen">+ darunter</a>
+      {% endif %}
+    </td>
+  </tr>
+  {% for child in node.children|sort(attribute='teil.bezeichnung') %}
+    {{ render_node(child, depth + 1) }}
+  {% endfor %}
+{% endmacro %}
+
+{% if roots %}
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-kompakt table-hover m-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Anlagenteil</th>
+          <th>Spannung</th>
+          <th class="text-end">Eigene Last</th>
+          <th class="text-end">Summe nachgelagert</th>
+          <th class="text-end">IKmax</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for root in roots|sort(attribute='teil.bezeichnung') %}
+          {{ render_node(root, 0) }}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="alert alert-info">
+  Noch keine Anlagenteile erfasst.
+  <a href="{{ url_for('installations.new_teil', anlage_id=anlage.id) }}">Erstes Anlagenteil anlegen →</a>
+</div>
+{% endif %}
+
+{% endblock %}

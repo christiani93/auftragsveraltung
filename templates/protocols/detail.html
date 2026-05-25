@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}Messprotokoll {{ protokoll.datum }}{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2 no-print">
+  <div>
+    <div class="text-muted small">
+      {% if kunde %}<a href="{{ url_for('customers.detail', kunde_id=kunde.id) }}">{{ kunde.name }}</a> ›{% endif %}
+      {% if anlage %}<a href="{{ url_for('installations.detail', anlage_id=anlage.id) }}">{{ anlage.bezeichnung }}</a> ›{% endif %}
+      Messprotokoll
+    </div>
+    <h1 class="h3 m-0">Messprotokoll vom {{ protokoll.datum }}</h1>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <a class="btn btn-outline-secondary" href="{{ url_for('protocols.edit_protocol', protokoll_id=protokoll.id) }}">Bearbeiten</a>
+    <a class="btn btn-outline-dark" href="{{ url_for('pdf.messprotokoll_einzeln', protokoll_id=protokoll.id) }}" target="_blank">📄 PDF</a>
+    <button class="btn btn-outline-primary" onclick="window.print()">Drucken (Browser)</button>
+  </div>
+</div>
+
+<div class="print-header d-none d-print-block mb-3">
+  <h2>Messprotokoll</h2>
+  {% if kunde %}<div><strong>Kunde:</strong> {{ kunde.name }}{% if kunde.ort %}, {{ kunde.plz }} {{ kunde.ort }}{% endif %}</div>{% endif %}
+  {% if anlage %}<div><strong>Anlage:</strong> {{ anlage.bezeichnung }}{% if anlage.standort %} – {{ anlage.standort }}{% endif %}</div>{% endif %}
+</div>
+
+<div class="card card-body mb-3 protokoll-meta">
+  <div class="row g-2">
+    {% if auftrag %}
+    <div class="col-12 no-print">
+      <span class="text-muted small">Zugehöriger Auftrag:</span>
+      <a href="{{ url_for('auftraege.detail', auftrag_id=auftrag.id) }}">{{ auftrag.titel }}</a>
+      <span class="text-muted small">({{ auftrag.erteilungsdatum }}{% if auftrag.erteilt_von %}, erteilt von {{ auftrag.erteilt_von }}{% endif %})</span>
+    </div>
+    {% endif %}
+    <div class="col-md-4">
+      <div class="text-muted small">Protokoll-Datum</div>
+      <div class="fw-semibold">{{ protokoll.datum or '—' }}</div>
+    </div>
+    <div class="col-md-4">
+      <div class="text-muted small">Monteur</div>
+      <div class="fw-semibold">{{ protokoll.monteur or '—' }}</div>
+    </div>
+    <div class="col-md-4">
+      <div class="text-muted small">Messpunkte</div>
+      <div class="fw-semibold">{{ protokoll.messungen|length }}</div>
+    </div>
+    <div class="col-12">
+      <div class="text-muted small">Messgerät (inkl. Seriennummer und Kalibrierdaten)</div>
+      <div class="fw-semibold">
+        {% if geraet %}
+          {{ geraet.bezeichnung }}
+          {% if geraet.hersteller %} <span class="text-muted">({{ geraet.hersteller }}{% if geraet.modell %} {{ geraet.modell }}{% endif %})</span>{% endif %}
+          {% if geraet.seriennr %} · <strong>Seriennr.:</strong> <code>{{ geraet.seriennr }}</code>{% endif %}
+        {% else %}
+          <span class="text-danger">— Kein Messgerät angegeben —</span>
+        {% endif %}
+      </div>
+      {% if geraet and (geraet.kalibrierdatum or geraet.naechste_kalibrierung) %}
+      <div class="text-muted small mt-1">
+        {% if geraet.kalibrierdatum %}Kalibriert am <strong>{{ geraet.kalibrierdatum }}</strong>{% endif %}
+        {% if geraet.kalibrierdatum and geraet.naechste_kalibrierung %} ·{% endif %}
+        {% if geraet.naechste_kalibrierung %}gültig bis <strong>{{ geraet.naechste_kalibrierung }}</strong>{% endif %}
+      </div>
+      {% endif %}
+    </div>
+    {% if protokoll.bemerkungen %}
+    <div class="col-12">
+      <div class="text-muted small">Bemerkungen</div>
+      <div>{{ protokoll.bemerkungen }}</div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<h2 class="h5 mb-2 no-print">Messpunkte ({{ protokoll.messungen|length }})</h2>
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-sm table-kompakt m-0 protokoll-tabelle">
+      <thead class="table-light">
+        <tr>
+          {% for g in messpunkt_gruppen %}
+          <th colspan="{{ g.span }}" class="text-center border-start">{{ g.name }}</th>
+          {% endfor %}
+        </tr>
+        <tr>
+          {% for f in messpunkt_felder %}
+          <th class="small">{{ f.label }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in protokoll.messungen %}
+        <tr>
+          {% for f in messpunkt_felder %}
+          <td>{{ m.get(f.name, '') or '—' }}</td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<form method="post" action="{{ url_for('protocols.delete_protocol', protokoll_id=protokoll.id) }}"
+      class="mt-5 no-print" onsubmit="return confirm('Messprotokoll wirklich löschen?');">
+  <button type="submit" class="btn btn-sm btn-outline-danger">Messprotokoll löschen</button>
+</form>
+{% endblock %}

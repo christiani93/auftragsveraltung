@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}{{ kunde.name }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div>
+    <h1 class="h3 m-0">{{ kunde.name }}
+      {% if kunde.ist_stammkunde %}<span class="badge bg-info align-middle ms-2">Stammkunde</span>{% endif %}
+    </h1>
+    <div class="text-muted">{{ kunde.adresse }}{% if kunde.adresse %}, {% endif %}{{ kunde.plz }} {{ kunde.ort }}</div>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <a class="btn btn-outline-secondary" href="{{ url_for('customers.edit_customer', kunde_id=kunde.id) }}">Bearbeiten</a>
+    <a class="btn btn-primary" href="{{ url_for('auftraege.new_auftrag', kunde_id=kunde.id) }}">+ Neuer Auftrag</a>
+    {% if kunde.ist_stammkunde %}
+    <a class="btn btn-outline-primary" href="{{ url_for('kontrolle.kunde_uebersicht', kunde_id=kunde.id) }}">Kontroll-Übersicht</a>
+    {% endif %}
+    <a class="btn btn-outline-dark" href="{{ url_for('pdf.auftraege_pro_kunde', kunde_id=kunde.id) }}" target="_blank">📄 Auftragsliste PDF</a>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-6">
+    <div class="card card-body">
+      <h6 class="text-muted">Kontakt</h6>
+      <div>📞 {{ kunde.telefon or '—' }}</div>
+      <div>✉️ {{ kunde.email or '—' }}</div>
+      {% if kunde.kontroll_intervall_monate %}
+      <div class="mt-2"><span class="text-muted">Kontroll-Intervall:</span> alle {{ kunde.kontroll_intervall_monate }} Monate</div>
+      {% endif %}
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card card-body">
+      <h6 class="text-muted">Notizen</h6>
+      <div style="white-space: pre-wrap;">{{ kunde.notizen or '—' }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <h2 class="h5 m-0">Anlagen ({{ anlagen|length }})</h2>
+  <a class="btn btn-sm btn-primary" href="{{ url_for('installations.new_installation', kunde_id=kunde.id) }}">+ Neue Anlage</a>
+</div>
+
+{% if anlagen %}
+<div class="list-group">
+  {% for a in anlagen %}
+    <a class="list-group-item list-group-item-action d-flex justify-content-between" href="{{ url_for('installations.detail', anlage_id=a.id) }}">
+      <div>
+        <div class="fw-semibold">{{ a.bezeichnung }}</div>
+        <div class="text-muted small">{{ a.standort or '' }}{% if a.baujahr %} · Baujahr {{ a.baujahr }}{% endif %}</div>
+      </div>
+      <div class="text-muted small align-self-center">›</div>
+    </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="alert alert-light border">Noch keine Anlagen erfasst.</div>
+{% endif %}
+
+<div class="d-flex justify-content-between align-items-center mt-4 mb-2">
+  <h2 class="h5 m-0">Aufträge ({{ auftraege|length }})</h2>
+  <a class="btn btn-sm btn-primary" href="{{ url_for('auftraege.new_auftrag', kunde_id=kunde.id) }}">+ Neuer Auftrag</a>
+</div>
+{% if auftraege %}
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-kompakt table-sm m-0">
+      <thead class="table-light">
+        <tr>
+          <th>Datum</th>
+          <th>Titel</th>
+          <th>Erteilt von</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in auftraege %}
+        <tr>
+          <td>{{ a.erteilungsdatum }}</td>
+          <td><a href="{{ url_for('auftraege.detail', auftrag_id=a.id) }}">{{ a.titel }}</a></td>
+          <td>{{ a.erteilt_von or '—' }}</td>
+          <td>
+            {% if a.status == 'offen' %}<span class="badge bg-secondary">{{ auftrag_status_label[a.status] }}</span>
+            {% elif a.status == 'in_arbeit' %}<span class="badge bg-warning text-dark">{{ auftrag_status_label[a.status] }}</span>
+            {% elif a.status == 'erledigt' %}<span class="badge bg-success">{{ auftrag_status_label[a.status] }}</span>
+            {% endif %}
+          </td>
+          <td class="text-end"><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('auftraege.detail', auftrag_id=a.id) }}">›</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="alert alert-light border">Noch keine Aufträge.</div>
+{% endif %}
+
+<form method="post" action="{{ url_for('customers.delete_customer', kunde_id=kunde.id) }}"
+      class="mt-5" onsubmit="return confirm('Kunde wirklich löschen?');">
+  <button type="submit" class="btn btn-sm btn-outline-danger">Kunde löschen</button>
+</form>
+{% endblock %}

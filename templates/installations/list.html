@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Anlagen{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3 m-0">Anlagen</h1>
+  <a href="{{ url_for('installations.new_installation') }}" class="btn btn-primary">+ Neue Anlage</a>
+</div>
+
+{% if rows %}
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-kompakt table-hover m-0">
+      <thead class="table-light">
+        <tr>
+          <th>Kunde</th>
+          <th>Anlage</th>
+          <th>Standort</th>
+          <th>Nächste Kontrolle</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td>
+            {% if r.kunde %}<a href="{{ url_for('customers.detail', kunde_id=r.kunde.id) }}">{{ r.kunde.name }}</a>
+            {% else %}<span class="text-muted">— ohne Kunde —</span>{% endif %}
+          </td>
+          <td><a href="{{ url_for('installations.detail', anlage_id=r.anlage.id) }}" class="fw-semibold text-decoration-none">{{ r.anlage.bezeichnung }}</a></td>
+          <td>{{ r.anlage.standort or '' }}</td>
+          <td>{{ r.anlage.naechste_periodische_kontrolle or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="alert alert-info">Noch keine Anlagen. <a href="{{ url_for('installations.new_installation') }}">Erste Anlage anlegen →</a></div>
+{% endif %}
+{% endblock %}

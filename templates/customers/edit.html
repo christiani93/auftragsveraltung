@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}{{ "Neuer Kunde" if neu else "Kunde bearbeiten" }}{% endblock %}
+{% block content %}
+<h1 class="h3 mb-3">{{ "Neuer Kunde" if neu else "Kunde bearbeiten" }}</h1>
+
+<form method="post" class="card card-body">
+  <div class="row g-3">
+    <div class="col-md-6">
+      <label class="form-label">Name *</label>
+      <input type="text" name="name" class="form-control" value="{{ kunde.name or '' }}" required autofocus>
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">Telefon</label>
+      <input type="tel" name="telefon" class="form-control" value="{{ kunde.telefon or '' }}">
+    </div>
+    <div class="col-12">
+      <label class="form-label">Adresse</label>
+      <input type="text" name="adresse" class="form-control" value="{{ kunde.adresse or '' }}">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">PLZ</label>
+      <input type="text" name="plz" class="form-control" value="{{ kunde.plz or '' }}">
+    </div>
+    <div class="col-md-9">
+      <label class="form-label">Ort</label>
+      <input type="text" name="ort" class="form-control" value="{{ kunde.ort or '' }}">
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">E-Mail</label>
+      <input type="email" name="email" class="form-control" value="{{ kunde.email or '' }}">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Kontroll-Intervall (Monate)</label>
+      <input type="number" name="kontroll_intervall_monate" class="form-control" min="1" max="60"
+             value="{{ kunde.kontroll_intervall_monate or 6 }}">
+    </div>
+    <div class="col-md-3 d-flex align-items-end">
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" name="ist_stammkunde" id="ist_stammkunde"
+               {% if kunde.ist_stammkunde %}checked{% endif %}>
+        <label class="form-check-label" for="ist_stammkunde">Stammkunde</label>
+      </div>
+    </div>
+    <div class="col-12">
+      <label class="form-label">Notizen</label>
+      <textarea name="notizen" class="form-control" rows="3">{{ kunde.notizen or '' }}</textarea>
+    </div>
+  </div>
+
+  <div class="mt-4 d-flex gap-2">
+    <button type="submit" class="btn btn-primary">Speichern</button>
+    <a class="btn btn-outline-secondary" href="{{ url_for('customers.list_customers') }}">Abbrechen</a>
+  </div>
+</form>
+{% endblock %}

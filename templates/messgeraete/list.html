@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Messgeräte{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3 m-0">Messgeräte</h1>
+  <a href="{{ url_for('messgeraete.new_device') }}" class="btn btn-primary">+ Neues Messgerät</a>
+</div>
+
+{% if messgeraete %}
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-kompakt table-hover m-0">
+      <thead class="table-light">
+        <tr>
+          <th>Bezeichnung</th>
+          <th>Hersteller / Modell</th>
+          <th>Seriennr.</th>
+          <th>Typ</th>
+          <th>Kalibrierdatum</th>
+          <th>Nächste Kalibrierung</th>
+          <th class="text-end">Aktion</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in messgeraete %}
+        <tr>
+          <td class="fw-semibold">{{ m.bezeichnung }}</td>
+          <td>{{ m.hersteller }}{% if m.hersteller and m.modell %} – {% endif %}{{ m.modell }}</td>
+          <td><code>{{ m.seriennr or '—' }}</code></td>
+          <td>{{ m.typ or '—' }}</td>
+          <td>{{ m.kalibrierdatum or '—' }}</td>
+          <td>{{ m.naechste_kalibrierung or '—' }}</td>
+          <td class="text-end">
+            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('messgeraete.edit_device', geraet_id=m.id) }}">Bearbeiten</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="alert alert-info">
+  Noch keine Messgeräte erfasst. <a href="{{ url_for('messgeraete.new_device') }}">Erstes Messgerät anlegen →</a>
+</div>
+{% endif %}
+{% endblock %}

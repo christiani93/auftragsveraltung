@@ -1,0 +1,36 @@
+/* Eigene Styles über Bootstrap. Touch-freundliche Inputs für Baustelleneinsatz. */
+
+input[type="text"],
+input[type="number"],
+input[type="email"],
+input[type="tel"],
+input[type="date"],
+select,
+textarea {
+  font-size: 1rem;
+  min-height: 2.5rem;
+}
+
+.table-kompakt td, .table-kompakt th {
+  vertical-align: middle;
+}
+
+.badge-status-offen     { background-color: #6c757d; }
+.badge-status-geprueft  { background-color: #198754; }
+.badge-status-maengel   { background-color: #dc3545; }
+
+.kontroll-card { border-left: 4px solid #0d6efd; }
+.kontroll-card.warn { border-left-color: #dc3545; }
+
+/* Druckansicht für Messprotokolle */
+@media print {
+  body { background: white !important; }
+  nav, .no-print, .navbar, .alert-dismissible { display: none !important; }
+  main.container-fluid { padding: 0 !important; }
+  .card { border: none !important; box-shadow: none !important; }
+  .protokoll-tabelle { font-size: 9pt; }
+  .protokoll-tabelle th, .protokoll-tabelle td { padding: 4px 6px !important; border: 1px solid #888 !important; }
+  .protokoll-meta { border: 1px solid #888 !important; margin-bottom: 1rem !important; }
+  .print-header { margin-bottom: 1rem; }
+  @page { size: A4 landscape; margin: 1cm; }
+}

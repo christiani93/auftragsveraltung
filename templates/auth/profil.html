@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Mein Profil{% endblock %}
+{% block content %}
+<h1 class="h3 mb-3">Mein Profil</h1>
+
+<div class="card card-body mb-3">
+  <div><span class="text-muted">Username:</span> <code>{{ current_user.username }}</code></div>
+  <div><span class="text-muted">Name:</span> {{ current_user.name }}</div>
+  <div><span class="text-muted">Rolle:</span> {{ current_user.role }}</div>
+</div>
+
+<h2 class="h5 mb-2">Passwort ändern</h2>
+<form method="post" action="{{ url_for('auth.change_password_route', username=current_user.username) }}" class="card card-body">
+  <div class="row g-3">
+    <div class="col-md-6">
+      <label class="form-label">Neues Passwort</label>
+      <input type="password" name="new_password" class="form-control" required minlength="6">
+    </div>
+    <div class="col-12">
+      <button type="submit" class="btn btn-primary">Passwort ändern</button>
+    </div>
+  </div>
+</form>
+{% endblock %}

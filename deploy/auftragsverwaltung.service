@@ -1,0 +1,38 @@
+# systemd-Unit-File fuer die Auftragsverwaltung auf HostPoint FlexServer.
+#
+# Installation (auf dem Server, als root oder mit sudo):
+#   1. Diese Datei nach /etc/systemd/system/auftragsverwaltung.service kopieren
+#   2. <USER> und Pfade unten an deinen Server anpassen
+#   3. systemctl daemon-reload
+#   4. systemctl enable --now auftragsverwaltung
+#   5. systemctl status auftragsverwaltung  (= sollte "active (running)" sein)
+#
+# Logs anschauen:
+#   journalctl -u auftragsverwaltung -f
+
+[Unit]
+Description=Auftragsverwaltung (Flask) fuer Elektroinstallateur
+After=network.target
+
+[Service]
+Type=notify
+User=xahizivi
+Group=xahizivi
+WorkingDirectory=/home/xahizivi/auftragsverwaltung
+Environment="AUFTRAGSVERWALTUNG_DATA_DIR=/home/xahizivi/auftragsverwaltung_data"
+Environment="AUFTRAGSVERWALTUNG_HTTPS_ONLY=1"
+EnvironmentFile=-/home/xahizivi/auftragsverwaltung/.env
+ExecStart=/home/xahizivi/auftragsverwaltung/.venv/bin/gunicorn -c deploy/gunicorn.conf.py "app:create_app()"
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Sicherheits-Haerten
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=false
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

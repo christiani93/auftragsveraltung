@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="de-CH">
+<head>
+<meta charset="utf-8">
+<title>{% block title %}{% endblock %}</title>
+<style>
+  @page {
+    size: A4;
+    margin: 1.8cm 1.5cm 2cm 1.5cm;
+    @bottom-center {
+      content: counter(page) " / " counter(pages);
+      font-size: 9pt;
+      color: #888;
+    }
+    @bottom-left {
+      content: "{% block footer_left %}Auftragsverwaltung{% endblock %}";
+      font-size: 9pt;
+      color: #888;
+    }
+    @bottom-right {
+      content: "{{ erstellt_am }}";
+      font-size: 9pt;
+      color: #888;
+    }
+  }
+  body {
+    font-family: "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 10pt;
+    color: #212529;
+    line-height: 1.4;
+  }
+  h1 { font-size: 18pt; margin: 0 0 4pt 0; }
+  h2 { font-size: 13pt; margin: 16pt 0 4pt 0; border-bottom: 1pt solid #ccc; padding-bottom: 2pt; }
+  h3 { font-size: 11pt; margin: 10pt 0 2pt 0; }
+  .firma { color: #888; font-size: 10pt; }
+  .header-block {
+    display: flex; justify-content: space-between;
+    border-bottom: 2pt solid #212529;
+    padding-bottom: 6pt; margin-bottom: 12pt;
+  }
+  table { width: 100%; border-collapse: collapse; margin: 6pt 0; }
+  th, td { padding: 4pt 6pt; border: 0.5pt solid #888; vertical-align: top; }
+  th { background: #f0f0f0; font-weight: 600; text-align: left; }
+  .label { color: #666; font-size: 9pt; }
+  .badge { display: inline-block; padding: 1pt 5pt; border-radius: 3pt; font-size: 8pt; }
+  .badge-offen { background: #ddd; }
+  .badge-in_arbeit { background: #ffc107; }
+  .badge-erledigt { background: #198754; color: white; }
+  .small { font-size: 8.5pt; color: #666; }
+  .signature { margin-top: 30pt; }
+  .signature-line { border-top: 0.5pt solid #888; width: 50%; padding-top: 4pt; font-size: 9pt; color: #666; }
+</style>
+</head>
+<body>
+  <div class="header-block">
+    <div>
+      <h1>{% block heading %}{% endblock %}</h1>
+      <div>{% block subheading %}{% endblock %}</div>
+    </div>
+    <div style="text-align: right;">
+      {% if firma_name %}<div class="firma">⚡ {{ firma_name }}</div>{% endif %}
+      <div class="label">erstellt {{ erstellt_am }}</div>
+    </div>
+  </div>
+
+  {% block content %}{% endblock %}
+</body>
+</html>

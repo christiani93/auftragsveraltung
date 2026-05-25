@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}{{ "Neue Anlage" if neu else "Anlage bearbeiten" }}{% endblock %}
+{% block content %}
+<h1 class="h3 mb-3">{{ "Neue Anlage" if neu else "Anlage bearbeiten" }}</h1>
+
+<form method="post" class="card card-body">
+  <div class="row g-3">
+    <div class="col-md-6">
+      <label class="form-label">Kunde *</label>
+      <select name="kunde_id" class="form-select" required>
+        <option value="">— wählen —</option>
+        {% for k in alle_kunden %}
+        <option value="{{ k.id }}" {% if k.id == anlage.kunde_id %}selected{% endif %}>{{ k.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">Bezeichnung *</label>
+      <input type="text" name="bezeichnung" class="form-control" value="{{ anlage.bezeichnung or '' }}" required>
+    </div>
+    <div class="col-md-8">
+      <label class="form-label">Standort</label>
+      <input type="text" name="standort" class="form-control" value="{{ anlage.standort or '' }}" placeholder="z.B. Hauptgebäude, Keller">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Baujahr</label>
+      <input type="text" name="baujahr" class="form-control" value="{{ anlage.baujahr or '' }}">
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">Nächste periodische Kontrolle</label>
+      <input type="date" name="naechste_periodische_kontrolle" class="form-control"
+             value="{{ anlage.naechste_periodische_kontrolle or '' }}">
+    </div>
+    <div class="col-12">
+      <label class="form-label">Notizen</label>
+      <textarea name="notizen" class="form-control" rows="3">{{ anlage.notizen or '' }}</textarea>
+    </div>
+  </div>
+
+  <div class="mt-4 d-flex gap-2">
+    <button type="submit" class="btn btn-primary">Speichern</button>
+    <a class="btn btn-outline-secondary" href="{{ url_for('installations.list_installations') }}">Abbrechen</a>
+  </div>
+</form>
+{% endblock %}

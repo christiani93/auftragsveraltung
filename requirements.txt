@@ -1,0 +1,7 @@
+Flask>=3.0,<4.0
+Jinja2>=3.1
+python-dateutil>=2.9
+Flask-Login>=0.6.3
+werkzeug>=3.0
+weasyprint>=63.0
+gunicorn>=23.0

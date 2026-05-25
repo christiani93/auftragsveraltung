@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}{{ "Neuer Auftrag" if neu else "Auftrag bearbeiten" }}{% endblock %}
+{% block content %}
+<h1 class="h3 mb-3">{{ "Neuer Auftrag" if neu else "Auftrag bearbeiten" }}</h1>
+
+<form method="post">
+  <div class="card card-body mb-3">
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label">Kunde *</label>
+        <select name="kunde_id" class="form-select" required onchange="this.form.action='?kunde_id='+this.value; this.form.method='GET'; this.form.submit();">
+          <option value="">— wählen —</option>
+          {% for k in alle_kunden %}
+          <option value="{{ k.id }}" {% if auftrag.kunde_id == k.id %}selected{% endif %}>{{ k.name }}</option>
+          {% endfor %}
+        </select>
+        {% if neu %}
+        <small class="text-muted">Beim Wechseln des Kunden werden die Anlagenteile neu geladen.</small>
+        {% endif %}
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Erteilungsdatum *</label>
+        <input type="date" name="erteilungsdatum" class="form-control" value="{{ auftrag.erteilungsdatum or '' }}" required>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Status</label>
+        <select name="status" class="form-select">
+          {% for s in status_optionen %}
+          <option value="{{ s }}" {% if auftrag.status == s %}selected{% endif %}>{{ status_label[s] }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-12">
+        <label class="form-label">Titel *</label>
+        <input type="text" name="titel" class="form-control" value="{{ auftrag.titel or '' }}" required
+               placeholder="z.B. Neue Steckdose Küche / Kontrolle UV Werkstatt">
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label">Erteilt von (Person beim Kunden)</label>
+        <input type="text" name="erteilt_von" class="form-control" value="{{ auftrag.erteilt_von or '' }}"
+               placeholder="z.B. Hr. Müller">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Erledigt am</label>
+        <input type="date" name="erledigt_am" class="form-control" value="{{ auftrag.erledigt_am or '' }}">
+      </div>
+
+      <div class="col-12">
+        <label class="form-label">Beschreibung</label>
+        <textarea name="beschreibung" class="form-control" rows="3" placeholder="Was ist zu tun?">{{ auftrag.beschreibung or '' }}</textarea>
+      </div>
+      <div class="col-12">
+        <label class="form-label">Interne Notizen</label>
+        <textarea name="notizen" class="form-control" rows="2">{{ auftrag.notizen or '' }}</textarea>
+      </div>
+    </div>
+  </div>
+
+  {% if auftrag.kunde_id %}
+  <div class="card card-body mb-3">
+    <h2 class="h6">Betroffene Anlagenteile</h2>
+    <div class="text-muted small mb-2">Mehrfachauswahl möglich. Pro Anlage wird eine Gruppe angezeigt.</div>
+
+    {% if anlagen_mit_teilen %}
+      {% for gruppe in anlagen_mit_teilen %}
+      <div class="border rounded p-2 mb-2">
+        <div class="fw-semibold mb-1">{{ gruppe.anlage.bezeichnung }}{% if gruppe.anlage.standort %} <span class="text-muted">– {{ gruppe.anlage.standort }}</span>{% endif %}</div>
+        {% if gruppe.teile %}
+          <div class="row g-1">
+          {% for t in gruppe.teile %}
+            <div class="col-md-6">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="anlagenteil_ids" value="{{ t.id }}"
+                       id="teil_{{ t.id }}"
+                       {% if t.id in auftrag.anlagenteil_ids %}checked{% endif %}>
+                <label class="form-check-label" for="teil_{{ t.id }}">
+                  <span class="badge bg-secondary me-1">{{ t.typ }}</span>
+                  {{ t.bezeichnung }}
+                  {% if t.sicherungsnr %}<code class="ms-1">{{ t.sicherungsnr }}</code>{% endif %}
+                </label>
+              </div>
+            </div>
+          {% endfor %}
+          </div>
+        {% else %}
+          <div class="text-muted small">Keine Anlagenteile erfasst. <a href="{{ url_for('installations.new_teil', anlage_id=gruppe.anlage.id) }}">Anlagenteil anlegen →</a></div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="alert alert-light border mb-0 small">
+        Dieser Kunde hat noch keine Anlagen. <a href="{{ url_for('installations.new_installation') }}?kunde_id={{ auftrag.kunde_id }}">Anlage anlegen →</a>
+      </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <div class="d-flex gap-2 justify-content-between">
+    <div class="d-flex gap-2">
+      <button type="submit" class="btn btn-primary">Speichern</button>
+      <a class="btn btn-outline-secondary" href="{{ url_for('auftraege.list_auftraege') }}">Abbrechen</a>
+    </div>
+    {% if not neu %}
+    <button type="button" class="btn btn-outline-danger"
+            onclick="if(confirm('Auftrag löschen?')) document.getElementById('delete-form').submit();">Löschen</button>
+    {% endif %}
+  </div>
+</form>
+
+{% if not neu %}
+<form id="delete-form" method="post" action="{{ url_for('auftraege.delete_auftrag', auftrag_id=auftrag.id) }}" class="d-none"></form>
+{% endif %}
+{% endblock %}
