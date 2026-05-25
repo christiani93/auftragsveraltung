@@ -18,11 +18,11 @@ After=network.target
 Type=notify
 User=xahizivi
 Group=xahizivi
-WorkingDirectory=/home/xahizivi/auftragsverwaltung
-Environment="AUFTRAGSVERWALTUNG_DATA_DIR=/home/xahizivi/auftragsverwaltung_data"
+WorkingDirectory=/home/xahizivi/apps/auftragsverwaltung
+Environment="AUFTRAGSVERWALTUNG_DATA_DIR=/home/xahizivi/apps/auftragsverwaltung_data"
 Environment="AUFTRAGSVERWALTUNG_HTTPS_ONLY=1"
-EnvironmentFile=-/home/xahizivi/auftragsverwaltung/.env
-ExecStart=/home/xahizivi/auftragsverwaltung/.venv/bin/gunicorn -c deploy/gunicorn.conf.py "app:create_app()"
+EnvironmentFile=-/home/xahizivi/apps/auftragsverwaltung/.env
+ExecStart=/home/xahizivi/apps/auftragsverwaltung/.venv/bin/gunicorn -c deploy/gunicorn.conf.py "app:create_app()"
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal
