@@ -46,22 +46,26 @@
       <div class="fw-semibold">{{ protokoll.messungen|length }}</div>
     </div>
     <div class="col-12">
-      <div class="text-muted small">Messgerät (inkl. Seriennummer und Kalibrierdaten)</div>
-      <div class="fw-semibold">
-        {% if geraet %}
-          {{ geraet.bezeichnung }}
-          {% if geraet.hersteller %} <span class="text-muted">({{ geraet.hersteller }}{% if geraet.modell %} {{ geraet.modell }}{% endif %})</span>{% endif %}
-          {% if geraet.seriennr %} · <strong>Seriennr.:</strong> <code>{{ geraet.seriennr }}</code>{% endif %}
-        {% else %}
-          <span class="text-danger">— Kein Messgerät angegeben —</span>
-        {% endif %}
-      </div>
-      {% if geraet and (geraet.kalibrierdatum or geraet.naechste_kalibrierung) %}
-      <div class="text-muted small mt-1">
-        {% if geraet.kalibrierdatum %}Kalibriert am <strong>{{ geraet.kalibrierdatum }}</strong>{% endif %}
-        {% if geraet.kalibrierdatum and geraet.naechste_kalibrierung %} ·{% endif %}
-        {% if geraet.naechste_kalibrierung %}gültig bis <strong>{{ geraet.naechste_kalibrierung }}</strong>{% endif %}
-      </div>
+      <div class="text-muted small">Verwendete Messgeräte (inkl. Seriennummer und Kalibrierdaten)</div>
+      {% if geraete %}
+        <ul class="mb-0 ps-3">
+          {% for geraet in geraete %}
+          <li>
+            <strong>{{ geraet.bezeichnung }}</strong>
+            {% if geraet.hersteller %} <span class="text-muted">({{ geraet.hersteller }}{% if geraet.modell %} {{ geraet.modell }}{% endif %})</span>{% endif %}
+            {% if geraet.seriennr %} · SN: <code>{{ geraet.seriennr }}</code>{% endif %}
+            {% if geraet.kalibrierdatum or geraet.naechste_kalibrierung %}
+              <div class="text-muted small">
+                {% if geraet.kalibrierdatum %}Kalibriert am <strong>{{ geraet.kalibrierdatum }}</strong>{% endif %}
+                {% if geraet.kalibrierdatum and geraet.naechste_kalibrierung %} ·{% endif %}
+                {% if geraet.naechste_kalibrierung %}gültig bis <strong>{{ geraet.naechste_kalibrierung }}</strong>{% endif %}
+              </div>
+            {% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <div class="text-danger">— Kein Messgerät angegeben —</div>
       {% endif %}
     </div>
     {% if protokoll.bemerkungen %}

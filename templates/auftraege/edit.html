@@ -37,10 +37,16 @@
                placeholder="z.B. Neue Steckdose Küche / Kontrolle UV Werkstatt">
       </div>
 
-      <div class="col-md-6">
+      <div class="col-md-4">
         <label class="form-label">Erteilt von (Person beim Kunden)</label>
         <input type="text" name="erteilt_von" class="form-control" value="{{ auftrag.erteilt_von or '' }}"
                placeholder="z.B. Hr. Müller">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Telefon Kontaktperson</label>
+        <input type="tel" name="erteilt_von_telefon" class="form-control" value="{{ auftrag.erteilt_von_telefon or '' }}"
+               placeholder="z.B. 079 123 45 67"
+               inputmode="tel">
       </div>
       <div class="col-md-3">
         <label class="form-label">Erledigt am</label>

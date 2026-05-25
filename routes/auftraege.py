@@ -1,10 +1,16 @@
 """Aufträge — vom Kunden erteilte Arbeiten mit betroffenen Anlagenteilen."""
 from __future__ import annotations
 
-from datetime import date
+import mimetypes
+import uuid
+from datetime import date, datetime
+from pathlib import Path
 
-from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+from flask import Blueprint, abort, flash, redirect, render_template, request, send_file, url_for
+from flask_login import current_user
+from werkzeug.utils import secure_filename
 
+import config
 from models.repos import (
     AUFTRAG_STATUS,
     AUFTRAG_STATUS_LABEL,
@@ -23,6 +29,21 @@ from models.repos import (
 
 bp = Blueprint("auftraege", __name__)
 
+# ---- Bilder-Upload ----------------------------------------------------------
+
+ERLAUBTE_BILD_EXTS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif"}
+MAX_BILD_BYTES = 15 * 1024 * 1024  # 15 MB pro Datei (Phone-Fotos sind oft groß)
+
+
+def _bilder_dir(auftrag_id: str) -> Path:
+    d = config.DATA_DIR / "auftrag_bilder" / auftrag_id
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _ext_ok(filename: str) -> bool:
+    return Path(filename).suffix.lower() in ERLAUBTE_BILD_EXTS
+
 
 def _form_to_auftrag(form) -> dict:
     return {
@@ -31,6 +52,7 @@ def _form_to_auftrag(form) -> dict:
         "beschreibung": form.get("beschreibung", "").strip(),
         "erteilungsdatum": form.get("erteilungsdatum", "").strip() or date.today().isoformat(),
         "erteilt_von": form.get("erteilt_von", "").strip(),
+        "erteilt_von_telefon": form.get("erteilt_von_telefon", "").strip(),
         "anlagenteil_ids": form.getlist("anlagenteil_ids"),
         "status": form.get("status", "offen") if form.get("status") in AUFTRAG_STATUS else "offen",
         "erledigt_am": form.get("erledigt_am", "").strip() or None,
@@ -227,6 +249,112 @@ def delete_auftrag(auftrag_id: str):
         abort(404)
     for z in zeitbuchungen_fuer_auftrag(auftrag_id):
         zeitbuchungen.delete(z["id"])
+    # Bilderordner aufräumen
+    bild_dir = config.DATA_DIR / "auftrag_bilder" / auftrag_id
+    if bild_dir.exists():
+        for f in bild_dir.iterdir():
+            try:
+                f.unlink()
+            except OSError:
+                pass
+        try:
+            bild_dir.rmdir()
+        except OSError:
+            pass
     auftraege.delete(auftrag_id)
     flash(f"Auftrag „{auftrag['titel']}“ gelöscht.", "info")
     return redirect(url_for("auftraege.list_auftraege"))
+
+
+# ---- Bilder-Routen ----------------------------------------------------------
+
+@bp.route("/<auftrag_id>/bild/neu", methods=["POST"])
+def upload_bild(auftrag_id: str):
+    auftrag = auftraege.get(auftrag_id)
+    if not auftrag:
+        abort(404)
+    files = request.files.getlist("bilder")
+    if not files or all(not f.filename for f in files):
+        flash("Keine Datei ausgewählt.", "warning")
+        return redirect(url_for("auftraege.detail", auftrag_id=auftrag_id))
+
+    beschreibung = request.form.get("beschreibung", "").strip()
+    bilder = list(auftrag.get("bilder") or [])
+    erfolgreich = 0
+    fehler: list[str] = []
+
+    for f in files:
+        if not f or not f.filename:
+            continue
+        if not _ext_ok(f.filename):
+            fehler.append(f"{f.filename}: Format nicht unterstützt")
+            continue
+        # Groesse pruefen
+        f.stream.seek(0, 2)
+        size = f.stream.tell()
+        f.stream.seek(0)
+        if size == 0:
+            fehler.append(f"{f.filename}: leere Datei")
+            continue
+        if size > MAX_BILD_BYTES:
+            fehler.append(f"{f.filename}: zu groß (max {MAX_BILD_BYTES // (1024*1024)} MB)")
+            continue
+
+        bild_id = uuid.uuid4().hex[:12]
+        ext = Path(f.filename).suffix.lower()
+        dateiname = f"{bild_id}{ext}"
+        ziel = _bilder_dir(auftrag_id) / dateiname
+        f.save(str(ziel))
+        bilder.append({
+            "id": bild_id,
+            "dateiname": dateiname,
+            "original_name": secure_filename(f.filename) or dateiname,
+            "beschreibung": beschreibung,
+            "mime": mimetypes.guess_type(dateiname)[0] or "application/octet-stream",
+            "groesse": size,
+            "hochgeladen_am": datetime.now().isoformat(timespec="seconds"),
+            "hochgeladen_von": getattr(current_user, "username", "") or "",
+        })
+        erfolgreich += 1
+
+    if erfolgreich:
+        auftraege.update(auftrag_id, {"bilder": bilder})
+        flash(f"{erfolgreich} Bild(er) hochgeladen.", "success")
+    for msg in fehler:
+        flash(msg, "warning")
+    return redirect(url_for("auftraege.detail", auftrag_id=auftrag_id))
+
+
+@bp.route("/<auftrag_id>/bild/<bild_id>")
+def show_bild(auftrag_id: str, bild_id: str):
+    auftrag = auftraege.get(auftrag_id)
+    if not auftrag:
+        abort(404)
+    bild = next((b for b in (auftrag.get("bilder") or []) if b.get("id") == bild_id), None)
+    if not bild:
+        abort(404)
+    pfad = _bilder_dir(auftrag_id) / bild["dateiname"]
+    if not pfad.exists():
+        abort(404)
+    return send_file(str(pfad), mimetype=bild.get("mime") or "application/octet-stream")
+
+
+@bp.route("/<auftrag_id>/bild/<bild_id>/loeschen", methods=["POST"])
+def delete_bild(auftrag_id: str, bild_id: str):
+    auftrag = auftraege.get(auftrag_id)
+    if not auftrag:
+        abort(404)
+    bilder = list(auftrag.get("bilder") or [])
+    bild = next((b for b in bilder if b.get("id") == bild_id), None)
+    if not bild:
+        abort(404)
+    pfad = _bilder_dir(auftrag_id) / bild["dateiname"]
+    try:
+        if pfad.exists():
+            pfad.unlink()
+    except OSError:
+        pass
+    bilder = [b for b in bilder if b.get("id") != bild_id]
+    auftraege.update(auftrag_id, {"bilder": bilder})
+    flash("Bild gelöscht.", "info")
+    return redirect(url_for("auftraege.detail", auftrag_id=auftrag_id))

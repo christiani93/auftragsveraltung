@@ -20,7 +20,8 @@ Anlagenteil (gehört zu einer Anlage)
 
 Messgerät
     id, bezeichnung, hersteller, modell, seriennr, typ,
-    kalibrierdatum, naechste_kalibrierung, notizen
+    kalibrierdatum, naechste_kalibrierung, notizen,
+    owner (Username des Besitzers — User sieht nur eigene, Admin sieht alle)
 
 Messprotokoll (gehört zu einer Anlage, optional zu einem Anlagenteil)
     id, anlage_id, anlagenteil_id, datum, monteur,
@@ -154,6 +155,17 @@ def messprotokolle_fuer_anlage(anlage_id: str) -> List[Dict[str, Any]]:
 
 def auftraege_fuer_kunde(kunde_id: str) -> List[Dict[str, Any]]:
     return [a for a in auftraege.list() if a.get("kunde_id") == kunde_id]
+
+
+def messgeraete_fuer_user(username: str, ist_admin: bool = False) -> List[Dict[str, Any]]:
+    """Liefert die fuer den aktuellen User sichtbaren Messgeraete.
+    Admin sieht alle, andere User nur ihre eigenen (owner == username) plus
+    'verwaiste' Messgeraete ohne owner (Backward-Kompat mit alten Daten).
+    """
+    alle = messgeraete.list()
+    if ist_admin:
+        return alle
+    return [m for m in alle if m.get("owner") == username or not m.get("owner")]
 
 
 def auftraege_fuer_anlagenteil(teil_id: str) -> List[Dict[str, Any]]:

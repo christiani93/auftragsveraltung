@@ -45,6 +45,11 @@
     <div class="card card-body">
       <div class="text-muted small">Erteilt von</div>
       <div class="fw-semibold">{{ auftrag.erteilt_von or '—' }}</div>
+      {% if auftrag.erteilt_von_telefon %}
+        <div class="small mt-1">
+          📞 <a href="tel:{{ auftrag.erteilt_von_telefon|replace(' ', '') }}" class="text-decoration-none">{{ auftrag.erteilt_von_telefon }}</a>
+        </div>
+      {% endif %}
     </div>
   </div>
   <div class="col-md-3">
@@ -117,6 +122,60 @@
   <div style="white-space: pre-wrap;">{{ auftrag.notizen }}</div>
 </div>
 {% endif %}
+
+<div class="d-flex justify-content-between align-items-center mt-4 mb-2">
+  <h2 class="h5 m-0">Bilder ({{ (auftrag.bilder or [])|length }})</h2>
+</div>
+
+{% if auftrag.bilder %}
+<div class="row g-2 mb-3">
+  {% for b in auftrag.bilder %}
+  <div class="col-6 col-sm-4 col-md-3 col-lg-2">
+    <div class="card h-100">
+      <a href="{{ url_for('auftraege.show_bild', auftrag_id=auftrag.id, bild_id=b.id) }}" target="_blank"
+         class="d-block" style="aspect-ratio: 1/1; overflow: hidden; background: #f3f3f3;">
+        <img src="{{ url_for('auftraege.show_bild', auftrag_id=auftrag.id, bild_id=b.id) }}"
+             alt="{{ b.original_name }}"
+             loading="lazy"
+             style="width: 100%; height: 100%; object-fit: cover;">
+      </a>
+      <div class="card-body p-2">
+        {% if b.beschreibung %}<div class="small">{{ b.beschreibung }}</div>{% endif %}
+        <div class="text-muted" style="font-size: 0.7rem;">
+          {{ b.hochgeladen_am[:10] }}
+          {% if b.hochgeladen_von %}· {{ b.hochgeladen_von }}{% endif %}
+        </div>
+        <form method="post" action="{{ url_for('auftraege.delete_bild', auftrag_id=auftrag.id, bild_id=b.id) }}"
+              class="mt-1" onsubmit="return confirm('Bild löschen?');">
+          <button type="submit" class="btn btn-sm btn-outline-danger w-100" style="font-size: 0.75rem;">Löschen</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<form method="post" action="{{ url_for('auftraege.upload_bild', auftrag_id=auftrag.id) }}"
+      enctype="multipart/form-data" class="card card-body mb-3">
+  <div class="row g-2 align-items-end">
+    <div class="col-md-5">
+      <label class="form-label small">Bilder hochladen <span class="text-muted">(mehrere möglich, max. 15 MB je Bild)</span></label>
+      <input type="file" name="bilder" class="form-control" accept="image/*" multiple required>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label small">Foto direkt aufnehmen (Handy)</label>
+      <input type="file" name="bilder" class="form-control" accept="image/*" capture="environment">
+    </div>
+    <div class="col-md-2">
+      <label class="form-label small">Beschreibung (optional)</label>
+      <input type="text" name="beschreibung" class="form-control" placeholder="z.B. Vorher">
+    </div>
+    <div class="col-md-1">
+      <button type="submit" class="btn btn-primary w-100">+ Hochladen</button>
+    </div>
+  </div>
+</form>
 
 <div class="d-flex justify-content-between align-items-center mt-4 mb-2">
   <h2 class="h5 m-0">

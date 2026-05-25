@@ -11,19 +11,23 @@
 {% block content %}
 <table style="margin-bottom: 8pt;">
   <tr>
-    <th style="width: 25%;">Messgerät</th>
+    <th style="width: 25%;">Messgeräte</th>
     <td colspan="3">
-      {% if geraet %}
-        <strong>{{ geraet.bezeichnung }}</strong>
-        {% if geraet.hersteller %} ({{ geraet.hersteller }}{% if geraet.modell %} {{ geraet.modell }}{% endif %}){% endif %}
-        {% if geraet.seriennr %} · Seriennr.: <code>{{ geraet.seriennr }}</code>{% endif %}
-        {% if geraet.kalibrierdatum or geraet.naechste_kalibrierung %}
-        <div class="small">
-          {% if geraet.kalibrierdatum %}Kalibriert am {{ geraet.kalibrierdatum }}{% endif %}
-          {% if geraet.kalibrierdatum and geraet.naechste_kalibrierung %} · {% endif %}
-          {% if geraet.naechste_kalibrierung %}Gültig bis {{ geraet.naechste_kalibrierung }}{% endif %}
-        </div>
-        {% endif %}
+      {% if geraete %}
+        {% for geraet in geraete %}
+          <div{% if not loop.first %} style="margin-top: 4pt;"{% endif %}>
+            <strong>{{ geraet.bezeichnung }}</strong>
+            {% if geraet.hersteller %} ({{ geraet.hersteller }}{% if geraet.modell %} {{ geraet.modell }}{% endif %}){% endif %}
+            {% if geraet.seriennr %} · SN: <code>{{ geraet.seriennr }}</code>{% endif %}
+            {% if geraet.kalibrierdatum or geraet.naechste_kalibrierung %}
+            <div class="small">
+              {% if geraet.kalibrierdatum %}Kalibriert am {{ geraet.kalibrierdatum }}{% endif %}
+              {% if geraet.kalibrierdatum and geraet.naechste_kalibrierung %} · {% endif %}
+              {% if geraet.naechste_kalibrierung %}gültig bis {{ geraet.naechste_kalibrierung }}{% endif %}
+            </div>
+            {% endif %}
+          </div>
+        {% endfor %}
       {% else %}<em>nicht angegeben</em>{% endif %}
     </td>
   </tr>

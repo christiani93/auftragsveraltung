@@ -2,7 +2,9 @@
 {% block title %}Messgeräte{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
-  <h1 class="h3 m-0">Messgeräte</h1>
+  <h1 class="h3 m-0">Messgeräte
+    {% if is_admin %}<span class="badge bg-danger ms-2">Admin-Ansicht: alle</span>{% else %}<span class="badge bg-secondary ms-2">Deine Geräte</span>{% endif %}
+  </h1>
   <a href="{{ url_for('messgeraete.new_device') }}" class="btn btn-primary">+ Neues Messgerät</a>
 </div>
 
@@ -18,6 +20,7 @@
           <th>Typ</th>
           <th>Kalibrierdatum</th>
           <th>Nächste Kalibrierung</th>
+          {% if is_admin %}<th>Besitzer</th>{% endif %}
           <th class="text-end">Aktion</th>
         </tr>
       </thead>
@@ -30,6 +33,12 @@
           <td>{{ m.typ or '—' }}</td>
           <td>{{ m.kalibrierdatum or '—' }}</td>
           <td>{{ m.naechste_kalibrierung or '—' }}</td>
+          {% if is_admin %}
+            <td>
+              {% if m.owner %}<span class="badge bg-info text-dark">{{ m.owner }}</span>
+              {% else %}<span class="badge bg-secondary">ohne</span>{% endif %}
+            </td>
+          {% endif %}
           <td class="text-end">
             <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('messgeraete.edit_device', geraet_id=m.id) }}">Bearbeiten</a>
           </td>

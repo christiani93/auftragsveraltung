@@ -39,6 +39,19 @@
       <label class="form-label">Notizen</label>
       <textarea name="notizen" class="form-control" rows="3">{{ geraet.notizen or '' }}</textarea>
     </div>
+
+    {% if not neu %}
+    <div class="col-md-6">
+      <label class="form-label">Besitzer</label>
+      {% if is_admin %}
+        <input type="text" name="owner" class="form-control" value="{{ geraet.owner or '' }}"
+               placeholder="Username — leer = ohne Besitzer (alle sehen es)">
+        <small class="text-muted">Nur Admin kann den Besitzer ändern.</small>
+      {% else %}
+        <input type="text" class="form-control" value="{{ geraet.owner or '— ohne Besitzer —' }}" readonly>
+      {% endif %}
+    </div>
+    {% endif %}
   </div>
 
   <div class="mt-4 d-flex gap-2 justify-content-between">

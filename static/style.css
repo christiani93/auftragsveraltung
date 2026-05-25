@@ -5,10 +5,43 @@ input[type="number"],
 input[type="email"],
 input[type="tel"],
 input[type="date"],
+input[type="time"],
+input[type="file"],
+input[type="password"],
 select,
 textarea {
   font-size: 1rem;
-  min-height: 2.5rem;
+  min-height: 2.75rem; /* ~44px Touch-Target */
+}
+
+/* iOS-Safari zoomt rein wenn font-size <16px — also auf Mobile bewusst grösser */
+@media (max-width: 575.98px) {
+  input, select, textarea, .form-control, .form-select {
+    font-size: 16px !important;
+  }
+  /* Buttons auf Handy bequemer klickbar */
+  .btn { min-height: 44px; padding-top: 0.5rem; padding-bottom: 0.5rem; }
+  .btn-sm { min-height: 38px; }
+  /* Form-Check (Checkbox/Radio) — Klickfläche grösser */
+  .form-check { padding-top: 0.25rem; padding-bottom: 0.25rem; }
+  .form-check-input { width: 1.25em; height: 1.25em; margin-top: 0.2em; }
+  .form-check-label { padding-left: 0.25rem; }
+  /* Tabellen scrollen statt Layout sprengen */
+  .table-responsive { -webkit-overflow-scrolling: touch; }
+  /* Action-Buttons nebeneinander auf Handy meist zu eng — voll Breite */
+  .btn-group-mobile-stack .btn { display: block; width: 100%; margin: 0 0 0.5rem 0 !important; }
+  /* Mehr Luft zwischen Cards */
+  .card + .card { margin-top: 0.75rem; }
+  /* Navbar-Brand kleiner, damit Burger nicht umbricht */
+  .navbar-brand { font-size: 1rem; }
+  /* dropdown-menu auf Handy etwas breiter / lesbarer */
+  .dropdown-menu { font-size: 1rem; }
+  .dropdown-item { padding: 0.6rem 1rem; }
+}
+
+/* Touch-freundliche Nav auch auf Tablet */
+@media (max-width: 991.98px) {
+  .navbar-nav .nav-link { padding: 0.65rem 1rem; }
 }
 
 .table-kompakt td, .table-kompakt th {

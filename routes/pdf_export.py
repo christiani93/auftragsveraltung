@@ -75,12 +75,17 @@ def messprotokoll_einzeln(protokoll_id: str):
         abort(404)
     anlage = anlagen.get(p.get("anlage_id"))
     kunde = kunden.get(anlage["kunde_id"]) if anlage else None
-    geraet = messgeraete.get(p.get("messgeraet_id")) if p.get("messgeraet_id") else None
+    # Multi- + Single-Field-Kompatibilitaet
+    ids = p.get("messgeraet_ids") or []
+    if not ids and p.get("messgeraet_id"):
+        ids = [p["messgeraet_id"]]
+    geraete = [messgeraete.get(gid) for gid in ids]
+    geraete = [g for g in geraete if g]
     auftrag = auftraege.get(p.get("auftrag_id")) if p.get("auftrag_id") else None
 
     html = render_template(
         "pdf/messprotokoll.html",
-        protokoll=p, anlage=anlage, kunde=kunde, geraet=geraet, auftrag=auftrag,
+        protokoll=p, anlage=anlage, kunde=kunde, geraete=geraete, auftrag=auftrag,
         messpunkt_felder=MESSPUNKT_FELDER,
         erstellt_am=date.today().isoformat(),
     )

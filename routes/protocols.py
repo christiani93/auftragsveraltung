@@ -5,6 +5,8 @@ from datetime import date
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 
+from flask_login import current_user
+
 from models.repos import (
     IO_OPTIONEN,
     MESSPUNKT_FELDER,
@@ -14,8 +16,20 @@ from models.repos import (
     auftraege,
     kunden,
     messgeraete,
+    messgeraete_fuer_user,
     messprotokolle,
 )
+
+
+def _messgeraet_ids_of(protokoll: dict) -> list[str]:
+    """Liefert die Liste der zugeordneten Messgeraet-IDs.
+    Unterstützt sowohl das neue Multi-Field als auch das alte Single-Field
+    (für Backward-Kompat).
+    """
+    ids = protokoll.get("messgeraet_ids") or []
+    if not ids and protokoll.get("messgeraet_id"):
+        ids = [protokoll["messgeraet_id"]]
+    return [i for i in ids if i]
 
 bp = Blueprint("protocols", __name__)
 
@@ -94,7 +108,7 @@ def new_protocol():
             "anlagenteil_id": request.form.get("anlagenteil_id", "").strip() or None,
             "datum": request.form.get("datum", "").strip() or date.today().isoformat(),
             "monteur": request.form.get("monteur", "").strip(),
-            "messgeraet_id": request.form.get("messgeraet_id", "").strip() or None,
+            "messgeraet_ids": request.form.getlist("messgeraet_ids"),
             "bemerkungen": request.form.get("bemerkungen", "").strip(),
             "messungen": _parse_messpunkte(request.form),
         }
@@ -104,7 +118,7 @@ def new_protocol():
                 "protocols/edit.html",
                 protokoll=data, anlage=anlage, auftrag=auftrag,
                 alle_anlagen=anlagen.list(),
-                alle_messgeraete=messgeraete.list(),
+                alle_messgeraete=messgeraete_fuer_user(current_user.username, current_user.is_admin),
                 teile_der_anlage=anlagenteile_fuer_anlage(anlage_id) if anlage else [],
                 messpunkt_felder=MESSPUNKT_FELDER, io_optionen=IO_OPTIONEN, neu=True,
             )
@@ -138,7 +152,7 @@ def new_protocol():
         protokoll=protokoll,
         anlage=anlage, auftrag=auftrag,
         alle_anlagen=anlagen.list(),
-        alle_messgeraete=messgeraete.list(),
+        alle_messgeraete=messgeraete_fuer_user(current_user.username, current_user.is_admin),
         teile_der_anlage=anlagenteile_fuer_anlage(anlage_id) if anlage else [],
         messpunkt_felder=MESSPUNKT_FELDER, io_optionen=IO_OPTIONEN, neu=True,
     )
@@ -151,11 +165,13 @@ def detail(protokoll_id: str):
         abort(404)
     anlage = anlagen.get(p.get("anlage_id"))
     kunde = kunden.get(anlage.get("kunde_id")) if anlage else None
-    geraet = messgeraete.get(p.get("messgeraet_id")) if p.get("messgeraet_id") else None
+    ids = _messgeraet_ids_of(p)
+    geraete = [messgeraete.get(gid) for gid in ids]
+    geraete = [g for g in geraete if g]
     auftrag = auftraege.get(p.get("auftrag_id")) if p.get("auftrag_id") else None
     return render_template(
         "protocols/detail.html",
-        protokoll=p, anlage=anlage, kunde=kunde, geraet=geraet, auftrag=auftrag,
+        protokoll=p, anlage=anlage, kunde=kunde, geraete=geraete, auftrag=auftrag,
         messpunkt_felder=MESSPUNKT_FELDER,
     )
 
@@ -189,19 +205,23 @@ def edit_protocol(protokoll_id: str):
             "anlagenteil_id": request.form.get("anlagenteil_id", "").strip() or None,
             "datum": request.form.get("datum", "").strip() or p.get("datum"),
             "monteur": request.form.get("monteur", "").strip(),
-            "messgeraet_id": request.form.get("messgeraet_id", "").strip() or None,
+            "messgeraet_ids": request.form.getlist("messgeraet_ids"),
             "bemerkungen": request.form.get("bemerkungen", "").strip(),
             "messungen": _parse_messpunkte(request.form),
         }
+        # Altes Single-Field beim Edit aufraeumen
+        data["messgeraet_id"] = None
         messprotokolle.update(protokoll_id, data)
         flash("Messprotokoll aktualisiert.", "success")
         return redirect(url_for("protocols.detail", protokoll_id=protokoll_id))
 
+    # Vorausgewaehlt: bisher gewaehlte Messgeraete (auch aus altem messgeraet_id-Feld)
+    p["messgeraet_ids"] = _messgeraet_ids_of(p)
     return render_template(
         "protocols/edit.html",
         protokoll=p, anlage=anlage,
         alle_anlagen=anlagen.list(),
-        alle_messgeraete=messgeraete.list(),
+        alle_messgeraete=messgeraete_fuer_user(current_user.username, current_user.is_admin),
         teile_der_anlage=anlagenteile_fuer_anlage(anlage["id"]) if anlage else [],
         messpunkt_felder=MESSPUNKT_FELDER, io_optionen=IO_OPTIONEN, neu=False,
     )

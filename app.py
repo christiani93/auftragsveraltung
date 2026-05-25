@@ -47,6 +47,8 @@ def create_app() -> Flask:
         static_folder=str(config.BUNDLE_DIR / "static"),
     )
     app.config["FIRMA_NAME"] = config.FIRMA_NAME
+    # Bilder-Uploads: bis zu 60 MB pro Request (mehrere Fotos auf einmal)
+    app.config["MAX_CONTENT_LENGTH"] = 60 * 1024 * 1024
     app.secret_key = _load_or_create_secret_key()
     # Session-Cookie: secure nur im HTTPS-Production-Betrieb
     app.config["SESSION_COOKIE_HTTPONLY"] = True

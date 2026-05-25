@@ -35,15 +35,28 @@
         <input type="text" name="monteur" class="form-control" value="{{ protokoll.monteur or '' }}">
       </div>
       <div class="col-12">
-        <label class="form-label">Messgerät <span class="text-muted small">(inkl. Seriennr. — wird auf dem Protokoll ausgewiesen)</span></label>
-        <select name="messgeraet_id" class="form-select">
-          <option value="">— keines —</option>
-          {% for g in alle_messgeraete %}
-          <option value="{{ g.id }}" {% if protokoll.messgeraet_id == g.id %}selected{% endif %}>
-            {{ g.bezeichnung }}{% if g.seriennr %} – SN {{ g.seriennr }}{% endif %}{% if g.naechste_kalibrierung %} (kal. bis {{ g.naechste_kalibrierung }}){% endif %}
-          </option>
-          {% endfor %}
-        </select>
+        <label class="form-label">Verwendete Messgeräte <span class="text-muted small">(Mehrfachauswahl — Bezeichnung + Seriennr. erscheinen auf dem Protokoll)</span></label>
+        {% if alle_messgeraete %}
+          <div class="border rounded p-2" style="max-height: 240px; overflow-y: auto;">
+            {% for g in alle_messgeraete %}
+            <div class="form-check py-1">
+              <input class="form-check-input" type="checkbox" name="messgeraet_ids" value="{{ g.id }}"
+                     id="geraet_{{ g.id }}"
+                     {% if g.id in (protokoll.messgeraet_ids or []) %}checked{% endif %}>
+              <label class="form-check-label" for="geraet_{{ g.id }}">
+                <strong>{{ g.bezeichnung }}</strong>
+                {% if g.seriennr %} – SN <code>{{ g.seriennr }}</code>{% endif %}
+                {% if g.naechste_kalibrierung %} <span class="text-muted small">(kal. gültig bis {{ g.naechste_kalibrierung }})</span>{% endif %}
+              </label>
+            </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="alert alert-warning py-2 mb-0 small">
+            Du hast noch keine Messgeräte erfasst.
+            <a href="{{ url_for('messgeraete.new_device') }}">Jetzt anlegen →</a>
+          </div>
+        {% endif %}
         <small class="text-muted">
           Verwaltung unter <a href="{{ url_for('messgeraete.list_devices') }}">Messgeräte</a>.
         </small>
