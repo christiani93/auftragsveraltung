@@ -9,7 +9,7 @@
 </div>
 
 {% if messgeraete %}
-<div class="card">
+<div class="card desktop-table-only">
   <div class="table-responsive">
     <table class="table table-kompakt table-hover m-0">
       <thead class="table-light">
@@ -47,6 +47,22 @@
       </tbody>
     </table>
   </div>
+</div>
+
+<div class="card mobile-list">
+  {% for m in messgeraete %}
+  <a class="mobile-list-item" href="{{ url_for('messgeraete.edit_device', geraet_id=m.id) }}">
+    <div class="mobile-list-row">
+      <div class="mobile-list-title flex-grow-1">{{ m.bezeichnung }}</div>
+      {% if is_admin and m.owner %}<span class="badge bg-info text-dark">{{ m.owner }}</span>{% endif %}
+    </div>
+    <div class="mobile-list-meta">
+      {% if m.hersteller %}{{ m.hersteller }}{% if m.modell %} {{ m.modell }}{% endif %}{% endif %}
+      {% if m.seriennr %} · SN <code>{{ m.seriennr }}</code>{% endif %}
+      {% if m.naechste_kalibrierung %} · kal. bis {{ m.naechste_kalibrierung }}{% endif %}
+    </div>
+  </a>
+  {% endfor %}
 </div>
 {% else %}
 <div class="alert alert-info">

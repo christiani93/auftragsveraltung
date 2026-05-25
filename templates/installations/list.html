@@ -7,7 +7,7 @@
 </div>
 
 {% if rows %}
-<div class="card">
+<div class="card desktop-table-only">
   <div class="table-responsive">
     <table class="table table-kompakt table-hover m-0">
       <thead class="table-light">
@@ -33,6 +33,19 @@
       </tbody>
     </table>
   </div>
+</div>
+
+<div class="card mobile-list">
+  {% for r in rows %}
+  <a class="mobile-list-item" href="{{ url_for('installations.detail', anlage_id=r.anlage.id) }}">
+    <div class="mobile-list-title">{{ r.anlage.bezeichnung }}</div>
+    <div class="mobile-list-meta">
+      {% if r.kunde %}{{ r.kunde.name }}{% else %}— ohne Kunde —{% endif %}
+      {% if r.anlage.standort %} · {{ r.anlage.standort }}{% endif %}
+      {% if r.anlage.naechste_periodische_kontrolle %} · nächste Kontrolle {{ r.anlage.naechste_periodische_kontrolle }}{% endif %}
+    </div>
+  </a>
+  {% endfor %}
 </div>
 {% else %}
 <div class="alert alert-info">Noch keine Anlagen. <a href="{{ url_for('installations.new_installation') }}">Erste Anlage anlegen →</a></div>

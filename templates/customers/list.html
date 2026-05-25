@@ -7,7 +7,7 @@
 </div>
 
 {% if kunden %}
-<div class="card">
+<div class="card desktop-table-only">
   <div class="table-responsive">
     <table class="table table-kompakt table-hover m-0">
       <thead class="table-light">
@@ -24,7 +24,7 @@
         <tr>
           <td><a href="{{ url_for('customers.detail', kunde_id=k.id) }}" class="fw-semibold text-decoration-none">{{ k.name }}</a></td>
           <td>{{ k.plz }} {{ k.ort }}</td>
-          <td>{{ k.telefon }}</td>
+          <td>{% if k.telefon %}<a href="tel:{{ k.telefon|replace(' ', '') }}" class="text-decoration-none">{{ k.telefon }}</a>{% endif %}</td>
           <td>{% if k.ist_stammkunde %}<span class="badge bg-info">Stammkunde</span>{% endif %}</td>
           <td class="text-end">
             <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('customers.detail', kunde_id=k.id) }}">Details</a>
@@ -34,6 +34,21 @@
       </tbody>
     </table>
   </div>
+</div>
+
+<div class="card mobile-list">
+  {% for k in kunden %}
+  <a class="mobile-list-item" href="{{ url_for('customers.detail', kunde_id=k.id) }}">
+    <div class="mobile-list-row">
+      <div class="mobile-list-title flex-grow-1">{{ k.name }}</div>
+      {% if k.ist_stammkunde %}<span class="badge bg-info">Stammkunde</span>{% endif %}
+    </div>
+    <div class="mobile-list-meta">
+      {% if k.plz or k.ort %}{{ k.plz }} {{ k.ort }}{% endif %}
+      {% if k.telefon %}· {{ k.telefon }}{% endif %}
+    </div>
+  </a>
+  {% endfor %}
 </div>
 {% else %}
 <div class="alert alert-info">

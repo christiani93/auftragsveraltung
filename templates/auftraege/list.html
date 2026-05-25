@@ -7,7 +7,7 @@
 </div>
 
 {% if rows %}
-<div class="card">
+<div class="card desktop-table-only">
   <div class="table-responsive">
     <table class="table table-kompakt table-hover m-0">
       <thead class="table-light">
@@ -43,6 +43,26 @@
       </tbody>
     </table>
   </div>
+</div>
+
+<div class="card mobile-list">
+  {% for r in rows %}
+  <a class="mobile-list-item" href="{{ url_for('auftraege.detail', auftrag_id=r.auftrag.id) }}">
+    <div class="mobile-list-row">
+      <div class="mobile-list-title flex-grow-1">{{ r.auftrag.titel }}</div>
+      {% if r.auftrag.status == 'offen' %}<span class="badge bg-secondary">{{ status_label[r.auftrag.status] }}</span>
+      {% elif r.auftrag.status == 'in_arbeit' %}<span class="badge bg-warning text-dark">{{ status_label[r.auftrag.status] }}</span>
+      {% elif r.auftrag.status == 'erledigt' %}<span class="badge bg-success">{{ status_label[r.auftrag.status] }}</span>
+      {% endif %}
+    </div>
+    <div class="mobile-list-meta">
+      {{ r.auftrag.erteilungsdatum }}
+      {% if r.kunde %}· {{ r.kunde.name }}{% endif %}
+      {% if r.auftrag.erteilt_von %}· {{ r.auftrag.erteilt_von }}{% endif %}
+      · {{ r.auftrag.anlagenteil_ids|length }} Teil(e)
+    </div>
+  </a>
+  {% endfor %}
 </div>
 {% else %}
 <div class="alert alert-info">Noch keine Aufträge. <a href="{{ url_for('auftraege.new_auftrag') }}">Ersten Auftrag erfassen →</a></div>

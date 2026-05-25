@@ -1,20 +1,52 @@
 {
   "name": "Auftragsverwaltung",
-  "short_name": "Auftragsverwaltung",
+  "short_name": "Aufträge",
   "description": "Kunden, Anlagen, Messprotokolle und Kontroll-Übersicht für den Elektroinstallateur-Alltag.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "orientation": "any",
   "background_color": "#212529",
   "theme_color": "#212529",
   "lang": "de-CH",
+  "categories": ["business", "productivity", "utilities"],
   "icons": [
     {
       "src": "/static/icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Neuer Auftrag",
+      "short_name": "Auftrag +",
+      "description": "Neuen Kundenauftrag erfassen",
+      "url": "/auftraege/neu",
+      "icons": [{ "src": "/static/icon.svg", "sizes": "any" }]
+    },
+    {
+      "name": "Neues Messprotokoll",
+      "short_name": "Messprot. +",
+      "description": "Messprotokoll vor Ort erfassen",
+      "url": "/messprotokolle/neu",
+      "icons": [{ "src": "/static/icon.svg", "sizes": "any" }]
+    },
+    {
+      "name": "Kontroll-Übersicht",
+      "short_name": "Kontrolle",
+      "description": "Stammkunden-Übersicht für den Elektrokontrolleur",
+      "url": "/kontrolle",
+      "icons": [{ "src": "/static/icon.svg", "sizes": "any" }]
+    },
+    {
+      "name": "Kunden",
+      "short_name": "Kunden",
+      "description": "Kundenliste",
+      "url": "/kunden/",
+      "icons": [{ "src": "/static/icon.svg", "sizes": "any" }]
     }
   ]
 }

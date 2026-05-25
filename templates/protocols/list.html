@@ -7,7 +7,7 @@
 </div>
 
 {% if rows %}
-<div class="card">
+<div class="card desktop-table-only">
   <div class="table-responsive">
     <table class="table table-kompakt table-hover m-0">
       <thead class="table-light">
@@ -36,6 +36,24 @@
       </tbody>
     </table>
   </div>
+</div>
+
+<div class="card mobile-list">
+  {% for r in rows %}
+  <a class="mobile-list-item" href="{{ url_for('protocols.detail', protokoll_id=r.protokoll.id) }}">
+    <div class="mobile-list-row">
+      <div class="mobile-list-title flex-grow-1">
+        {% if r.anlage %}{{ r.anlage.bezeichnung }}{% else %}— Anlage —{% endif %}
+      </div>
+      <span class="badge bg-secondary">{{ r.protokoll.messungen|length }} Pkt.</span>
+    </div>
+    <div class="mobile-list-meta">
+      {{ r.protokoll.datum }}
+      {% if r.kunde %}· {{ r.kunde.name }}{% endif %}
+      {% if r.protokoll.monteur %}· {{ r.protokoll.monteur }}{% endif %}
+    </div>
+  </a>
+  {% endfor %}
 </div>
 {% else %}
 <div class="alert alert-info">Noch keine Messprotokolle.</div>

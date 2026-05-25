@@ -2,11 +2,13 @@
 <html lang="de-CH">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover">
   <meta name="theme-color" content="#212529">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="Auftragsverwaltung">
+  <meta name="apple-mobile-web-app-title" content="Aufträge">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="format-detection" content="telephone=yes">
   <title>{% block title %}Auftragsverwaltung{% endblock %}{% if firma_name %} – {{ firma_name }}{% endif %}</title>
   <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
   <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='icon.svg') }}">
