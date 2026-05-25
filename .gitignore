@@ -22,6 +22,9 @@ data/
 *.swp
 .DS_Store
 
+# Claude-Konfiguration + SSH-Keys (lokal pro Maschine, nie ins Repo)
+.claude/
+
 # Build artifacts (PyInstaller, Flutter, etc.)
 build/
 dist/
