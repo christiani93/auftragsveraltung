@@ -37,10 +37,57 @@
                placeholder="z.B. Neue Steckdose Küche / Kontrolle UV Werkstatt">
       </div>
 
+      {% set kontakte = (kunde.kontaktpersonen if kunde else None) or [] %}
+      {% if kontakte %}
+      <div class="col-md-4">
+        <label class="form-label">Kontaktperson auswählen</label>
+        <select class="form-select" id="kontakt-select">
+          <option value="">— oder Freitext unten —</option>
+          {% for k in kontakte %}
+          <option value="{{ loop.index0 }}"
+                  data-name="{{ k.name or '' }}"
+                  data-telefon="{{ k.telefon or '' }}">
+            {{ k.name or '—' }}{% if k.funktion %} ({{ k.funktion }}){% endif %}{% if k.telefon %} · {{ k.telefon }}{% endif %}
+          </option>
+          {% endfor %}
+        </select>
+        <small class="text-muted">Füllt die zwei Felder rechts.</small>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Erteilt von (Person beim Kunden)</label>
+        <input type="text" name="erteilt_von" id="erteilt-von-input" class="form-control" value="{{ auftrag.erteilt_von or '' }}"
+               placeholder="z.B. Hr. Müller">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Telefon Kontaktperson</label>
+        <input type="tel" name="erteilt_von_telefon" id="erteilt-von-telefon-input" class="form-control" value="{{ auftrag.erteilt_von_telefon or '' }}"
+               placeholder="z.B. 079 123 45 67"
+               inputmode="tel">
+      </div>
+      <script>
+      (function() {
+        const sel = document.getElementById('kontakt-select');
+        const nameInp = document.getElementById('erteilt-von-input');
+        const telInp = document.getElementById('erteilt-von-telefon-input');
+        if (!sel || !nameInp || !telInp) return;
+        sel.addEventListener('change', function() {
+          const opt = sel.options[sel.selectedIndex];
+          if (!opt || !opt.value) return;
+          nameInp.value = opt.dataset.name || '';
+          telInp.value = opt.dataset.telefon || '';
+        });
+      })();
+      </script>
+      {% else %}
       <div class="col-md-4">
         <label class="form-label">Erteilt von (Person beim Kunden)</label>
         <input type="text" name="erteilt_von" class="form-control" value="{{ auftrag.erteilt_von or '' }}"
                placeholder="z.B. Hr. Müller">
+        {% if kunde %}
+        <small class="text-muted">
+          Tipp: <a href="{{ url_for('customers.edit_customer', kunde_id=kunde.id) }}#kontakte-container">Kontaktpersonen am Kunden hinterlegen</a> — dann kannst du sie hier per Dropdown auswählen.
+        </small>
+        {% endif %}
       </div>
       <div class="col-md-3">
         <label class="form-label">Telefon Kontaktperson</label>
@@ -48,6 +95,7 @@
                placeholder="z.B. 079 123 45 67"
                inputmode="tel">
       </div>
+      {% endif %}
       <div class="col-md-3">
         <label class="form-label">Erledigt am</label>
         <input type="date" name="erledigt_am" class="form-control" value="{{ auftrag.erledigt_am or '' }}">
