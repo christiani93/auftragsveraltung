@@ -12,6 +12,13 @@ from .storage import JsonStore
 users_store = JsonStore("users.json")
 
 USER_ROLES = ("admin", "projektleiter", "monteur")
+
+# Default-Arbeitszeit-Blöcke (Schweizer 8-Stunden-Tag mit Znüni + Mittagspause)
+DEFAULT_ARBEITSZEITEN = [
+    {"von": "07:15", "bis": "09:00"},
+    {"von": "09:15", "bis": "12:00"},
+    {"von": "13:00", "bis": "16:15"},
+]
 USER_ROLE_LABEL = {
     "admin": "Admin",
     "projektleiter": "Projektleiter",
@@ -75,6 +82,24 @@ class User(UserMixin):
         """Admin + Projektleiter sehen alles. Monteur nur eigene + unzugewiesene."""
         return self.role in ("admin", "projektleiter")
 
+    @property
+    def arbeitszeiten(self) -> list[Dict[str, str]]:
+        """Liste von {von, bis} Bloecken im 'HH:MM'-Format. Faellt auf Default zurueck wenn nichts gesetzt."""
+        raw = self._data.get("arbeitszeiten")
+        if not raw:
+            return list(DEFAULT_ARBEITSZEITEN)
+        # Auf gueltige Eintraege filtern
+        clean = []
+        for b in raw:
+            von, bis = (b.get("von") or "").strip(), (b.get("bis") or "").strip()
+            if von and bis:
+                clean.append({"von": von, "bis": bis})
+        return clean or list(DEFAULT_ARBEITSZEITEN)
+
+    @property
+    def hat_eigene_arbeitszeiten(self) -> bool:
+        return bool(self._data.get("arbeitszeiten"))
+
     def check_password(self, password: str) -> bool:
         h = self._data.get("password_hash")
         if not h:
@@ -113,6 +138,35 @@ def set_password(username: str, new_password: str) -> bool:
         return False
     users_store.update(user.id, {"password_hash": generate_password_hash(new_password)})
     return True
+
+
+def set_arbeitszeiten(username: str, bloecke: list[Dict[str, str]]) -> bool:
+    """Speichert die Arbeitszeit-Bloecke eines Users. Leere Liste = zurueck auf Default."""
+    user = find_user(username)
+    if not user:
+        return False
+    bereinigt = []
+    for b in bloecke:
+        von, bis = (b.get("von") or "").strip(), (b.get("bis") or "").strip()
+        # Format-Check 'HH:MM'
+        if not _ist_hhmm(von) or not _ist_hhmm(bis):
+            continue
+        if von >= bis:
+            continue
+        bereinigt.append({"von": von, "bis": bis})
+    bereinigt.sort(key=lambda b: b["von"])
+    users_store.update(user.id, {"arbeitszeiten": bereinigt})
+    return True
+
+
+def _ist_hhmm(value: str) -> bool:
+    if not value or len(value) != 5 or value[2] != ":":
+        return False
+    try:
+        h, m = int(value[:2]), int(value[3:])
+    except ValueError:
+        return False
+    return 0 <= h <= 23 and 0 <= m <= 59
 
 
 def set_role(username: str, new_role: str) -> bool:

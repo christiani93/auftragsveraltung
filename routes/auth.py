@@ -5,12 +5,14 @@ from flask import Blueprint, abort, flash, redirect, render_template, request, u
 from flask_login import current_user, login_required, login_user, logout_user
 
 from models.users import (
+    DEFAULT_ARBEITSZEITEN,
     USER_ROLE_LABEL,
     USER_ROLES,
     create_user,
     delete_user,
     find_user,
     list_users,
+    set_arbeitszeiten,
     set_password,
     set_role,
 )
@@ -132,4 +134,20 @@ def delete_user_route(username: str):
 @bp.route("/profil")
 @login_required
 def profil():
-    return render_template("auth/profil.html")
+    return render_template("auth/profil.html", default_arbeitszeiten=DEFAULT_ARBEITSZEITEN)
+
+
+@bp.route("/profil/arbeitszeiten", methods=["POST"])
+@login_required
+def update_arbeitszeiten():
+    von_liste = request.form.getlist("az_von[]")
+    bis_liste = request.form.getlist("az_bis[]")
+    bloecke = []
+    for i, von in enumerate(von_liste):
+        bis = bis_liste[i] if i < len(bis_liste) else ""
+        bloecke.append({"von": von, "bis": bis})
+    if set_arbeitszeiten(current_user.username, bloecke):
+        flash("Arbeitszeiten gespeichert.", "success")
+    else:
+        flash("Konnte Arbeitszeiten nicht speichern.", "warning")
+    return redirect(url_for("auth.profil"))

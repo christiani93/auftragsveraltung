@@ -9,6 +9,64 @@
   <div><span class="text-muted">Rolle:</span> {{ current_user.role_label }}</div>
 </div>
 
+<h2 class="h5 mb-2">Arbeitszeiten</h2>
+<p class="text-muted small mb-2">
+  Die Bloecke definieren deinen Arbeitstag. Luecken dazwischen (z.B. 12:00&ndash;13:00) gelten als Pause und werden bei der
+  Stempelung automatisch von der Brutto-Dauer abgezogen. Leer lassen = Standard
+  ({% for b in default_arbeitszeiten %}{{ b.von }}&ndash;{{ b.bis }}{% if not loop.last %}, {% endif %}{% endfor %}).
+</p>
+<form method="post" action="{{ url_for('auth.update_arbeitszeiten') }}" class="card card-body mb-4">
+  <div id="az-container">
+    {% for b in current_user.arbeitszeiten %}
+    <div class="row g-2 mb-2 align-items-end az-zeile">
+      <div class="col-4 col-md-3">
+        <label class="form-label small mb-0">Von</label>
+        <input type="time" name="az_von[]" class="form-control form-control-sm" value="{{ b.von }}">
+      </div>
+      <div class="col-4 col-md-3">
+        <label class="form-label small mb-0">Bis</label>
+        <input type="time" name="az_bis[]" class="form-control form-control-sm" value="{{ b.bis }}">
+      </div>
+      <div class="col-4 col-md-2">
+        <button type="button" class="btn btn-sm btn-outline-danger az-remove">Entfernen</button>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  <template id="az-template">
+    <div class="row g-2 mb-2 align-items-end az-zeile">
+      <div class="col-4 col-md-3">
+        <label class="form-label small mb-0">Von</label>
+        <input type="time" name="az_von[]" class="form-control form-control-sm">
+      </div>
+      <div class="col-4 col-md-3">
+        <label class="form-label small mb-0">Bis</label>
+        <input type="time" name="az_bis[]" class="form-control form-control-sm">
+      </div>
+      <div class="col-4 col-md-2">
+        <button type="button" class="btn btn-sm btn-outline-danger az-remove">Entfernen</button>
+      </div>
+    </div>
+  </template>
+  <div class="d-flex gap-2 mt-2">
+    <button type="button" id="az-add" class="btn btn-sm btn-outline-primary">+ Block hinzufuegen</button>
+    <button type="submit" class="btn btn-primary">Arbeitszeiten speichern</button>
+  </div>
+</form>
+<script>
+(function() {
+  const c = document.getElementById('az-container');
+  const t = document.getElementById('az-template');
+  document.getElementById('az-add').addEventListener('click', () => c.appendChild(t.content.cloneNode(true)));
+  c.addEventListener('click', (e) => {
+    const btn = e.target.closest('.az-remove');
+    if (!btn) return;
+    const row = btn.closest('.az-zeile');
+    if (row) row.remove();
+  });
+})();
+</script>
+
 <h2 class="h5 mb-2">Passwort ändern</h2>
 <form method="post" action="{{ url_for('auth.change_password_route', username=current_user.username) }}" class="card card-body">
   <div class="row g-3">
