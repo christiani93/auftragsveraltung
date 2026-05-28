@@ -185,7 +185,25 @@ def list_users() -> list[User]:
 
 
 def migrate_legacy_roles() -> int:
-    """Migriert alte 'user'-Rolle auf 'monteur'. Liefert Anzahl geänderter Einträge."""
+    """Migriert alte 'user'-Rolle auf 'monteur'. Liefert Anzahl geänderter Einträge.
+
+    Race-sicher zwischen gunicorn-Workern via Marker-Datei (O_CREAT|O_EXCL).
+    Nur ein Worker fuehrt die Migration durch; die anderen sehen den Marker
+    und skippen sofort.
+    """
+    import config
+    marker = config.DATA_DIR / ".roles_migrated.done"
+    if marker.exists():
+        return 0
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        fd = os.open(str(marker), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError:
+        return 0
+    try:
+        os.write(fd, b"ok\n")
+    finally:
+        os.close(fd)
     count = 0
     for record in users_store.list():
         if record.get("role") == "user":

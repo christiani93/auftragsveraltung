@@ -55,12 +55,24 @@ class JsonStore:
 
     def _write_all(self, records: Iterable[Dict[str, Any]]) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = self.path.with_suffix(self.path.suffix + ".tmp")
-        with tmp.open("w", encoding="utf-8") as f:
-            json.dump(list(records), f, ensure_ascii=False, indent=2, default=_json_default)
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(tmp, self.path)
+        # WICHTIG: tmp-Dateiname pro Prozess+Thread eindeutig, damit mehrere
+        # gunicorn-Worker (separate Prozesse) nicht den gleichen .tmp benutzen
+        # und sich gegenseitig den os.replace wegnehmen. Frueher hat das beim
+        # parallelen Schreiben einen FileNotFoundError im Service-Boot ausgeloest.
+        tmp = self.path.with_suffix(self.path.suffix + f".{os.getpid()}.{threading.get_ident()}.tmp")
+        try:
+            with tmp.open("w", encoding="utf-8") as f:
+                json.dump(list(records), f, ensure_ascii=False, indent=2, default=_json_default)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp, self.path)
+        finally:
+            # Aufraeumen falls os.replace fehlschlug
+            if tmp.exists():
+                try:
+                    tmp.unlink()
+                except OSError:
+                    pass
 
     def list(self) -> List[Dict[str, Any]]:
         with self._lock:
