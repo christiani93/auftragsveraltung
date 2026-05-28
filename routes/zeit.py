@@ -251,12 +251,12 @@ def heute():
             "kunde": kunden_idx.get(a.get("kunde_id")) if a else None,
         })
 
-    # Gruppieren pro Mitarbeiter
+    # Gruppieren pro Mitarbeiter (Key = username, Anzeige-Name kommt im Template via Filter)
     pro_mitarbeiter: dict[str, dict] = {}
     for row in sichtbare:
-        mit = row["z"].get("mitarbeiter") or "—"
+        mit = row["z"].get("mitarbeiter") or ""
         if mit not in pro_mitarbeiter:
-            pro_mitarbeiter[mit] = {"name": mit, "eintraege": [], "summe": 0.0}
+            pro_mitarbeiter[mit] = {"username": mit, "eintraege": [], "summe": 0.0}
         pro_mitarbeiter[mit]["eintraege"].append(row)
         try:
             pro_mitarbeiter[mit]["summe"] += float(row["z"].get("dauer_h") or 0)

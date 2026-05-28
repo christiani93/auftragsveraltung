@@ -164,7 +164,7 @@
         {% for l in laufend %}
         {% if l.s.mitarbeiter != stempel_fuer %}
         <tr>
-          <td>{{ l.s.mitarbeiter_name or l.s.mitarbeiter }}</td>
+          <td>{{ l.s.mitarbeiter|mitarbeiter_name or l.s.mitarbeiter_name or l.s.mitarbeiter }}</td>
           <td>{{ l.start_hm }}</td>
           <td>
             {% if l.auftrag %}
@@ -197,7 +197,7 @@
 {% for mit, daten in pro_mitarbeiter.items() %}
 <div class="card mb-3">
   <div class="card-header d-flex justify-content-between align-items-center">
-    <strong>{{ daten.name }}</strong>
+    <strong>{{ (daten.username|mitarbeiter_name) or '— ohne Mitarbeiter —' }}</strong>
     <span class="badge bg-primary">{{ '%.2f'|format(daten.summe) }} h</span>
   </div>
   <div class="table-responsive">

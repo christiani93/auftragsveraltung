@@ -50,7 +50,7 @@
             {% for z in r.zeitbuchungen %}
             <tr style="background: #fafafa;">
               <td style="width: 75pt; border: none; padding-left: 18pt; font-size: 9pt;">{{ z.datum }}</td>
-              <td style="border: none; font-size: 9pt;">{{ z.taetigkeit or '(ohne Tätigkeit)' }}{% if z.mitarbeiter %} <span class="small">– {{ z.mitarbeiter }}</span>{% endif %}</td>
+              <td style="border: none; font-size: 9pt;">{{ z.taetigkeit or '(ohne Tätigkeit)' }}{% if z.mitarbeiter %} <span class="small">– {{ z.mitarbeiter|mitarbeiter_name }}</span>{% endif %}</td>
               <td style="width: 80pt; border: none; font-size: 9pt;">
                 {% if z.von_zeit and z.bis_zeit %}{{ z.von_zeit }}–{{ z.bis_zeit }}{% endif %}
               </td>

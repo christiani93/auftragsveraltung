@@ -63,7 +63,7 @@
     <div class="card card-body">
       <div class="text-muted small">Zugewiesen an</div>
       <div class="fw-semibold">
-        {% if auftrag.zugewiesen_an %}{{ auftrag.zugewiesen_an }}{% else %}<span class="text-muted">— niemand —</span>{% endif %}
+        {% if auftrag.zugewiesen_an %}{{ auftrag.zugewiesen_an|mitarbeiter_name }}{% else %}<span class="text-muted">— niemand —</span>{% endif %}
       </div>
     </div>
   </div>
@@ -156,7 +156,7 @@
         {% if b.beschreibung %}<div class="small">{{ b.beschreibung }}</div>{% endif %}
         <div class="text-muted" style="font-size: 0.7rem;">
           {{ b.hochgeladen_am[:10] }}
-          {% if b.hochgeladen_von %}· {{ b.hochgeladen_von }}{% endif %}
+          {% if b.hochgeladen_von %}· {{ b.hochgeladen_von|mitarbeiter_name }}{% endif %}
         </div>
         <form method="post" action="{{ url_for('auftraege.delete_bild', auftrag_id=auftrag.id, bild_id=b.id) }}"
               class="mt-1" onsubmit="return confirm('Bild löschen?');">
@@ -232,7 +232,7 @@
                 </select>
               </form>
             {% else %}
-              {{ z.mitarbeiter or '—' }}
+              {{ z.mitarbeiter|mitarbeiter_name or '—' }}
             {% endif %}
           </td>
           <td>{{ z.von_zeit or '—' }}</td>

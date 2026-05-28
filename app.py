@@ -12,7 +12,7 @@ import os
 import secrets
 import socket
 
-from flask import Flask, redirect, send_from_directory, url_for
+from flask import Flask, g, redirect, send_from_directory, url_for
 from flask_login import LoginManager
 
 import config
@@ -97,6 +97,20 @@ def create_app() -> Flask:
 
     from models.repos import fi_erforderlich
     app.jinja_env.globals["fi_erforderlich"] = fi_erforderlich
+
+    @app.template_filter("mitarbeiter_name")
+    def _mitarbeiter_name(username):
+        """Username -> Anzeigename. Cache pro Request via flask.g, damit users.json
+        nicht pro Tabellen-Zeile neu gelesen wird. Fallback auf den uebergebenen Wert,
+        damit Legacy-Freitext-Eintraege (z.B. 'Braunschweiler') nicht verschwinden."""
+        if not username:
+            return ""
+        cache = getattr(g, "_mitarbeiter_name_cache", None)
+        if cache is None:
+            from models.users import list_users
+            cache = {u.username: u.name for u in list_users()}
+            g._mitarbeiter_name_cache = cache
+        return cache.get(username, username)
 
     @app.before_request
     def require_login():
