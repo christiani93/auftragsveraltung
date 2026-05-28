@@ -47,6 +47,7 @@ messprotokolle = JsonStore("messprotokolle.json")
 messgeraete = JsonStore("messgeraete.json")
 auftraege = JsonStore("auftraege.json")
 zeitbuchungen = JsonStore("zeitbuchungen.json")
+stempelungen = JsonStore("stempelung.json")
 
 
 # ----- Konstanten -------------------------------------------------------------
@@ -211,6 +212,27 @@ def zeitsumme_h(eintraege: List[Dict[str, Any]]) -> float:
         if d:
             total += d
     return round(total, 2)
+
+
+# ----- Stempelung (laufende Zeit-Erfassung) ----------------------------------
+
+def aktive_stempelung_von(username: str) -> Optional[Dict[str, Any]]:
+    """Aktuell laufende Stempelung eines Mitarbeiters (max 1 pro User)."""
+    if not username:
+        return None
+    for s in stempelungen.list():
+        if (s.get("mitarbeiter") or "").lower() == username.lower():
+            return s
+    return None
+
+
+def alle_aktiven_stempelungen() -> List[Dict[str, Any]]:
+    return list(stempelungen.list())
+
+
+def zeitbuchungen_am_tag(datum_iso: str) -> List[Dict[str, Any]]:
+    """Alle abgeschlossenen Zeitbuchungen eines bestimmten Tages."""
+    return [z for z in zeitbuchungen.list() if z.get("datum") == datum_iso]
 
 
 # ----- Last-/Aufbau-Berechnung -----------------------------------------------
