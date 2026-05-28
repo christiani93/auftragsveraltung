@@ -31,6 +31,19 @@
         </select>
       </div>
 
+      <div class="col-md-4">
+        <label class="form-label">Zugewiesen an</label>
+        <select name="zugewiesen_an" class="form-select">
+          <option value="">— niemand (alle Monteure sehen es) —</option>
+          {% for m in monteure %}
+          <option value="{{ m.username }}" {% if auftrag.zugewiesen_an == m.username %}selected{% endif %}>
+            {{ m.name }} ({{ m.username }})
+          </option>
+          {% endfor %}
+        </select>
+        <small class="text-muted">Monteur sieht nur eigene + unzugewiesene Aufträge. Projektleiter/Admin sehen alle.</small>
+      </div>
+
       <div class="col-12">
         <label class="form-label">Titel *</label>
         <input type="text" name="titel" class="form-control" value="{{ auftrag.titel or '' }}" required

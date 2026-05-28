@@ -2,7 +2,9 @@
 {% block title %}Aufträge{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
-  <h1 class="h3 m-0">Aufträge</h1>
+  <h1 class="h3 m-0">Aufträge
+    {% if gefiltert %}<small class="text-muted fs-6 ms-2">(nur eigene + unzugewiesene · {{ anzahl_sichtbar }}/{{ anzahl_total }})</small>{% endif %}
+  </h1>
   <a href="{{ url_for('auftraege.new_auftrag') }}" class="btn btn-primary">+ Neuer Auftrag</a>
 </div>
 

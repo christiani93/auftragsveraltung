@@ -60,6 +60,14 @@
   </div>
   <div class="col-md-3">
     <div class="card card-body">
+      <div class="text-muted small">Zugewiesen an</div>
+      <div class="fw-semibold">
+        {% if auftrag.zugewiesen_an %}{{ auftrag.zugewiesen_an }}{% else %}<span class="text-muted">— niemand —</span>{% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card card-body">
       <div class="text-muted small">Schnellaktion</div>
       <div class="btn-group btn-group-sm" role="group">
         <form method="post" action="{{ url_for('auftraege.set_status', auftrag_id=auftrag.id) }}" class="d-inline">
@@ -232,8 +240,52 @@
 </div>
 {% endif %}
 
+<div class="card card-body mb-3 border-primary">
+  <h6 class="text-muted small mb-2">⏱ Stempeln</h6>
+  {% if aktive_stempelung and aktive_stempelung.auftrag_id == auftrag.id %}
+    <div class="alert alert-warning d-flex justify-content-between align-items-center mb-2">
+      <div>
+        <strong>Du bist auf diesem Auftrag eingestempelt.</strong>
+        <div class="small">Seit {{ aktive_stempelung.start[11:16] }} ({{ aktive_stempelung.start[:10] }})
+          {% if aktive_stempelung.taetigkeit %} · {{ aktive_stempelung.taetigkeit }}{% endif %}
+        </div>
+      </div>
+    </div>
+    <form method="post" action="{{ url_for('zeit.stempel_stop') }}" class="d-flex flex-wrap gap-2 align-items-end">
+      <div class="flex-grow-1" style="min-width: 200px;">
+        <label class="form-label small mb-0">Tätigkeit (optional ergänzen)</label>
+        <input type="text" name="taetigkeit" class="form-control form-control-sm" value="{{ aktive_stempelung.taetigkeit or '' }}">
+      </div>
+      <button type="submit" class="btn btn-success">⏹ Ausstempeln</button>
+    </form>
+    <form method="post" action="{{ url_for('zeit.stempel_abbrechen') }}" class="mt-2"
+          onsubmit="return confirm('Stempelung wirklich verwerfen? Es wird KEINE Zeitbuchung angelegt.');">
+      <button type="submit" class="btn btn-sm btn-outline-secondary">Verwerfen (keine Buchung)</button>
+    </form>
+  {% elif aktive_stempelung %}
+    <div class="alert alert-info mb-0">
+      Du bist bereits auf einem <strong>anderen</strong> Auftrag eingestempelt
+      ({% if aktive_stempelung.auftrag_id %}<a href="{{ url_for('auftraege.detail', auftrag_id=aktive_stempelung.auftrag_id) }}">öffnen</a>{% else %}—{% endif %},
+      seit {{ aktive_stempelung.start[11:16] }}).
+      Bitte dort zuerst ausstempeln.
+    </div>
+  {% else %}
+    <form method="post" action="{{ url_for('zeit.stempel_start') }}" class="d-flex flex-wrap gap-2 align-items-end">
+      <input type="hidden" name="auftrag_id" value="{{ auftrag.id }}">
+      <div class="flex-grow-1" style="min-width: 200px;">
+        <label class="form-label small mb-0">Tätigkeit (optional)</label>
+        <input type="text" name="taetigkeit" class="form-control form-control-sm" placeholder="z.B. Verdrahtung Verteiler">
+      </div>
+      <button type="submit" class="btn btn-primary">▶ Einstempeln</button>
+    </form>
+  {% endif %}
+  <div class="text-muted small mt-2">
+    Beim Ausstempeln wird automatisch eine Zeitbuchung angelegt. Übersicht: <a href="{{ url_for('zeit.heute') }}">Zeiterfassung heute →</a>
+  </div>
+</div>
+
 <form method="post" action="{{ url_for('auftraege.add_zeitbuchung', auftrag_id=auftrag.id) }}" class="card card-body">
-  <h6 class="text-muted small">Neue Zeitbuchung</h6>
+  <h6 class="text-muted small">Neue Zeitbuchung (manuell)</h6>
   <div class="row g-2">
     <div class="col-6 col-md-2">
       <label class="form-label small">Datum</label>

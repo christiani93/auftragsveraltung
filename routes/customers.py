@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+from flask_login import current_user
 
 from models.repos import (
     AUFTRAG_STATUS_LABEL,
@@ -8,6 +9,18 @@ from models.repos import (
     auftraege_fuer_kunde,
     kunden,
 )
+
+
+def _darf_auftrag_sehen(auftrag: dict) -> bool:
+    """Spiegelt routes/auftraege.py — Monteur sieht nur eigene + unzugewiesene."""
+    if not current_user.is_authenticated:
+        return False
+    if current_user.sieht_alle_auftraege:
+        return True
+    zugewiesen = (auftrag.get("zugewiesen_an") or "").strip()
+    if not zugewiesen:
+        return True
+    return zugewiesen.lower() == current_user.username.lower()
 
 bp = Blueprint("customers", __name__)
 
@@ -74,7 +87,7 @@ def detail(kunde_id: str):
     if not kunde:
         abort(404)
     auftraege_dieses_kunden = sorted(
-        auftraege_fuer_kunde(kunde_id),
+        [a for a in auftraege_fuer_kunde(kunde_id) if _darf_auftrag_sehen(a)],
         key=lambda a: (a.get("status") != "offen", a.get("status") != "in_arbeit", a.get("erteilungsdatum", "")),
     )
     return render_template(

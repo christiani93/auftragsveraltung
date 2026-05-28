@@ -14,6 +14,7 @@ import config
 from models.repos import (
     AUFTRAG_STATUS,
     AUFTRAG_STATUS_LABEL,
+    aktive_stempelung_von,
     anlagen,
     anlagen_fuer_kunde,
     anlagen_ids_im_auftrag,
@@ -26,6 +27,7 @@ from models.repos import (
     zeitbuchungen_fuer_auftrag,
     zeitsumme_h,
 )
+from models.users import list_monteure
 
 bp = Blueprint("auftraege", __name__)
 
@@ -54,10 +56,23 @@ def _form_to_auftrag(form) -> dict:
         "erteilt_von": form.get("erteilt_von", "").strip(),
         "erteilt_von_telefon": form.get("erteilt_von_telefon", "").strip(),
         "anlagenteil_ids": form.getlist("anlagenteil_ids"),
+        "zugewiesen_an": form.get("zugewiesen_an", "").strip(),
         "status": form.get("status", "offen") if form.get("status") in AUFTRAG_STATUS else "offen",
         "erledigt_am": form.get("erledigt_am", "").strip() or None,
         "notizen": form.get("notizen", "").strip(),
     }
+
+
+def _darf_auftrag_sehen(auftrag: dict) -> bool:
+    """Sichtbarkeitsregel: Admin/Projektleiter sehen alles, Monteur nur eigene + unzugewiesene."""
+    if not current_user.is_authenticated:
+        return False
+    if current_user.sieht_alle_auftraege:
+        return True
+    zugewiesen = (auftrag.get("zugewiesen_an") or "").strip()
+    if not zugewiesen:
+        return True  # unzugewiesen → für alle Monteure sichtbar
+    return zugewiesen.lower() == current_user.username.lower()
 
 
 def _teile_strukturiert(kunde_id: str):
@@ -75,10 +90,16 @@ def _teile_strukturiert(kunde_id: str):
 @bp.route("/")
 def list_auftraege():
     alle = sorted(auftraege.list(), key=lambda a: a.get("erteilungsdatum", ""), reverse=True)
+    sichtbar = [a for a in alle if _darf_auftrag_sehen(a)]
     kunden_idx = {k["id"]: k for k in kunden.list()}
-    rows = [{"auftrag": a, "kunde": kunden_idx.get(a.get("kunde_id"))} for a in alle]
+    rows = [{"auftrag": a, "kunde": kunden_idx.get(a.get("kunde_id"))} for a in sichtbar]
     return render_template(
-        "auftraege/list.html", rows=rows, status_label=AUFTRAG_STATUS_LABEL,
+        "auftraege/list.html",
+        rows=rows,
+        status_label=AUFTRAG_STATUS_LABEL,
+        gefiltert=not current_user.sieht_alle_auftraege,
+        anzahl_total=len(alle),
+        anzahl_sichtbar=len(sichtbar),
     )
 
 
@@ -98,6 +119,7 @@ def new_auftrag():
                 kunde=kunde,
                 anlagen_mit_teilen=_teile_strukturiert(data["kunde_id"]) if data["kunde_id"] else [],
                 status_optionen=AUFTRAG_STATUS, status_label=AUFTRAG_STATUS_LABEL,
+                monteure=list_monteure(),
             )
         record = auftraege.create(data)
         flash(f"Auftrag „{record['titel']}“ angelegt.", "success")
@@ -117,6 +139,7 @@ def new_auftrag():
         kunde=kunde,
         anlagen_mit_teilen=_teile_strukturiert(kunde_id) if kunde_id else [],
         status_optionen=AUFTRAG_STATUS, status_label=AUFTRAG_STATUS_LABEL,
+        monteure=list_monteure(),
     )
 
 
@@ -125,6 +148,8 @@ def detail(auftrag_id: str):
     auftrag = auftraege.get(auftrag_id)
     if not auftrag:
         abort(404)
+    if not _darf_auftrag_sehen(auftrag):
+        abort(403)
     kunde = kunden.get(auftrag.get("kunde_id"))
     teile_idx = {t["id"]: t for t in anlagenteile.list()}
     anlagen_idx = {a["id"]: a for a in anlagen.list()}
@@ -137,6 +162,7 @@ def detail(auftrag_id: str):
     anlage_ids = anlagen_ids_im_auftrag(auftrag)
     auftrag_anlagen = [anlagen_idx[aid] for aid in anlage_ids if aid in anlagen_idx]
     eintraege = zeitbuchungen_fuer_auftrag(auftrag_id)
+    aktive_stempelung = aktive_stempelung_von(current_user.username) if current_user.is_authenticated else None
     return render_template(
         "auftraege/detail.html",
         auftrag=auftrag, kunde=kunde, betroffene=betroffene,
@@ -145,6 +171,7 @@ def detail(auftrag_id: str):
         zeitsumme=zeitsumme_h(eintraege),
         today_iso=date.today().isoformat(),
         status_label=AUFTRAG_STATUS_LABEL,
+        aktive_stempelung=aktive_stempelung,
     )
 
 
@@ -153,6 +180,8 @@ def edit_auftrag(auftrag_id: str):
     auftrag = auftraege.get(auftrag_id)
     if not auftrag:
         abort(404)
+    if not _darf_auftrag_sehen(auftrag):
+        abort(403)
     if request.method == "POST":
         data = _form_to_auftrag(request.form)
         if not data["kunde_id"] or not data["titel"]:
@@ -164,6 +193,7 @@ def edit_auftrag(auftrag_id: str):
                 kunde=kunden.get(data["kunde_id"]) if data["kunde_id"] else None,
                 anlagen_mit_teilen=_teile_strukturiert(data["kunde_id"]) if data["kunde_id"] else [],
                 status_optionen=AUFTRAG_STATUS, status_label=AUFTRAG_STATUS_LABEL,
+                monteure=list_monteure(),
             )
         auftraege.update(auftrag_id, data)
         flash("Auftrag gespeichert.", "success")
@@ -175,6 +205,7 @@ def edit_auftrag(auftrag_id: str):
         kunde=kunden.get(auftrag.get("kunde_id")),
         anlagen_mit_teilen=_teile_strukturiert(auftrag.get("kunde_id", "")),
         status_optionen=AUFTRAG_STATUS, status_label=AUFTRAG_STATUS_LABEL,
+        monteure=list_monteure(),
     )
 
 
