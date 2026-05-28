@@ -17,9 +17,22 @@
 
 {# ============ Stempel-Kontrolle (oben, immer sichtbar) ============ #}
 {% if ist_heute %}
-<div class="card mb-4 border-primary">
-  <div class="card-header bg-primary text-white">
-    <strong>⏱ Meine Stempelung</strong>
+<div class="card mb-4 {% if ist_fremd_stempelung %}border-danger{% else %}border-primary{% endif %}">
+  <div class="card-header {% if ist_fremd_stempelung %}bg-danger{% else %}bg-primary{% endif %} text-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <strong>
+      ⏱ Stempelung
+      {% if ist_fremd_stempelung %}— für {{ stempel_fuer_name }} (Admin-Modus){% else %}— {{ stempel_fuer_name }}{% endif %}
+    </strong>
+    {% if current_user.is_admin %}
+    <form method="get" action="{{ url_for('zeit.heute') }}" class="d-flex gap-2 align-items-center">
+      <label class="small mb-0">Stempeln für:</label>
+      <select name="stempel_fuer" class="form-select form-select-sm" onchange="this.form.submit();">
+        {% for u in alle_user %}
+        <option value="{{ u.username }}" {% if u.username == stempel_fuer %}selected{% endif %}>{{ u.name }} ({{ u.username }})</option>
+        {% endfor %}
+      </select>
+    </form>
+    {% endif %}
   </div>
   <div class="card-body">
     {% if eigene_stempelung %}
@@ -29,14 +42,10 @@
           <div class="fs-4 fw-bold">{{ eigene_stempelung.start_hm }}</div>
         </div>
         <div class="col-md-3">
-          <div class="text-muted small">Brutto bisher</div>
-          <div class="fs-4 fw-bold">{{ '%.2f'|format(eigene_stempelung.brutto_h_live) }} h</div>
+          <div class="text-muted small">Bisher</div>
+          <div class="fs-4 fw-bold text-success">{{ '%.2f'|format(eigene_stempelung.dauer_h_live) }} h</div>
         </div>
-        <div class="col-md-3">
-          <div class="text-muted small">Netto (mit Pausen-Abzug)</div>
-          <div class="fs-4 fw-bold text-success">{{ '%.2f'|format(eigene_stempelung.netto_h_live) }} h</div>
-        </div>
-        <div class="col-md-3">
+        <div class="col-md-6">
           <div class="text-muted small">Aktueller Auftrag</div>
           <div class="fw-semibold">
             {% if eigene_stempelung.auftrag %}
@@ -54,6 +63,7 @@
 
       {# Auftrag-Wechsel-Form #}
       <form method="post" action="{{ url_for('zeit.stempel_wechsel') }}" class="row g-2 align-items-end mb-2">
+        <input type="hidden" name="fuer_mitarbeiter" value="{{ stempel_fuer }}">
         <div class="col-md-6">
           <label class="form-label small mb-0">→ Auftrag wechseln auf</label>
           <select name="auftrag_id" class="form-select form-select-sm" required>
@@ -75,6 +85,7 @@
       {# Auftrag-Zuordnen ohne Buchung (wenn aktuell noch keiner zugeordnet) #}
       {% if not eigene_stempelung.auftrag %}
       <form method="post" action="{{ url_for('zeit.stempel_auftrag_zuordnen') }}" class="row g-2 align-items-end mb-2">
+        <input type="hidden" name="fuer_mitarbeiter" value="{{ stempel_fuer }}">
         <div class="col-md-9">
           <label class="form-label small mb-0">Auftrag dem laufenden Block zuordnen (keine neue Buchung)</label>
           <select name="auftrag_id" class="form-select form-select-sm" required>
@@ -92,16 +103,22 @@
 
       <div class="d-flex gap-2 mt-3">
         <form method="post" action="{{ url_for('zeit.stempel_stop') }}" class="d-inline">
+          <input type="hidden" name="fuer_mitarbeiter" value="{{ stempel_fuer }}">
           <button type="submit" class="btn btn-success">⏹ Ausstempeln (Tagesende)</button>
         </form>
         <form method="post" action="{{ url_for('zeit.stempel_abbrechen') }}" class="d-inline"
               onsubmit="return confirm('Stempelung wirklich verwerfen? Es wird KEINE Zeitbuchung angelegt.');">
+          <input type="hidden" name="fuer_mitarbeiter" value="{{ stempel_fuer }}">
           <button type="submit" class="btn btn-sm btn-outline-secondary">Verwerfen (keine Buchung)</button>
         </form>
       </div>
     {% else %}
-      <p class="text-muted mb-3">Du bist gerade nicht eingestempelt. Tagesbeginn? Hier starten:</p>
+      <p class="text-muted mb-3">
+        {% if ist_fremd_stempelung %}{{ stempel_fuer_name }} ist{% else %}Du bist{% endif %}
+        gerade nicht eingestempelt.
+      </p>
       <form method="post" action="{{ url_for('zeit.stempel_start') }}" class="row g-2 align-items-end">
+        <input type="hidden" name="fuer_mitarbeiter" value="{{ stempel_fuer }}">
         <div class="col-md-6">
           <label class="form-label small mb-0">Auftrag (optional — kann später zugeordnet werden)</label>
           <select name="auftrag_id" class="form-select form-select-sm">
@@ -124,8 +141,9 @@
 </div>
 {% endif %}
 
-{# ============ Andere laufende Stempelungen (nur Admin/Projektleiter) ============ #}
-{% if laufend|length > (1 if eigene_stempelung else 0) %}
+{# ============ Andere laufende Stempelungen (Admin/Projektleiter) ============ #}
+{% set anzahl_andere = laufend|selectattr('s.mitarbeiter', 'ne', stempel_fuer)|list|length %}
+{% if anzahl_andere > 0 %}
 <div class="card mb-4 border-warning">
   <div class="card-header bg-warning-subtle">
     <strong>⏱ Laufende Stempelungen anderer Mitarbeiter</strong>
@@ -138,13 +156,13 @@
           <th>Start</th>
           <th>Auftrag / Kunde</th>
           <th>Tätigkeit</th>
-          <th class="text-end">Brutto</th>
-          <th class="text-end">Netto</th>
+          <th class="text-end">Bisher</th>
+          {% if current_user.is_admin %}<th></th>{% endif %}
         </tr>
       </thead>
       <tbody>
         {% for l in laufend %}
-        {% if l.s.mitarbeiter != current_user.username %}
+        {% if l.s.mitarbeiter != stempel_fuer %}
         <tr>
           <td>{{ l.s.mitarbeiter_name or l.s.mitarbeiter }}</td>
           <td>{{ l.start_hm }}</td>
@@ -155,8 +173,12 @@
             {% else %}<span class="text-muted">— nicht zugeordnet —</span>{% endif %}
           </td>
           <td>{{ l.s.taetigkeit or '' }}</td>
-          <td class="text-end">{{ '%.2f'|format(l.brutto_h_live) }} h</td>
-          <td class="text-end fw-semibold">{{ '%.2f'|format(l.netto_h_live) }} h</td>
+          <td class="text-end fw-semibold">{{ '%.2f'|format(l.dauer_h_live) }} h</td>
+          {% if current_user.is_admin %}
+          <td class="text-end">
+            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('zeit.heute', stempel_fuer=l.s.mitarbeiter) }}">Stempeln für →</a>
+          </td>
+          {% endif %}
         </tr>
         {% endif %}
         {% endfor %}
@@ -184,8 +206,7 @@
         <tr>
           <th>Von</th>
           <th>Bis</th>
-          <th class="text-end">Netto</th>
-          <th class="text-end">Brutto</th>
+          <th class="text-end">Stunden</th>
           <th>Auftrag / Kunde</th>
           <th>Tätigkeit</th>
           <th></th>
@@ -197,12 +218,6 @@
           <td>{{ row.z.von_zeit or '—' }}</td>
           <td>{{ row.z.bis_zeit or '—' }}</td>
           <td class="text-end fw-semibold">{{ '%.2f'|format(row.z.dauer_h) }}</td>
-          <td class="text-end text-muted small">
-            {% if row.z.brutto_h is defined and row.z.brutto_h %}{{ '%.2f'|format(row.z.brutto_h) }}{% else %}—{% endif %}
-            {% if row.z.pause_h_abgezogen and row.z.pause_h_abgezogen > 0 %}
-              <div title="Pause aus Arbeitszeit-Profil abgezogen">−{{ '%.2f'|format(row.z.pause_h_abgezogen) }} h</div>
-            {% endif %}
-          </td>
           <td>
             {% if row.auftrag %}
               <a href="{{ url_for('auftraege.detail', auftrag_id=row.auftrag.id) }}">{{ row.auftrag.titel }}</a>

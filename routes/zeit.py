@@ -1,8 +1,11 @@
 """Stempelung (Komm/Geh) + Tagesansicht der Zeiterfassung.
 
-Stempeln Start (auf einem Auftrag) → Eintrag in stempelung.json.
+Stempeln Start (optional mit Auftrag) → Eintrag in stempelung.json.
 Stempeln Stop → Eintrag wird in eine Zeitbuchung (zeitbuchungen.json)
-ueberfuehrt, mit Datum + Von/Bis + Dauer.
+ueberfuehrt, mit Datum + Von/Bis + Dauer (brutto, kein Pausen-Abzug).
+
+Admin kann fuer andere Mitarbeiter stempeln (Form-Feld 'fuer_mitarbeiter').
+Monteur stempelt immer fuer sich selbst.
 """
 from __future__ import annotations
 
@@ -20,75 +23,9 @@ from models.repos import (
     zeitbuchungen,
     zeitbuchungen_am_tag,
 )
-from models.users import find_user
+from models.users import find_user, list_users
 
 bp = Blueprint("zeit", __name__)
-
-
-# ----- Pausen-Logik ----------------------------------------------------------
-
-def _hhmm_zu_minuten(value: str) -> int:
-    """'HH:MM' -> Minuten seit 00:00. Liefert 0 bei kaputtem Format."""
-    try:
-        h, m = value.split(":")
-        return int(h) * 60 + int(m)
-    except (ValueError, AttributeError):
-        return 0
-
-
-def _bloecke_zu_minuten(arbeitszeiten: list[dict]) -> list[tuple[int, int]]:
-    out: list[tuple[int, int]] = []
-    for b in arbeitszeiten or []:
-        v = _hhmm_zu_minuten(b.get("von", ""))
-        bi = _hhmm_zu_minuten(b.get("bis", ""))
-        if bi > v:
-            out.append((v, bi))
-    out.sort()
-    return out
-
-
-def _pausen_aus_bloecken(bloecke_min: list[tuple[int, int]]) -> list[tuple[int, int]]:
-    """Liefert die Pausen zwischen aufeinanderfolgenden Arbeitsbloecken."""
-    pausen: list[tuple[int, int]] = []
-    for i in range(len(bloecke_min) - 1):
-        ende_a = bloecke_min[i][1]
-        start_b = bloecke_min[i + 1][0]
-        if start_b > ende_a:
-            pausen.append((ende_a, start_b))
-    return pausen
-
-
-def netto_dauer_h(start: datetime, ende: datetime, arbeitszeiten: list[dict]) -> float:
-    """Effektive Arbeitsdauer in Stunden zwischen start und ende, abzueglich der
-    geplanten Pausen, die in den Zeitraum fallen.
-
-    - Wenn start/ende ueber Mitternacht gehen, wird konservativ einfach die
-      Brutto-Dauer zurueckgegeben (Pausen-Abzug greift nur fuer Buchungen innerhalb
-      eines Kalendertages).
-    - Pausen werden pro Kalendertag berechnet (geplant aus Arbeitsbloecken).
-    """
-    brutto_min = (ende - start).total_seconds() / 60.0
-    if brutto_min <= 0:
-        return 0.0
-    # Nur Bloecke innerhalb desselben Tages mit Pausen-Abzug bedienen
-    if start.date() != ende.date():
-        return round(brutto_min / 60.0, 2)
-    pausen = _pausen_aus_bloecken(_bloecke_zu_minuten(arbeitszeiten))
-    start_min = start.hour * 60 + start.minute + start.second / 60.0
-    ende_min = ende.hour * 60 + ende.minute + ende.second / 60.0
-    pause_min = 0.0
-    for p_von, p_bis in pausen:
-        ueberlapp = max(0.0, min(ende_min, p_bis) - max(start_min, p_von))
-        pause_min += ueberlapp
-    netto = max(0.0, brutto_min - pause_min)
-    return round(netto / 60.0, 2)
-
-
-def _arbeitszeiten_von(username: str) -> list[dict]:
-    user = find_user(username)
-    if not user:
-        return []
-    return user.arbeitszeiten
 
 
 def _darf_auftrag_sehen(auftrag: dict) -> bool:
@@ -110,22 +47,41 @@ def _parse_dt(value: str) -> datetime:
         return datetime.now()
 
 
-def _stempelung_abschliessen(aktive: dict, taetigkeit_override: str = "", notizen: str = "") -> tuple[float, float]:
+def _validierter_auftrag(auftrag_id: str) -> dict | None:
+    if not auftrag_id:
+        return None
+    a = auftraege.get(auftrag_id)
+    if not a or not _darf_auftrag_sehen(a):
+        return None
+    return a
+
+
+def _ziel_mitarbeiter() -> tuple[str, str]:
+    """Liefert (username, anzeigename) — der User, fuer den die Stempel-Aktion gilt.
+
+    Admin darf via Form-Feld 'fuer_mitarbeiter' fuer jemand anderen stempeln,
+    alle anderen Rollen stempeln nur fuer sich selbst.
+    """
+    if current_user.is_admin:
+        gewuenscht = request.form.get("fuer_mitarbeiter", "").strip()
+        if gewuenscht and gewuenscht != current_user.username:
+            u = find_user(gewuenscht)
+            if u:
+                return u.username, u.name
+    return current_user.username, current_user.name
+
+
+def _stempelung_abschliessen(aktive: dict, taetigkeit_override: str = "", notizen: str = "") -> float:
     """Erzeugt eine Zeitbuchung aus der aktiven Stempelung, loescht die Stempelung.
 
-    Liefert (brutto_h, netto_h) — netto = brutto minus geplante Pausen aus den
-    Arbeitszeiten des Mitarbeiters.
+    Liefert die gebuchte Dauer in Stunden (brutto, kein Pausen-Abzug).
     """
     start = _parse_dt(aktive.get("start", ""))
     ende = datetime.now()
     if ende <= start:
-        # System-Uhr-Sprung: minimale Dauer einsetzen
         ende = start + timedelta(minutes=1)
-    brutto_min = (ende - start).total_seconds() / 60.0
-    brutto_h = round(brutto_min / 60.0, 2)
-    arbeitszeiten = _arbeitszeiten_von(aktive.get("mitarbeiter") or "")
-    netto_h = netto_dauer_h(start, ende, arbeitszeiten)
-    pause_h = round(brutto_h - netto_h, 2)
+    dauer_min = (ende - start).total_seconds() / 60.0
+    dauer_h = round(dauer_min / 60.0, 2)
 
     taetigkeit = taetigkeit_override.strip() or aktive.get("taetigkeit", "")
 
@@ -135,80 +91,66 @@ def _stempelung_abschliessen(aktive: dict, taetigkeit_override: str = "", notize
         "mitarbeiter": aktive.get("mitarbeiter") or current_user.username,
         "von_zeit": start.strftime("%H:%M"),
         "bis_zeit": ende.strftime("%H:%M"),
-        "dauer_h": netto_h,
-        "brutto_h": brutto_h,
-        "pause_h_abgezogen": pause_h,
+        "dauer_h": dauer_h,
         "taetigkeit": taetigkeit,
         "notizen": notizen.strip(),
         "via_stempelung": True,
     })
     stempelungen.delete(aktive["id"])
-    return brutto_h, netto_h
-
-
-def _validierter_auftrag(auftrag_id: str) -> dict | None:
-    """Liefert den Auftrag, wenn er existiert und der User ihn sehen darf — sonst None."""
-    if not auftrag_id:
-        return None
-    a = auftraege.get(auftrag_id)
-    if not a or not _darf_auftrag_sehen(a):
-        return None
-    return a
+    return dauer_h
 
 
 @bp.route("/stempel/start", methods=["POST"])
 @login_required
 def stempel_start():
-    """Stempelt ein. auftrag_id ist optional — am Tagesbeginn kann ohne Auftrag begonnen werden."""
+    """Stempelt ein. auftrag_id optional — Auftrag kann nachtraeglich zugeordnet werden."""
     auftrag_id = request.form.get("auftrag_id", "").strip()
     if auftrag_id and not _validierter_auftrag(auftrag_id):
         flash("Auftrag nicht gefunden oder keine Berechtigung.", "warning")
         return redirect(request.referrer or url_for("zeit.heute"))
 
-    if aktive_stempelung_von(current_user.username):
-        flash("Du bist bereits eingestempelt — nutze 'Auftrag wechseln' oder 'Ausstempeln'.", "warning")
+    ziel_user, ziel_name = _ziel_mitarbeiter()
+
+    if aktive_stempelung_von(ziel_user):
+        flash(f"{ziel_name} ist bereits eingestempelt — nutze 'Auftrag wechseln' oder 'Ausstempeln'.", "warning")
         return redirect(url_for("zeit.heute"))
 
     stempelungen.create({
-        "mitarbeiter": current_user.username,
-        "mitarbeiter_name": current_user.name,
+        "mitarbeiter": ziel_user,
+        "mitarbeiter_name": ziel_name,
         "auftrag_id": auftrag_id,
         "start": datetime.now().isoformat(timespec="seconds"),
         "taetigkeit": request.form.get("taetigkeit", "").strip(),
     })
+    wer = "Eingestempelt" if ziel_user == current_user.username else f"{ziel_name} eingestempelt"
     if auftrag_id:
-        flash("Eingestempelt.", "success")
+        flash(f"{wer}.", "success")
     else:
-        flash("Eingestempelt — Auftrag kannst du in der Zeiterfassung nachtraeglich zuordnen.", "success")
+        flash(f"{wer} — Auftrag kannst du nachtraeglich zuordnen.", "success")
     return redirect(url_for("zeit.heute"))
 
 
 @bp.route("/stempel/wechsel", methods=["POST"])
 @login_required
 def stempel_wechsel():
-    """Schliesst die aktuelle Stempelung als Zeitbuchung ab und startet eine neue.
-
-    Wenn nichts laeuft, wird einfach gestartet.
-    """
+    """Schliesst die aktuelle Stempelung als Zeitbuchung ab und startet eine neue."""
     neuer_auftrag_id = request.form.get("auftrag_id", "").strip()
     if neuer_auftrag_id and not _validierter_auftrag(neuer_auftrag_id):
         flash("Auftrag nicht gefunden oder keine Berechtigung.", "warning")
         return redirect(request.referrer or url_for("zeit.heute"))
 
-    aktive = aktive_stempelung_von(current_user.username)
+    ziel_user, ziel_name = _ziel_mitarbeiter()
+    aktive = aktive_stempelung_von(ziel_user)
     taetigkeit_neu = request.form.get("taetigkeit", "").strip()
 
     if aktive:
-        # Alte Stempelung abschliessen (mit ihrer eigenen Taetigkeit) und neue starten
-        brutto_h, netto_h = _stempelung_abschliessen(aktive)
-        meldung_alt = f"Umgestempelt — vorheriger Block: {netto_h} h"
-        if brutto_h != netto_h:
-            meldung_alt += f" (brutto {brutto_h} h, Pause -{round(brutto_h - netto_h, 2)} h)"
-        flash(meldung_alt + ".", "info")
+        dauer_h = _stempelung_abschliessen(aktive)
+        praefix = "Umgestempelt" if ziel_user == current_user.username else f"{ziel_name} umgestempelt"
+        flash(f"{praefix} — vorheriger Block: {dauer_h} h.", "info")
 
     stempelungen.create({
-        "mitarbeiter": current_user.username,
-        "mitarbeiter_name": current_user.name,
+        "mitarbeiter": ziel_user,
+        "mitarbeiter_name": ziel_name,
         "auftrag_id": neuer_auftrag_id,
         "start": datetime.now().isoformat(timespec="seconds"),
         "taetigkeit": taetigkeit_neu,
@@ -220,23 +162,19 @@ def stempel_wechsel():
 @bp.route("/stempel/stop", methods=["POST"])
 @login_required
 def stempel_stop():
-    aktive = aktive_stempelung_von(current_user.username)
+    ziel_user, ziel_name = _ziel_mitarbeiter()
+    aktive = aktive_stempelung_von(ziel_user)
     if not aktive:
-        flash("Keine laufende Stempelung.", "warning")
+        flash(f"Keine laufende Stempelung fuer {ziel_name}.", "warning")
         return redirect(request.referrer or url_for("zeit.heute"))
 
-    brutto_h, netto_h = _stempelung_abschliessen(
+    dauer_h = _stempelung_abschliessen(
         aktive,
         taetigkeit_override=request.form.get("taetigkeit", ""),
         notizen=request.form.get("notizen", ""),
     )
-    if brutto_h != netto_h:
-        flash(
-            f"Ausgestempelt — {netto_h} h gebucht (brutto {brutto_h} h, Pause -{round(brutto_h - netto_h, 2)} h).",
-            "success",
-        )
-    else:
-        flash(f"Ausgestempelt — {netto_h} h gebucht.", "success")
+    praefix = "Ausgestempelt" if ziel_user == current_user.username else f"{ziel_name} ausgestempelt"
+    flash(f"{praefix} — {dauer_h} h gebucht.", "success")
     return redirect(url_for("zeit.heute"))
 
 
@@ -244,22 +182,21 @@ def stempel_stop():
 @login_required
 def stempel_abbrechen():
     """Laufende Stempelung verwerfen — ohne Zeitbuchung anzulegen."""
-    aktive = aktive_stempelung_von(current_user.username)
+    ziel_user, ziel_name = _ziel_mitarbeiter()
+    aktive = aktive_stempelung_von(ziel_user)
     if aktive:
         stempelungen.delete(aktive["id"])
-        flash("Stempelung verworfen — keine Zeit gebucht.", "info")
+        praefix = "Stempelung verworfen" if ziel_user == current_user.username else f"Stempelung von {ziel_name} verworfen"
+        flash(f"{praefix} — keine Zeit gebucht.", "info")
     return redirect(request.referrer or url_for("zeit.heute"))
 
 
 @bp.route("/stempel/auftrag-zuordnen", methods=["POST"])
 @login_required
 def stempel_auftrag_zuordnen():
-    """Aendert den Auftrag der laufenden Stempelung OHNE umzustempeln (keine neue Buchung).
-
-    Praktisch, wenn man am Tagesstart ohne Auftrag eingestempelt hat und
-    nachtraeglich noch denselben Block einem Auftrag zuordnen will.
-    """
-    aktive = aktive_stempelung_von(current_user.username)
+    """Aendert den Auftrag der laufenden Stempelung OHNE eine Buchung zu erzeugen."""
+    ziel_user, _ = _ziel_mitarbeiter()
+    aktive = aktive_stempelung_von(ziel_user)
     if not aktive:
         flash("Keine laufende Stempelung.", "warning")
         return redirect(url_for("zeit.heute"))
@@ -283,6 +220,18 @@ def heute():
         d = date.today()
     datum_iso = d.isoformat()
 
+    # Wer wird in der Stempel-Karte oben angezeigt? Admin kann via ?stempel_fuer=...
+    # einen anderen Mitarbeiter waehlen; default = self.
+    stempel_fuer = current_user.username
+    if current_user.is_admin:
+        gewuenscht = request.args.get("stempel_fuer", "").strip()
+        if gewuenscht:
+            u = find_user(gewuenscht)
+            if u:
+                stempel_fuer = u.username
+    stempel_fuer_user = find_user(stempel_fuer)
+    stempel_fuer_name = stempel_fuer_user.name if stempel_fuer_user else stempel_fuer
+
     eintraege = zeitbuchungen_am_tag(datum_iso)
 
     # Sichtbarkeitsfilter wie bei Aufträgen
@@ -295,7 +244,6 @@ def heute():
             continue
         if (not current_user.sieht_alle_auftraege
                 and (z.get("mitarbeiter") or "").lower() != current_user.username.lower()):
-            # Monteur sieht nur eigene Zeitbuchungen (auch wenn Auftrag unzugewiesen)
             continue
         sichtbare.append({
             "z": z,
@@ -314,40 +262,39 @@ def heute():
             pro_mitarbeiter[mit]["summe"] += float(row["z"].get("dauer_h") or 0)
         except (TypeError, ValueError):
             pass
-
     for daten in pro_mitarbeiter.values():
         daten["eintraege"].sort(key=lambda r: r["z"].get("von_zeit") or "")
         daten["summe"] = round(daten["summe"], 2)
 
-    # Laufende Stempelungen (fuer Anzeige) + eigene (fuer Stempel-Karte oben)
-    eigene_aktive = aktive_stempelung_von(current_user.username)
+    # Aktive Stempelung des "gewaehlten" Users (Karte oben)
+    aktive_fuer_karte = aktive_stempelung_von(stempel_fuer)
+
+    # Andere laufende Stempelungen (Anzeige fuer Admin/Projektleiter)
     if current_user.sieht_alle_auftraege:
-        laufend = alle_aktiven_stempelungen()
+        alle_laufend = alle_aktiven_stempelungen()
     else:
-        laufend = [eigene_aktive] if eigene_aktive else []
+        alle_laufend = [aktive_fuer_karte] if aktive_fuer_karte else []
 
     jetzt = datetime.now()
     laufend_aufbereitet = []
-    for s in laufend:
+    for s in alle_laufend:
         start = _parse_dt(s.get("start", ""))
         a = auftraege_idx.get(s.get("auftrag_id") or "")
-        brutto_h = round((jetzt - start).total_seconds() / 3600.0, 2)
-        netto_h = netto_dauer_h(start, jetzt, _arbeitszeiten_von(s.get("mitarbeiter") or ""))
+        dauer_h = round((jetzt - start).total_seconds() / 3600.0, 2)
         laufend_aufbereitet.append({
             "s": s,
             "auftrag": a,
             "kunde": kunden_idx.get(a.get("kunde_id")) if a else None,
             "start_hm": start.strftime("%H:%M"),
-            "brutto_h_live": brutto_h,
-            "netto_h_live": netto_h,
+            "dauer_h_live": dauer_h,
         })
 
-    # Auftragsliste fuer die Dropdowns (nur sichtbare, sortiert: offene/in_arbeit zuerst)
+    # Auftragsliste fuer die Dropdowns (sichtbare, ohne 'erledigt' und 'abgerechnet')
     sichtbare_auftraege = sorted(
-        [a for a in auftraege.list() if _darf_auftrag_sehen(a) and a.get("status") != "erledigt"],
-        key=lambda a: (a.get("status") != "in_arbeit", a.get("status") != "offen", -1 * len(a.get("erteilungsdatum", ""))),
+        [a for a in auftraege.list()
+         if _darf_auftrag_sehen(a) and a.get("status") not in ("erledigt", "abgerechnet")],
+        key=lambda a: (a.get("status") != "in_arbeit", a.get("status") != "offen", a.get("titel", "").lower()),
     )
-    # Mit Kunden-Name fuer schoenere Anzeige
     auftrag_optionen = []
     for a in sichtbare_auftraege:
         k = kunden_idx.get(a.get("kunde_id"))
@@ -356,21 +303,23 @@ def heute():
             "label": (f"{k['name']}: " if k else "") + (a.get("titel") or "—"),
         })
 
+    # Karten-Daten fuer den gewaehlten Stempel-User
     eigene_stempelung_aufbereitet = None
-    if eigene_aktive:
-        start = _parse_dt(eigene_aktive.get("start", ""))
-        a = auftraege_idx.get(eigene_aktive.get("auftrag_id") or "")
+    if aktive_fuer_karte:
+        start = _parse_dt(aktive_fuer_karte.get("start", ""))
+        a = auftraege_idx.get(aktive_fuer_karte.get("auftrag_id") or "")
         eigene_stempelung_aufbereitet = {
-            "s": eigene_aktive,
+            "s": aktive_fuer_karte,
             "auftrag": a,
             "kunde": kunden_idx.get(a.get("kunde_id")) if a else None,
             "start_hm": start.strftime("%H:%M"),
-            "brutto_h_live": round((jetzt - start).total_seconds() / 3600.0, 2),
-            "netto_h_live": netto_dauer_h(start, jetzt, current_user.arbeitszeiten),
+            "dauer_h_live": round((jetzt - start).total_seconds() / 3600.0, 2),
         }
 
-    gesamtsumme = round(sum(d["summe"] for d in pro_mitarbeiter.values()), 2)
+    # Mitarbeiter-Liste fuer Admin-Auswahl (nur Admin)
+    alle_user = list_users() if current_user.is_admin else []
 
+    gesamtsumme = round(sum(d["summe"] for d in pro_mitarbeiter.values()), 2)
     prev_tag = (d - timedelta(days=1)).isoformat()
     next_tag = (d + timedelta(days=1)).isoformat()
 
@@ -384,6 +333,10 @@ def heute():
         laufend=laufend_aufbereitet,
         eigene_stempelung=eigene_stempelung_aufbereitet,
         auftrag_optionen=auftrag_optionen,
+        stempel_fuer=stempel_fuer,
+        stempel_fuer_name=stempel_fuer_name,
+        ist_fremd_stempelung=(stempel_fuer != current_user.username),
+        alle_user=alle_user,
         prev_tag=prev_tag,
         next_tag=next_tag,
         heute_iso=date.today().isoformat(),
