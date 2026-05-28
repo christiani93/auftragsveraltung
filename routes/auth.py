@@ -5,12 +5,14 @@ from flask import Blueprint, abort, flash, redirect, render_template, request, u
 from flask_login import current_user, login_required, login_user, logout_user
 
 from models.users import (
+    USER_ROLE_LABEL,
     USER_ROLES,
     create_user,
     delete_user,
     find_user,
     list_users,
     set_password,
+    set_role,
 )
 
 bp = Blueprint("auth", __name__)
@@ -52,7 +54,12 @@ def _require_admin():
 @login_required
 def user_list():
     _require_admin()
-    return render_template("auth/users.html", users=list_users(), roles=USER_ROLES)
+    return render_template(
+        "auth/users.html",
+        users=list_users(),
+        roles=USER_ROLES,
+        role_label=USER_ROLE_LABEL,
+    )
 
 
 @bp.route("/users/neu", methods=["POST"])
@@ -62,13 +69,31 @@ def new_user_route():
     username = request.form.get("username", "").strip()
     password = request.form.get("password", "")
     name = request.form.get("name", "").strip()
-    role = request.form.get("role", "user")
+    role = request.form.get("role", "monteur")
     if not username or not password:
         flash("Username und Passwort erforderlich.", "warning")
         return redirect(url_for("auth.user_list"))
     try:
         create_user(username, password, name=name, role=role)
         flash(f"User „{username}“ angelegt.", "success")
+    except ValueError as e:
+        flash(str(e), "warning")
+    return redirect(url_for("auth.user_list"))
+
+
+@bp.route("/users/<username>/rolle", methods=["POST"])
+@login_required
+def change_role_route(username: str):
+    _require_admin()
+    if username == current_user.username:
+        flash("Du kannst deine eigene Rolle nicht ändern (Lockout-Schutz).", "warning")
+        return redirect(url_for("auth.user_list"))
+    neue_rolle = request.form.get("role", "")
+    try:
+        if set_role(username, neue_rolle):
+            flash(f"Rolle für „{username}“ ist jetzt: {USER_ROLE_LABEL.get(neue_rolle, neue_rolle)}.", "success")
+        else:
+            flash("User nicht gefunden.", "warning")
     except ValueError as e:
         flash(str(e), "warning")
     return redirect(url_for("auth.user_list"))

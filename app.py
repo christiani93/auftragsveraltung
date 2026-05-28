@@ -24,6 +24,7 @@ from routes.kontrolle import bp as kontrolle_bp
 from routes.messgeraete import bp as messgeraete_bp
 from routes.pdf_export import bp as pdf_bp
 from routes.protocols import bp as protocols_bp
+from routes.zeit import bp as zeit_bp
 
 
 def _load_or_create_secret_key() -> str:
@@ -63,11 +64,14 @@ def create_app() -> Flask:
     login_manager.login_message = "Bitte melde dich an."
     login_manager.login_message_category = "info"
 
-    from models.users import find_user, ensure_initial_admin
+    from models.users import find_user, ensure_initial_admin, migrate_legacy_roles
 
     @login_manager.user_loader
     def load_user(user_id):
         return find_user(user_id)
+
+    # Idempotente Daten-Migrationen (laufen race-frei pro Worker, JsonStore.update ist atomar)
+    migrate_legacy_roles()
 
     # Initial-Admin anlegen wenn noch keine User existieren
     initial_pw = ensure_initial_admin()
@@ -88,6 +92,7 @@ def create_app() -> Flask:
     app.register_blueprint(kontrolle_bp, url_prefix="/kontrolle")
     app.register_blueprint(messgeraete_bp, url_prefix="/messgeraete")
     app.register_blueprint(auftraege_bp, url_prefix="/auftraege")
+    app.register_blueprint(zeit_bp, url_prefix="/zeit")
     app.register_blueprint(pdf_bp, url_prefix="/pdf")
 
     from models.repos import fi_erforderlich

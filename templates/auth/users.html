@@ -20,12 +20,24 @@
           <td><code>{{ u.username }}</code></td>
           <td>{{ u.name }}</td>
           <td>
-            {% if u.role == 'admin' %}<span class="badge bg-danger">{{ u.role }}</span>
-            {% else %}<span class="badge bg-secondary">{{ u.role }}</span>{% endif %}
+            {% if u.role == 'admin' %}<span class="badge bg-danger">{{ role_label[u.role] }}</span>
+            {% elif u.role == 'projektleiter' %}<span class="badge bg-primary">{{ role_label[u.role] }}</span>
+            {% else %}<span class="badge bg-secondary">{{ role_label[u.role] }}</span>{% endif %}
           </td>
           <td class="text-end">
+            {% if u.username != current_user.username %}
+            <form method="post" action="{{ url_for('auth.change_role_route', username=u.username) }}"
+                  class="d-inline-flex align-items-center gap-1">
+              <select name="role" class="form-select form-select-sm" style="width: auto;">
+                {% for r in roles %}
+                <option value="{{ r }}" {% if u.role == r %}selected{% endif %}>{{ role_label[r] }}</option>
+                {% endfor %}
+              </select>
+              <button type="submit" class="btn btn-sm btn-outline-primary">Rolle setzen</button>
+            </form>
+            {% endif %}
             <form method="post" action="{{ url_for('auth.delete_user_route', username=u.username) }}"
-                  class="d-inline" onsubmit="return confirm('User „{{ u.username }}“ löschen?');">
+                  class="d-inline ms-1" onsubmit="return confirm('User „{{ u.username }}“ löschen?');">
               <button type="submit" class="btn btn-sm btn-outline-danger">Löschen</button>
             </form>
           </td>
@@ -55,7 +67,7 @@
       <label class="form-label">Rolle</label>
       <select name="role" class="form-select">
         {% for r in roles %}
-        <option value="{{ r }}">{{ r }}</option>
+        <option value="{{ r }}" {% if r == 'monteur' %}selected{% endif %}>{{ role_label[r] }}</option>
         {% endfor %}
       </select>
     </div>

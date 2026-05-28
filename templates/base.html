@@ -31,6 +31,7 @@
         <li class="nav-item"><a class="nav-link" href="{{ url_for('kontrolle.dashboard') }}">Kontroll-Übersicht</a></li>
         <li class="nav-item"><a class="nav-link" href="{{ url_for('customers.list_customers') }}">Kunden</a></li>
         <li class="nav-item"><a class="nav-link" href="{{ url_for('auftraege.list_auftraege') }}">Aufträge</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('zeit.heute') }}">Zeiterfassung</a></li>
         <li class="nav-item"><a class="nav-link" href="{{ url_for('installations.list_installations') }}">Anlagen</a></li>
         <li class="nav-item"><a class="nav-link" href="{{ url_for('protocols.list_protocols') }}">Messprotokolle</a></li>
         <li class="nav-item"><a class="nav-link" href="{{ url_for('messgeraete.list_devices') }}">Messgeräte</a></li>
@@ -40,7 +41,9 @@
         <li class="nav-item dropdown">
           <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
             👤 {{ current_user.name }}
-            {% if current_user.is_admin %}<span class="badge bg-danger ms-1">admin</span>{% endif %}
+            {% if current_user.role == 'admin' %}<span class="badge bg-danger ms-1">Admin</span>
+            {% elif current_user.role == 'projektleiter' %}<span class="badge bg-primary ms-1">Projektleiter</span>
+            {% elif current_user.role == 'monteur' %}<span class="badge bg-secondary ms-1">Monteur</span>{% endif %}
           </a>
           <ul class="dropdown-menu dropdown-menu-end">
             <li><a class="dropdown-item" href="{{ url_for('auth.profil') }}">Mein Profil</a></li>
