@@ -28,7 +28,7 @@ from models.repos import (
     zeitbuchungen_fuer_auftrag,
     zeitsumme_h,
 )
-from models.users import list_monteure
+from models.users import find_user, list_monteure, list_users
 
 bp = Blueprint("auftraege", __name__)
 
@@ -212,6 +212,8 @@ def detail(auftrag_id: str):
     auftrag_anlagen = [anlagen_idx[aid] for aid in anlage_ids if aid in anlagen_idx]
     eintraege = zeitbuchungen_fuer_auftrag(auftrag_id)
     aktive_stempelung = aktive_stempelung_von(current_user.username) if current_user.is_authenticated else None
+    # Mitarbeiter-Auswahl-Liste — nur fuer Admin/Projektleiter; Monteur stempelt nur fuer sich.
+    moegliche_mitarbeiter = list_users() if current_user.sieht_alle_auftraege else []
     return render_template(
         "auftraege/detail.html",
         auftrag=auftrag, kunde=kunde, betroffene=betroffene,
@@ -221,6 +223,7 @@ def detail(auftrag_id: str):
         today_iso=date.today().isoformat(),
         status_label=AUFTRAG_STATUS_LABEL,
         aktive_stempelung=aktive_stempelung,
+        moegliche_mitarbeiter=moegliche_mitarbeiter,
     )
 
 
@@ -297,10 +300,16 @@ def add_zeitbuchung(auftrag_id: str):
         flash("Bitte Stunden direkt eintragen oder gültige Von/Bis-Zeiten angeben.", "warning")
         return redirect(url_for("auftraege.detail", auftrag_id=auftrag_id))
 
+    # Mitarbeiter: Admin/Projektleiter darf beliebig waehlen, Monteur immer self
+    if current_user.sieht_alle_auftraege:
+        mitarbeiter = request.form.get("mitarbeiter", "").strip()
+    else:
+        mitarbeiter = current_user.username
+
     zeitbuchungen.create({
         "auftrag_id": auftrag_id,
         "datum": request.form.get("datum", "").strip() or date.today().isoformat(),
-        "mitarbeiter": request.form.get("mitarbeiter", "").strip(),
+        "mitarbeiter": mitarbeiter,
         "von_zeit": von,
         "bis_zeit": bis,
         "dauer_h": dauer,
@@ -309,6 +318,24 @@ def add_zeitbuchung(auftrag_id: str):
     })
     flash(f"{dauer} h erfasst.", "success")
     return redirect(url_for("auftraege.detail", auftrag_id=auftrag_id))
+
+
+@bp.route("/zeit/<zeitbuchung_id>/mitarbeiter", methods=["POST"])
+def set_zeitbuchung_mitarbeiter(zeitbuchung_id: str):
+    """Aendert nur den Mitarbeiter einer bestehenden Zeitbuchung — nur Admin/Projektleiter."""
+    if not current_user.sieht_alle_auftraege:
+        abort(403)
+    z = zeitbuchungen.get(zeitbuchung_id)
+    if not z:
+        abort(404)
+    neuer = request.form.get("mitarbeiter", "").strip()
+    # Validieren: leer ist OK (zurueck auf 'nicht zugeordnet'), sonst muss User existieren
+    if neuer and not find_user(neuer):
+        flash(f"Mitarbeiter „{neuer}“ nicht gefunden.", "warning")
+        return redirect(url_for("auftraege.detail", auftrag_id=z.get("auftrag_id")) if z.get("auftrag_id") else url_for("auftraege.list_auftraege"))
+    zeitbuchungen.update(zeitbuchung_id, {"mitarbeiter": neuer})
+    flash("Mitarbeiter zugewiesen." if neuer else "Mitarbeiter entfernt.", "success")
+    return redirect(url_for("auftraege.detail", auftrag_id=z.get("auftrag_id")) if z.get("auftrag_id") else url_for("auftraege.list_auftraege"))
 
 
 @bp.route("/zeit/<zeitbuchung_id>/loeschen", methods=["POST"])

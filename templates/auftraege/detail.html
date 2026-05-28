@@ -219,7 +219,22 @@
         {% for z in zeitbuchungen %}
         <tr>
           <td>{{ z.datum }}</td>
-          <td>{{ z.mitarbeiter or '—' }}</td>
+          <td>
+            {% if current_user.sieht_alle_auftraege %}
+              <form method="post" action="{{ url_for('auftraege.set_zeitbuchung_mitarbeiter', zeitbuchung_id=z.id) }}"
+                    class="d-flex gap-1 align-items-center">
+                <select name="mitarbeiter" class="form-select form-select-sm" style="min-width: 140px;"
+                        onchange="this.form.submit();">
+                  <option value="">— nicht zugeordnet —</option>
+                  {% for u in moegliche_mitarbeiter %}
+                  <option value="{{ u.username }}" {% if z.mitarbeiter == u.username %}selected{% endif %}>{{ u.name }}</option>
+                  {% endfor %}
+                </select>
+              </form>
+            {% else %}
+              {{ z.mitarbeiter or '—' }}
+            {% endif %}
+          </td>
           <td>{{ z.von_zeit or '—' }}</td>
           <td>{{ z.bis_zeit or '—' }}</td>
           <td class="text-end fw-semibold">{{ '%.2f'|format(z.dauer_h) }}</td>
@@ -292,7 +307,17 @@
     </div>
     <div class="col-6 col-md-2">
       <label class="form-label small">Mitarbeiter</label>
-      <input type="text" name="mitarbeiter" class="form-control form-control-sm" placeholder="Name">
+      {% if current_user.sieht_alle_auftraege %}
+        <select name="mitarbeiter" class="form-select form-select-sm">
+          <option value="">— nicht zugeordnet —</option>
+          {% for u in moegliche_mitarbeiter %}
+          <option value="{{ u.username }}" {% if u.username == current_user.username %}selected{% endif %}>{{ u.name }}</option>
+          {% endfor %}
+        </select>
+      {% else %}
+        <input type="text" class="form-control form-control-sm" value="{{ current_user.name }}" readonly>
+        <input type="hidden" name="mitarbeiter" value="{{ current_user.username }}">
+      {% endif %}
     </div>
     <div class="col-4 col-md-1">
       <label class="form-label small">Von</label>
