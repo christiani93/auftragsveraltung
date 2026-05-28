@@ -34,8 +34,20 @@ bp = Blueprint("auftraege", __name__)
 
 # ---- Bilder-Upload ----------------------------------------------------------
 
+from PIL import Image, ImageOps
+
+# HEIC/HEIF (iPhone-Fotos) ueber pillow-heif — wenn die Lib fehlt, gehts ohne.
+try:
+    from pillow_heif import register_heif_opener
+    register_heif_opener()
+    _HEIF_OK = True
+except Exception:  # pragma: no cover — best effort, kein hard fail
+    _HEIF_OK = False
+
 ERLAUBTE_BILD_EXTS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif"}
-MAX_BILD_BYTES = 15 * 1024 * 1024  # 15 MB pro Datei (Phone-Fotos sind oft groß)
+MAX_BILD_BYTES = 25 * 1024 * 1024  # 25 MB Original — wird beim Speichern verkleinert
+MAX_KANTE_PX = 1920                # max. laengste Kante in der gespeicherten Version
+JPEG_QUALITY = 82                  # Qualitaet fuer JPEG-Re-Komprimierung
 
 
 def _bilder_dir(auftrag_id: str) -> Path:
@@ -46,6 +58,34 @@ def _bilder_dir(auftrag_id: str) -> Path:
 
 def _ext_ok(filename: str) -> bool:
     return Path(filename).suffix.lower() in ERLAUBTE_BILD_EXTS
+
+
+def _bild_speichern_verarbeitet(stream, bild_id: str, original_ext: str, ziel_dir: Path) -> tuple[Path, str, int]:
+    """Liest das hochgeladene Bild, dreht es nach EXIF gerade, verkleinert es auf
+    MAX_KANTE_PX laengste Kante und speichert es. Liefert (Pfad, MIME, Groesse).
+
+    PNGs mit Alpha-Kanal werden als PNG behalten (Screenshots/Diagramme), alles
+    andere wird als progressive JPEG gespeichert — auch HEIC/HEIF vom iPhone.
+    Liefert kein Bild zurueck wenn das Decoding fehlschlaegt (Exception nach oben).
+    """
+    img = Image.open(stream)
+    img = ImageOps.exif_transpose(img)  # Handy-Fotos automatisch ausrichten
+    img.thumbnail((MAX_KANTE_PX, MAX_KANTE_PX), Image.LANCZOS)
+
+    behalte_png = original_ext.lower() == ".png" and img.mode in ("RGBA", "LA", "P")
+    if behalte_png:
+        dateiname = f"{bild_id}.png"
+        ziel = ziel_dir / dateiname
+        img.save(ziel, "PNG", optimize=True)
+        mime = "image/png"
+    else:
+        if img.mode != "RGB":
+            img = img.convert("RGB")
+        dateiname = f"{bild_id}.jpg"
+        ziel = ziel_dir / dateiname
+        img.save(ziel, "JPEG", quality=JPEG_QUALITY, optimize=True, progressive=True)
+        mime = "image/jpeg"
+    return ziel, mime, ziel.stat().st_size
 
 
 def _form_to_auftrag(form) -> dict:
@@ -343,29 +383,38 @@ def upload_bild(auftrag_id: str):
         if not _ext_ok(f.filename):
             fehler.append(f"{f.filename}: Format nicht unterstützt")
             continue
-        # Groesse pruefen
+        # Original-Groesse pruefen
         f.stream.seek(0, 2)
-        size = f.stream.tell()
+        size_orig = f.stream.tell()
         f.stream.seek(0)
-        if size == 0:
+        if size_orig == 0:
             fehler.append(f"{f.filename}: leere Datei")
             continue
-        if size > MAX_BILD_BYTES:
+        if size_orig > MAX_BILD_BYTES:
             fehler.append(f"{f.filename}: zu groß (max {MAX_BILD_BYTES // (1024*1024)} MB)")
+            continue
+        original_ext = Path(f.filename).suffix.lower()
+        if original_ext in (".heic", ".heif") and not _HEIF_OK:
+            fehler.append(f"{f.filename}: HEIC/HEIF wird vom Server nicht unterstützt — bitte als JPG hochladen.")
             continue
 
         bild_id = uuid.uuid4().hex[:12]
-        ext = Path(f.filename).suffix.lower()
-        dateiname = f"{bild_id}{ext}"
-        ziel = _bilder_dir(auftrag_id) / dateiname
-        f.save(str(ziel))
+        try:
+            ziel, mime, size_neu = _bild_speichern_verarbeitet(
+                f.stream, bild_id, original_ext, _bilder_dir(auftrag_id)
+            )
+        except Exception as e:  # PIL kann Datei nicht lesen / kein Speicher / ...
+            fehler.append(f"{f.filename}: Bild konnte nicht verarbeitet werden ({type(e).__name__}).")
+            continue
+
         bilder.append({
             "id": bild_id,
-            "dateiname": dateiname,
-            "original_name": secure_filename(f.filename) or dateiname,
+            "dateiname": ziel.name,
+            "original_name": secure_filename(f.filename) or ziel.name,
             "beschreibung": beschreibung,
-            "mime": mimetypes.guess_type(dateiname)[0] or "application/octet-stream",
-            "groesse": size,
+            "mime": mime,
+            "groesse": size_neu,
+            "groesse_original": size_orig,
             "hochgeladen_am": datetime.now().isoformat(timespec="seconds"),
             "hochgeladen_von": getattr(current_user, "username", "") or "",
         })
