@@ -11,7 +11,22 @@ from .storage import JsonStore
 
 users_store = JsonStore("users.json")
 
-USER_ROLES = ("admin", "user")
+USER_ROLES = ("admin", "projektleiter", "monteur")
+USER_ROLE_LABEL = {
+    "admin": "Admin",
+    "projektleiter": "Projektleiter",
+    "monteur": "Monteur",
+}
+
+
+def _normalize_role(role: Optional[str]) -> str:
+    """Akzeptiert sowohl neue als auch alte Rollen-Bezeichnungen."""
+    if role in USER_ROLES:
+        return role
+    # Legacy: alte 'user'-Rolle wird wie 'monteur' behandelt
+    if role == "user":
+        return "monteur"
+    return "monteur"
 
 
 class User(UserMixin):
@@ -37,11 +52,28 @@ class User(UserMixin):
 
     @property
     def role(self) -> str:
-        return self._data.get("role", "user")
+        return _normalize_role(self._data.get("role"))
+
+    @property
+    def role_label(self) -> str:
+        return USER_ROLE_LABEL.get(self.role, self.role)
 
     @property
     def is_admin(self) -> bool:
         return self.role == "admin"
+
+    @property
+    def is_projektleiter(self) -> bool:
+        return self.role == "projektleiter"
+
+    @property
+    def is_monteur(self) -> bool:
+        return self.role == "monteur"
+
+    @property
+    def sieht_alle_auftraege(self) -> bool:
+        """Admin + Projektleiter sehen alles. Monteur nur eigene + unzugewiesene."""
+        return self.role in ("admin", "projektleiter")
 
     def check_password(self, password: str) -> bool:
         h = self._data.get("password_hash")
@@ -59,9 +91,10 @@ def find_user(username: str) -> Optional[User]:
     return None
 
 
-def create_user(username: str, password: str, name: str = "", role: str = "user") -> User:
+def create_user(username: str, password: str, name: str = "", role: str = "monteur") -> User:
     if find_user(username):
         raise ValueError(f"User „{username}“ existiert bereits.")
+    role = _normalize_role(role)
     if role not in USER_ROLES:
         raise ValueError(f"Ungültige Rolle: {role}")
     data = {
@@ -82,12 +115,56 @@ def set_password(username: str, new_password: str) -> bool:
     return True
 
 
+def set_role(username: str, new_role: str) -> bool:
+    user = find_user(username)
+    if not user:
+        return False
+    role = _normalize_role(new_role)
+    if role not in USER_ROLES:
+        raise ValueError(f"Ungültige Rolle: {new_role}")
+    users_store.update(user.id, {"role": role})
+    return True
+
+
+def list_monteure() -> list[User]:
+    """Alle User die als Monteur arbeiten können — fuer Auftrag-Zuweisung."""
+    return [u for u in list_users() if u.role in ("monteur", "projektleiter", "admin")]
+
+
 def ensure_initial_admin() -> Optional[str]:
     """Falls keine User existieren: erstellt einen Admin aus Env-Vars oder mit Default.
 
     Liefert das initiale Passwort zurück (zum Anzeigen im Log) wenn neu erzeugt,
     sonst None.
+
+    Race-sicher zwischen mehreren gunicorn-Workern: nutzt eine Marker-Datei,
+    die mit O_CREAT|O_EXCL atomar belegt wird. Nur der Worker, der den Marker
+    setzen konnte, darf den Bootstrap durchführen — die anderen sehen den
+    Marker schon existieren und tun nichts. Ohne diesen Schutz haben in der
+    Vergangenheit mehrere Worker parallel je einen Admin angelegt.
     """
+    import config
+    marker = config.DATA_DIR / ".admin_bootstrap.done"
+    # Schnellpfad: schon User vorhanden → sicherstellen, dass Marker existiert, fertig.
+    if users_store.list():
+        if not marker.exists():
+            marker.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                marker.write_text("ok\n", encoding="utf-8")
+            except OSError:
+                pass
+        return None
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        fd = os.open(str(marker), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError:
+        # Anderer Worker hat schon (oder ist gerade dabei) — wir nicht.
+        return None
+    try:
+        os.write(fd, b"ok\n")
+    finally:
+        os.close(fd)
+    # Nach dem Claim nochmal prüfen, falls zwischenzeitlich jemand User angelegt hat.
     if users_store.list():
         return None
     username = os.environ.get("AUFTRAGSVERWALTUNG_ADMIN_USER", "admin")
@@ -105,6 +182,16 @@ def _random_password(length: int = 16) -> str:
 
 def list_users() -> list[User]:
     return [User(d) for d in users_store.list()]
+
+
+def migrate_legacy_roles() -> int:
+    """Migriert alte 'user'-Rolle auf 'monteur'. Liefert Anzahl geänderter Einträge."""
+    count = 0
+    for record in users_store.list():
+        if record.get("role") == "user":
+            users_store.update(record["id"], {"role": "monteur"})
+            count += 1
+    return count
 
 
 def delete_user(username: str) -> bool:
