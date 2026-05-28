@@ -123,6 +123,7 @@
             {% if a.status == 'offen' %}<span class="badge bg-secondary">{{ auftrag_status_label[a.status] }}</span>
             {% elif a.status == 'in_arbeit' %}<span class="badge bg-warning text-dark">{{ auftrag_status_label[a.status] }}</span>
             {% elif a.status == 'erledigt' %}<span class="badge bg-success">{{ auftrag_status_label[a.status] }}</span>
+            {% elif a.status == 'abgerechnet' %}<span class="badge bg-dark">{{ auftrag_status_label[a.status] }}</span>
             {% endif %}
           </td>
           <td class="text-end"><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('auftraege.detail', auftrag_id=a.id) }}">›</a></td>

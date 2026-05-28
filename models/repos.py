@@ -95,12 +95,15 @@ SPANNUNG_TYPEN = [
 SPANNUNG_LABEL = {key: label for key, label in SPANNUNG_TYPEN}
 SPANNUNG_VOLT = {"230V": 230.0, "400V": 400.0}
 
-AUFTRAG_STATUS = ["offen", "in_arbeit", "erledigt"]
+AUFTRAG_STATUS = ["offen", "in_arbeit", "erledigt", "abgerechnet"]
 AUFTRAG_STATUS_LABEL = {
     "offen": "Offen",
     "in_arbeit": "In Arbeit",
     "erledigt": "Erledigt",
+    "abgerechnet": "Abgerechnet",
 }
+# 'abgerechnet' = archiviert, standardmäßig in der Liste ausgeblendet
+AUFTRAG_STATUS_ARCHIVIERT = {"abgerechnet"}
 
 # Felder eines Messpunkts — orientiert am gewohnten NIN-Messprotokoll-Template.
 # Spaltenstruktur: Datum | Installation | Kabel | Sicherung | Schutzorgan |

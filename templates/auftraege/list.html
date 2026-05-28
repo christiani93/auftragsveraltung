@@ -1,11 +1,20 @@
 {% extends "base.html" %}
 {% block title %}Aufträge{% endblock %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
   <h1 class="h3 m-0">Aufträge
     {% if gefiltert %}<small class="text-muted fs-6 ms-2">(nur eigene + unzugewiesene · {{ anzahl_sichtbar }}/{{ anzahl_total }})</small>{% endif %}
   </h1>
-  <a href="{{ url_for('auftraege.new_auftrag') }}" class="btn btn-primary">+ Neuer Auftrag</a>
+  <div class="d-flex gap-2 flex-wrap">
+    {% if archiv_anzeigen %}
+      <a href="{{ url_for('auftraege.list_auftraege') }}" class="btn btn-outline-secondary">Archiv ausblenden</a>
+    {% else %}
+      <a href="{{ url_for('auftraege.list_auftraege', archiv='1') }}" class="btn btn-outline-secondary">
+        Archiv anzeigen{% if anzahl_archiviert %} ({{ anzahl_archiviert }}){% endif %}
+      </a>
+    {% endif %}
+    <a href="{{ url_for('auftraege.new_auftrag') }}" class="btn btn-primary">+ Neuer Auftrag</a>
+  </div>
 </div>
 
 {% if rows %}
@@ -35,6 +44,7 @@
             {% if r.auftrag.status == 'offen' %}<span class="badge bg-secondary">{{ status_label[r.auftrag.status] }}</span>
             {% elif r.auftrag.status == 'in_arbeit' %}<span class="badge bg-warning text-dark">{{ status_label[r.auftrag.status] }}</span>
             {% elif r.auftrag.status == 'erledigt' %}<span class="badge bg-success">{{ status_label[r.auftrag.status] }}</span>
+            {% elif r.auftrag.status == 'abgerechnet' %}<span class="badge bg-dark">{{ status_label[r.auftrag.status] }}</span>
             {% endif %}
           </td>
           <td class="text-end">
@@ -55,6 +65,7 @@
       {% if r.auftrag.status == 'offen' %}<span class="badge bg-secondary">{{ status_label[r.auftrag.status] }}</span>
       {% elif r.auftrag.status == 'in_arbeit' %}<span class="badge bg-warning text-dark">{{ status_label[r.auftrag.status] }}</span>
       {% elif r.auftrag.status == 'erledigt' %}<span class="badge bg-success">{{ status_label[r.auftrag.status] }}</span>
+      {% elif r.auftrag.status == 'abgerechnet' %}<span class="badge bg-dark">{{ status_label[r.auftrag.status] }}</span>
       {% endif %}
     </div>
     <div class="mobile-list-meta">

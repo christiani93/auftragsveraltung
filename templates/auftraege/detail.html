@@ -12,6 +12,7 @@
       {% if auftrag.status == 'offen' %}<span class="badge bg-secondary align-middle ms-2">{{ status_label[auftrag.status] }}</span>
       {% elif auftrag.status == 'in_arbeit' %}<span class="badge bg-warning text-dark align-middle ms-2">{{ status_label[auftrag.status] }}</span>
       {% elif auftrag.status == 'erledigt' %}<span class="badge bg-success align-middle ms-2">{{ status_label[auftrag.status] }}</span>
+      {% elif auftrag.status == 'abgerechnet' %}<span class="badge bg-dark align-middle ms-2">{{ status_label[auftrag.status] }}</span>
       {% endif %}
     </h1>
   </div>
@@ -77,6 +78,10 @@
         <form method="post" action="{{ url_for('auftraege.set_status', auftrag_id=auftrag.id) }}" class="d-inline ms-1">
           <input type="hidden" name="status" value="erledigt">
           <button class="btn btn-outline-success" {% if auftrag.status == 'erledigt' %}disabled{% endif %}>Erledigt</button>
+        </form>
+        <form method="post" action="{{ url_for('auftraege.set_status', auftrag_id=auftrag.id) }}" class="d-inline ms-1">
+          <input type="hidden" name="status" value="abgerechnet">
+          <button class="btn btn-outline-dark" {% if auftrag.status == 'abgerechnet' %}disabled{% endif %}>Abgerechnet</button>
         </form>
       </div>
     </div>

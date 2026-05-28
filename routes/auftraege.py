@@ -13,6 +13,7 @@ from werkzeug.utils import secure_filename
 import config
 from models.repos import (
     AUFTRAG_STATUS,
+    AUFTRAG_STATUS_ARCHIVIERT,
     AUFTRAG_STATUS_LABEL,
     aktive_stempelung_von,
     anlagen,
@@ -89,8 +90,14 @@ def _teile_strukturiert(kunde_id: str):
 
 @bp.route("/")
 def list_auftraege():
+    archiv_anzeigen = request.args.get("archiv") == "1"
     alle = sorted(auftraege.list(), key=lambda a: a.get("erteilungsdatum", ""), reverse=True)
-    sichtbar = [a for a in alle if _darf_auftrag_sehen(a)]
+    sichtbar_alle = [a for a in alle if _darf_auftrag_sehen(a)]
+    if archiv_anzeigen:
+        sichtbar = sichtbar_alle
+    else:
+        sichtbar = [a for a in sichtbar_alle if a.get("status") not in AUFTRAG_STATUS_ARCHIVIERT]
+    anzahl_archiviert = sum(1 for a in sichtbar_alle if a.get("status") in AUFTRAG_STATUS_ARCHIVIERT)
     kunden_idx = {k["id"]: k for k in kunden.list()}
     rows = [{"auftrag": a, "kunde": kunden_idx.get(a.get("kunde_id"))} for a in sichtbar]
     return render_template(
@@ -100,6 +107,8 @@ def list_auftraege():
         gefiltert=not current_user.sieht_alle_auftraege,
         anzahl_total=len(alle),
         anzahl_sichtbar=len(sichtbar),
+        anzahl_archiviert=anzahl_archiviert,
+        archiv_anzeigen=archiv_anzeigen,
     )
 
 
