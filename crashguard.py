@@ -441,5 +441,16 @@ def install_feedback(app, *, project: str, mount: str = "/feedback") -> None:
         return _render_feedback(project=project)
 
     # Direkt als view function registrieren — kein Blueprint, kein Namens-Konflikt
-    app.add_url_rule(mount, endpoint=f"_crashguard_feedback_{project}",
+    endpoint = f"_crashguard_feedback_{project}"
+    app.add_url_rule(mount, endpoint=endpoint,
                      view_func=_handler, methods=["GET", "POST"])
+
+    # Falls Flask-WTF-CSRFProtect aktiv ist: /feedback explizit exempten.
+    # Anti-Spam laeuft per Convention ueber das Collector-Anti-Flood +
+    # rate-limit-per-message (gleiche Nachricht in 1h triggert keine Mail).
+    try:
+        csrf = getattr(app, "extensions", {}).get("csrf")
+        if csrf is not None and hasattr(csrf, "exempt"):
+            csrf.exempt(app.view_functions[endpoint])
+    except Exception:
+        pass
