@@ -48,9 +48,9 @@ import traceback
 import subprocess
 from datetime import datetime, timezone
 
-__all__ = ["install", "init_flask", "report_manual"]
+__all__ = ["install", "init_flask", "report_manual", "install_feedback"]
 
-_VERSION = "1.1.0"
+_VERSION = "1.2.0"
 _cfg: dict = {}
 _installed = False
 _disabled = False
@@ -333,6 +333,113 @@ def init_flask(app) -> None:
         pass
 
 
-def report_manual(message: str, context: dict | None = None) -> None:
-    """Manuell einen Report ausloesen (z.B. an einer kritischen Stelle)."""
-    _emit("manual", message=message, context=context)
+def report_manual(message: str, context: dict | None = None, kind: str = "manual") -> None:
+    """Manuell einen Report ausloesen (z.B. an einer kritischen Stelle).
+    `kind` darf ueberschrieben werden (z.B. 'bug', 'wish') — wird so vom
+    Collector + Workspace-Manager als Filter/Badge sichtbar."""
+    _emit(kind, message=message, context=context)
+
+
+# ---------------------------------------------------------------------------
+# Feedback-Drop-in (/feedback-Formular fuer Bug/Wunsch-Meldungen)
+# ---------------------------------------------------------------------------
+
+_FEEDBACK_HTML = """<!doctype html>
+<html lang="de"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Feedback &mdash; {project}</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+<style>
+body{{padding:1.5em;max-width:640px;margin:0 auto}}
+.msg-ok{{background:#d4edda;color:#155724;padding:.8em;border-radius:.3em;margin-bottom:1em}}
+.msg-err{{background:#f8d7da;color:#721c24;padding:.8em;border-radius:.3em;margin-bottom:1em}}
+@media (prefers-color-scheme:dark){{
+  .msg-ok{{background:rgba(74,222,128,0.18);color:#86efac}}
+  .msg-err{{background:rgba(248,113,113,0.18);color:#fca5a5}}
+}}
+</style></head><body>
+<header>
+<h1>💬 Feedback</h1>
+<p><small>Projekt: <strong>{project}</strong></small></p>
+</header>
+{flash}
+<form method="post">
+<label>Art<br>
+<select name="kind" required>
+<option value="bug" {sel_bug}>🐞 Bug (ohne Crash)</option>
+<option value="wish" {sel_wish}>✨ Wunsch / Feature-Idee</option>
+</select></label>
+<label>Nachricht *<br>
+<textarea name="message" rows="6" required placeholder="Beschreibe was du gesehen / dir wuenscht ...">{message}</textarea></label>
+<label>Name <small>(optional)</small><br>
+<input type="text" name="name" value="{name}"></label>
+<label>E-Mail <small>(optional — falls Rueckfrage gewuenscht)</small><br>
+<input type="email" name="email" value="{email}"></label>
+<button type="submit">Absenden</button>
+</form>
+<p><small><a href="{back}">&larr; zurueck</a></small></p>
+</body></html>"""
+
+
+def _render_feedback(*, project, flash="", kind="bug", message="", name="", email="", back="/"):
+    return _FEEDBACK_HTML.format(
+        project=project, flash=flash,
+        sel_bug='selected' if kind == 'bug' else '',
+        sel_wish='selected' if kind == 'wish' else '',
+        message=(message or '').replace('<', '&lt;'),
+        name=(name or '').replace('"', '&quot;'),
+        email=(email or '').replace('"', '&quot;'),
+        back=back,
+    )
+
+
+def install_feedback(app, *, project: str, mount: str = "/feedback") -> None:
+    """Registriert ein /feedback-Endpoint (GET=Formular, POST=Eintrag).
+    Sendet ueber `report_manual(..., kind='bug'|'wish')` ans zentrale Collector.
+    Pfad ist OEFFENTLICH (kein Login) — wenn die App Auth hat, manuell exempten.
+
+    Drop-in (in Flask-Factory, nach crashguard.init_flask):
+        crashguard.install_feedback(app, project="MyApp")
+    """
+    try:
+        from flask import request, g
+    except Exception:
+        return
+
+    def _handler():
+        if request.method == "POST":
+            kind = (request.form.get("kind") or "bug").strip()
+            if kind not in ("bug", "wish"):
+                kind = "bug"
+            message = (request.form.get("message") or "").strip()
+            name = (request.form.get("name") or "").strip()
+            email = (request.form.get("email") or "").strip()
+            if not message:
+                return _render_feedback(
+                    project=project, kind=kind, message=message, name=name, email=email,
+                    flash='<div class="msg-err">Bitte Nachricht ausfuellen.</div>',
+                )
+            try:
+                ctx = {"name": name, "email": email}
+                # Best-effort: Source-URL / IP als Kontext
+                try:
+                    ctx["referer"] = request.headers.get("Referer", "")
+                    ctx["remote_addr"] = request.remote_addr or ""
+                except Exception:
+                    pass
+                report_manual(message=message, kind=kind, context=ctx)
+            except Exception as e:
+                return _render_feedback(
+                    project=project, kind=kind, message=message, name=name, email=email,
+                    flash=f'<div class="msg-err">Fehler beim Senden: {e}</div>',
+                )
+            label = "🐞 Bug-Meldung" if kind == "bug" else "✨ Wunsch"
+            return _render_feedback(
+                project=project,
+                flash=f'<div class="msg-ok">{label} entgegengenommen &mdash; vielen Dank!</div>',
+            )
+        return _render_feedback(project=project)
+
+    # Direkt als view function registrieren — kein Blueprint, kein Namens-Konflikt
+    app.add_url_rule(mount, endpoint=f"_crashguard_feedback_{project}",
+                     view_func=_handler, methods=["GET", "POST"])

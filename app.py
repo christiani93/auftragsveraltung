@@ -61,6 +61,7 @@ def create_app() -> Flask:
         import crashguard
         crashguard.install(project="Auftragsverwaltung", repo_dir=_cg_root)
         crashguard.init_flask(app)
+        crashguard.install_feedback(app, project="Auftragsverwaltung")
     except Exception:
         pass
     app.secret_key = _load_or_create_secret_key()
