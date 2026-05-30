@@ -50,6 +50,19 @@ def create_app() -> Flask:
     app.config["FIRMA_NAME"] = config.FIRMA_NAME
     # Bilder-Uploads: bis zu 60 MB pro Request (mehrere Fotos auf einmal)
     app.config["MAX_CONTENT_LENGTH"] = 60 * 1024 * 1024
+
+    # crashguard: Crash-/Fehler-Erfassung (URL+Token via CRASHGUARD_URL/_TOKEN env;
+    # ohne gesetzte Env nur lokales Schreiben, kein Versand).
+    try:
+        import sys as _cg_sys
+        _cg_root = os.path.dirname(os.path.abspath(__file__))
+        if _cg_root not in _cg_sys.path:
+            _cg_sys.path.insert(0, _cg_root)
+        import crashguard
+        crashguard.install(project="Auftragsverwaltung", repo_dir=_cg_root)
+        crashguard.init_flask(app)
+    except Exception:
+        pass
     app.secret_key = _load_or_create_secret_key()
     # Session-Cookie: secure nur im HTTPS-Production-Betrieb
     app.config["SESSION_COOKIE_HTTPONLY"] = True
