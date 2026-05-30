@@ -448,9 +448,25 @@ def install_feedback(app, *, project: str, mount: str = "/feedback") -> None:
     # Falls Flask-WTF-CSRFProtect aktiv ist: /feedback explizit exempten.
     # Anti-Spam laeuft per Convention ueber das Collector-Anti-Flood +
     # rate-limit-per-message (gleiche Nachricht in 1h triggert keine Mail).
-    try:
-        csrf = getattr(app, "extensions", {}).get("csrf")
-        if csrf is not None and hasattr(csrf, "exempt"):
-            csrf.exempt(app.view_functions[endpoint])
-    except Exception:
-        pass
+    #
+    # Tricky: oft wird install_feedback() VOR csrf.init_app(app) gerufen — dann
+    # ist app.extensions['csrf'] noch nicht gesetzt. Deshalb deferred via
+    # before_request: registrieren passiert in install-Reihenfolge VOR Flask-WTF,
+    # also laeuft unser before_request VOR Flask-WTFs CSRF-Check. Beim 1. Request
+    # ist csrf bereits initialisiert.
+    _vf = app.view_functions[endpoint]
+    _exempt_done = [False]
+
+    def _ensure_csrf_exempt():
+        if _exempt_done[0]:
+            return
+        try:
+            csrf = getattr(app, "extensions", {}).get("csrf")
+            if csrf is not None and hasattr(csrf, "exempt"):
+                csrf.exempt(_vf)
+                _exempt_done[0] = True
+        except Exception:
+            pass
+
+    _ensure_csrf_exempt()                      # sofort, falls csrf schon da
+    app.before_request(_ensure_csrf_exempt)    # deferred, falls erst spaeter init'd
