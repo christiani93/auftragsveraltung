@@ -136,6 +136,9 @@ def create_app() -> Flask:
             return None
         if request.endpoint and request.endpoint.startswith("static"):
             return None
+        # crashguard /feedback (Bug/Wunsch-Meldung) ist bewusst public
+        if request.endpoint and request.endpoint.startswith("_crashguard_feedback_"):
+            return None
         if current_user.is_authenticated:
             return None
         return redirect(url_for("auth.login", next=request.path))
