@@ -24,6 +24,7 @@ from routes.kontrolle import bp as kontrolle_bp
 from routes.messgeraete import bp as messgeraete_bp
 from routes.pdf_export import bp as pdf_bp
 from routes.protocols import bp as protocols_bp
+from routes.revisionen import bp as revisionen_bp
 from routes.zeit import bp as zeit_bp
 
 
@@ -107,6 +108,7 @@ def create_app() -> Flask:
     app.register_blueprint(messgeraete_bp, url_prefix="/messgeraete")
     app.register_blueprint(auftraege_bp, url_prefix="/auftraege")
     app.register_blueprint(zeit_bp, url_prefix="/zeit")
+    app.register_blueprint(revisionen_bp, url_prefix="/revisionen")
     app.register_blueprint(pdf_bp, url_prefix="/pdf")
 
     from models.repos import fi_erforderlich

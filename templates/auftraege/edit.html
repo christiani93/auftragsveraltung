@@ -44,6 +44,21 @@
         <small class="text-muted">Monteur sieht nur eigene + unzugewiesene Aufträge. Projektleiter/Admin sehen alle.</small>
       </div>
 
+      {% if kunde_revisionen %}
+      <div class="col-md-4">
+        <label class="form-label">Revision (Betriebsferien-Pool)</label>
+        <select name="revision_id" class="form-select">
+          <option value="">— keine —</option>
+          {% for r in kunde_revisionen %}
+          <option value="{{ r.id }}" {% if auftrag.revision_id == r.id %}selected{% endif %}>
+            {{ r.titel }}{% if r.von %} ({{ r.von }}{% if r.bis %}–{{ r.bis }}{% endif %}){% endif %}
+          </option>
+          {% endfor %}
+        </select>
+        <small class="text-muted">Optional: Auftrag einer Revision dieses Kunden zuordnen.</small>
+      </div>
+      {% endif %}
+
       <div class="col-12">
         <label class="form-label">Titel *</label>
         <input type="text" name="titel" class="form-control" value="{{ auftrag.titel or '' }}" required

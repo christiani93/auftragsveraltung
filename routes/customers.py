@@ -5,9 +5,12 @@ from flask_login import current_user
 
 from models.repos import (
     AUFTRAG_STATUS_LABEL,
+    REVISION_STATUS_LABEL,
     anlagen_fuer_kunde,
     auftraege_fuer_kunde,
+    auftraege_in_revision,
     kunden,
+    revisionen_fuer_kunde,
 )
 
 
@@ -90,12 +93,24 @@ def detail(kunde_id: str):
         [a for a in auftraege_fuer_kunde(kunde_id) if _darf_auftrag_sehen(a)],
         key=lambda a: (a.get("status") != "offen", a.get("status") != "in_arbeit", a.get("erteilungsdatum", "")),
     )
+    # Revisionen mit Counts vorbereiten
+    rev_rows = []
+    for r in revisionen_fuer_kunde(kunde_id):
+        rev_rows.append({
+            "r": r,
+            "anzahl_auftraege": len(auftraege_in_revision(r["id"])),
+            "anzahl_todos_offen": sum(1 for t in (r.get("todos") or []) if not t.get("erledigt")),
+            "anzahl_todos_total": len(r.get("todos") or []),
+        })
     return render_template(
         "customers/detail.html",
         kunde=kunde,
         anlagen=anlagen_fuer_kunde(kunde_id),
         auftraege=auftraege_dieses_kunden,
         auftrag_status_label=AUFTRAG_STATUS_LABEL,
+        revisionen=rev_rows,
+        revision_status_label=REVISION_STATUS_LABEL,
+        darf_revision_anlegen=current_user.is_authenticated and current_user.sieht_alle_auftraege,
     )
 
 

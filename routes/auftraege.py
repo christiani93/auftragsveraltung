@@ -24,6 +24,8 @@ from models.repos import (
     auftraege,
     dauer_aus_zeitspanne,
     kunden,
+    revisionen,
+    revisionen_fuer_kunde,
     zeitbuchungen,
     zeitbuchungen_fuer_auftrag,
     zeitsumme_h,
@@ -102,6 +104,7 @@ def _form_to_auftrag(form) -> dict:
         "erledigt_am": form.get("erledigt_am", "").strip() or None,
         "zu_erledigen_bis": form.get("zu_erledigen_bis", "").strip() or None,
         "termin": form.get("termin", "").strip() or None,
+        "revision_id": form.get("revision_id", "").strip() or None,
         "notizen": form.get("notizen", "").strip(),
     }
 
@@ -157,6 +160,7 @@ def list_auftraege():
 @bp.route("/neu", methods=["GET", "POST"])
 def new_auftrag():
     kunde_id = request.values.get("kunde_id", "")
+    vor_revision_id = request.values.get("revision_id", "")
 
     if request.method == "POST":
         data = _form_to_auftrag(request.form)
@@ -171,6 +175,7 @@ def new_auftrag():
                 anlagen_mit_teilen=_teile_strukturiert(data["kunde_id"]) if data["kunde_id"] else [],
                 status_optionen=AUFTRAG_STATUS, status_label=AUFTRAG_STATUS_LABEL,
                 monteure=list_monteure(),
+                kunde_revisionen=revisionen_fuer_kunde(data["kunde_id"]) if data["kunde_id"] else [],
             )
         record = auftraege.create(data)
         flash(f"Auftrag „{record['titel']}“ angelegt.", "success")
@@ -184,6 +189,7 @@ def new_auftrag():
             "erteilungsdatum": date.today().isoformat(),
             "status": "offen",
             "anlagenteil_ids": [],
+            "revision_id": vor_revision_id,
         },
         neu=True,
         alle_kunden=sorted(kunden.list(), key=lambda k: k["name"].lower()),
@@ -191,6 +197,7 @@ def new_auftrag():
         anlagen_mit_teilen=_teile_strukturiert(kunde_id) if kunde_id else [],
         status_optionen=AUFTRAG_STATUS, status_label=AUFTRAG_STATUS_LABEL,
         monteure=list_monteure(),
+        kunde_revisionen=revisionen_fuer_kunde(kunde_id) if kunde_id else [],
     )
 
 
@@ -216,6 +223,7 @@ def detail(auftrag_id: str):
     aktive_stempelung = aktive_stempelung_von(current_user.username) if current_user.is_authenticated else None
     # Mitarbeiter-Auswahl-Liste — nur fuer Admin/Projektleiter; Monteur stempelt nur fuer sich.
     moegliche_mitarbeiter = list_users() if current_user.sieht_alle_auftraege else []
+    zugeordnete_revision = revisionen.get(auftrag.get("revision_id")) if auftrag.get("revision_id") else None
     return render_template(
         "auftraege/detail.html",
         auftrag=auftrag, kunde=kunde, betroffene=betroffene,
@@ -226,6 +234,7 @@ def detail(auftrag_id: str):
         status_label=AUFTRAG_STATUS_LABEL,
         aktive_stempelung=aktive_stempelung,
         moegliche_mitarbeiter=moegliche_mitarbeiter,
+        zugeordnete_revision=zugeordnete_revision,
     )
 
 
@@ -248,6 +257,7 @@ def edit_auftrag(auftrag_id: str):
                 anlagen_mit_teilen=_teile_strukturiert(data["kunde_id"]) if data["kunde_id"] else [],
                 status_optionen=AUFTRAG_STATUS, status_label=AUFTRAG_STATUS_LABEL,
                 monteure=list_monteure(),
+                kunde_revisionen=revisionen_fuer_kunde(data["kunde_id"]) if data["kunde_id"] else [],
             )
         auftraege.update(auftrag_id, data)
         flash("Auftrag gespeichert.", "success")
@@ -260,6 +270,7 @@ def edit_auftrag(auftrag_id: str):
         anlagen_mit_teilen=_teile_strukturiert(auftrag.get("kunde_id", "")),
         status_optionen=AUFTRAG_STATUS, status_label=AUFTRAG_STATUS_LABEL,
         monteure=list_monteure(),
+        kunde_revisionen=revisionen_fuer_kunde(auftrag.get("kunde_id", "")),
     )
 
 

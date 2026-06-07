@@ -48,6 +48,7 @@ messgeraete = JsonStore("messgeraete.json")
 auftraege = JsonStore("auftraege.json")
 zeitbuchungen = JsonStore("zeitbuchungen.json")
 stempelungen = JsonStore("stempelung.json")
+revisionen = JsonStore("revisionen.json")
 
 
 # ----- Konstanten -------------------------------------------------------------
@@ -105,6 +106,13 @@ AUFTRAG_STATUS_LABEL = {
 # 'abgerechnet' = archiviert, standardmäßig in der Liste ausgeblendet
 AUFTRAG_STATUS_ARCHIVIERT = {"abgerechnet"}
 
+REVISION_STATUS = ["geplant", "laeuft", "abgeschlossen"]
+REVISION_STATUS_LABEL = {
+    "geplant": "Geplant",
+    "laeuft": "Läuft",
+    "abgeschlossen": "Abgeschlossen",
+}
+
 # Felder eines Messpunkts — orientiert am gewohnten NIN-Messprotokoll-Template.
 # Spaltenstruktur: Datum | Installation | Kabel | Sicherung | Schutzorgan |
 #                  Prüfungen obligatorisch | Prüfungen fakultativ | Prüfer
@@ -159,6 +167,17 @@ def messprotokolle_fuer_anlage(anlage_id: str) -> List[Dict[str, Any]]:
 
 def auftraege_fuer_kunde(kunde_id: str) -> List[Dict[str, Any]]:
     return [a for a in auftraege.list() if a.get("kunde_id") == kunde_id]
+
+
+def revisionen_fuer_kunde(kunde_id: str) -> List[Dict[str, Any]]:
+    eintraege = [r for r in revisionen.list() if r.get("kunde_id") == kunde_id]
+    # Aktuelle/zukuenftige zuerst (nach Startdatum absteigend wenn vorhanden)
+    eintraege.sort(key=lambda r: (r.get("status") == "abgeschlossen", r.get("von", "") or "9999"), reverse=False)
+    return eintraege
+
+
+def auftraege_in_revision(revision_id: str) -> List[Dict[str, Any]]:
+    return [a for a in auftraege.list() if a.get("revision_id") == revision_id]
 
 
 def messgeraete_fuer_user(username: str, ist_admin: bool = False) -> List[Dict[str, Any]]:

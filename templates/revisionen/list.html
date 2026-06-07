@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Revisionen{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <h1 class="h3 m-0">Revisionen</h1>
+  <form method="get" class="d-flex gap-2 align-items-center">
+    <select name="status" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit();">
+      <option value="">Alle Status</option>
+      {% for s in status_optionen %}
+      <option value="{{ s }}" {% if s == status_filter %}selected{% endif %}>{{ status_label[s] }}</option>
+      {% endfor %}
+    </select>
+  </form>
+</div>
+
+{% if rows %}
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-kompakt table-hover m-0">
+      <thead class="table-light">
+        <tr>
+          <th>Status</th>
+          <th>Kunde</th>
+          <th>Titel</th>
+          <th>Zeitraum</th>
+          <th class="text-end">Aufträge</th>
+          <th class="text-end">ToDos offen</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td>
+            {% if row.r.status == 'geplant' %}<span class="badge bg-secondary">{{ status_label[row.r.status] }}</span>
+            {% elif row.r.status == 'laeuft' %}<span class="badge bg-warning text-dark">{{ status_label[row.r.status] }}</span>
+            {% elif row.r.status == 'abgeschlossen' %}<span class="badge bg-success">{{ status_label[row.r.status] }}</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if row.kunde %}<a href="{{ url_for('customers.detail', kunde_id=row.kunde.id) }}">{{ row.kunde.name }}</a>
+            {% else %}<span class="text-muted">—</span>{% endif %}
+          </td>
+          <td><a href="{{ url_for('revisionen.detail', revision_id=row.r.id) }}" class="fw-semibold text-decoration-none">{{ row.r.titel }}</a></td>
+          <td>
+            {% if row.r.von and row.r.bis %}{{ row.r.von }} – {{ row.r.bis }}
+            {% elif row.r.von %}ab {{ row.r.von }}
+            {% elif row.r.bis %}bis {{ row.r.bis }}
+            {% else %}<span class="text-muted">—</span>{% endif %}
+          </td>
+          <td class="text-end">{{ row.anzahl_auftraege }}</td>
+          <td class="text-end">
+            {% if row.anzahl_todos_total %}
+              {{ row.anzahl_todos_offen }} / {{ row.anzahl_todos_total }}
+            {% else %}<span class="text-muted">—</span>{% endif %}
+          </td>
+          <td class="text-end"><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('revisionen.detail', revision_id=row.r.id) }}">Öffnen</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="alert alert-info">
+  Keine Revisionen{% if status_filter %} mit Status „{{ status_label[status_filter] }}"{% endif %}.
+  Eine neue Revision wird auf der Kunden-Detail-Seite angelegt.
+</div>
+{% endif %}
+{% endblock %}

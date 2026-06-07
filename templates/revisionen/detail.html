@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% block title %}{{ revision.titel }}{% endblock %}
+{% block content %}
+<div class="text-muted small mb-2">
+  {% if kunde %}<a href="{{ url_for('customers.detail', kunde_id=kunde.id) }}">{{ kunde.name }}</a> › Revision{% else %}Revision{% endif %}
+</div>
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+  <div>
+    <h1 class="h3 m-0">
+      {{ revision.titel }}
+      {% if revision.status == 'geplant' %}<span class="badge bg-secondary align-middle ms-2">{{ status_label[revision.status] }}</span>
+      {% elif revision.status == 'laeuft' %}<span class="badge bg-warning text-dark align-middle ms-2">{{ status_label[revision.status] }}</span>
+      {% elif revision.status == 'abgeschlossen' %}<span class="badge bg-success align-middle ms-2">{{ status_label[revision.status] }}</span>
+      {% endif %}
+    </h1>
+    <div class="text-muted">
+      {% if revision.von and revision.bis %}{{ revision.von }} bis {{ revision.bis }}
+      {% elif revision.von %}ab {{ revision.von }}
+      {% elif revision.bis %}bis {{ revision.bis }}
+      {% else %}Kein Zeitraum gesetzt{% endif %}
+    </div>
+  </div>
+  {% if darf_aendern %}
+  <div class="d-flex gap-2 flex-wrap">
+    <a class="btn btn-outline-secondary" href="{{ url_for('revisionen.edit_revision', revision_id=revision.id) }}">Bearbeiten</a>
+    {% if kunde %}
+    <a class="btn btn-primary" href="{{ url_for('auftraege.new_auftrag', kunde_id=kunde.id, revision_id=revision.id) }}">+ Auftrag für Revision</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+{% if darf_aendern %}
+<div class="card card-body mb-3">
+  <h6 class="text-muted small">Status setzen</h6>
+  <div class="btn-group btn-group-sm">
+    {% for s in status_optionen %}
+    <form method="post" action="{{ url_for('revisionen.set_status', revision_id=revision.id) }}" class="d-inline">
+      <input type="hidden" name="status" value="{{ s }}">
+      <button class="btn btn-outline-{% if s == 'geplant' %}secondary{% elif s == 'laeuft' %}warning{% else %}success{% endif %}"
+              {% if revision.status == s %}disabled{% endif %}>{{ status_label[s] }}</button>
+    </form>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if revision.notizen %}
+<div class="card card-body mb-3">
+  <h6 class="text-muted small">Notizen</h6>
+  <div style="white-space: pre-wrap;">{{ revision.notizen }}</div>
+</div>
+{% endif %}
+
+{# ============ ToDo-Liste ============ #}
+<div class="d-flex justify-content-between align-items-center mt-4 mb-2">
+  <h2 class="h5 m-0">ToDos
+    {% set offen = (revision.todos or [])|rejectattr('erledigt')|list|length %}
+    {% set total = (revision.todos or [])|length %}
+    {% if total %}<small class="text-muted">{{ offen }} / {{ total }} offen</small>{% endif %}
+  </h2>
+</div>
+<div class="card mb-3">
+  {% if revision.todos %}
+  <ul class="list-group list-group-flush">
+    {% for t in revision.todos %}
+    <li class="list-group-item d-flex align-items-center gap-2">
+      {% if darf_aendern %}
+      <form method="post" action="{{ url_for('revisionen.toggle_todo', revision_id=revision.id, todo_id=t.id) }}" class="d-inline">
+        <button type="submit" class="btn btn-sm btn-outline-{% if t.erledigt %}success{% else %}secondary{% endif %}" title="Toggle">
+          {% if t.erledigt %}✓{% else %}☐{% endif %}
+        </button>
+      </form>
+      {% else %}
+      <span>{% if t.erledigt %}✓{% else %}☐{% endif %}</span>
+      {% endif %}
+      <span class="flex-grow-1 {% if t.erledigt %}text-muted text-decoration-line-through{% endif %}">{{ t.text }}</span>
+      {% if darf_aendern %}
+      <form method="post" action="{{ url_for('revisionen.delete_todo', revision_id=revision.id, todo_id=t.id) }}"
+            class="d-inline" onsubmit="return confirm('ToDo löschen?');">
+        <button type="submit" class="btn btn-sm btn-outline-danger">×</button>
+      </form>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <div class="card-body text-muted small">Noch keine ToDos.</div>
+  {% endif %}
+</div>
+
+{% if darf_aendern %}
+<form method="post" action="{{ url_for('revisionen.add_todo', revision_id=revision.id) }}" class="card card-body mb-4">
+  <h6 class="text-muted small">Neue ToDo</h6>
+  <div class="input-group">
+    <input type="text" name="text" class="form-control" placeholder="z.B. Sicherungskasten EG prüfen" required autofocus>
+    <button type="submit" class="btn btn-primary">+ Hinzufügen</button>
+  </div>
+</form>
+{% endif %}
+
+{# ============ Zugeordnete Aufträge ============ #}
+<div class="d-flex justify-content-between align-items-center mt-4 mb-2">
+  <h2 class="h5 m-0">Zugeordnete Aufträge ({{ auftraege|length }})</h2>
+  {% if darf_aendern and kunde %}
+  <a class="btn btn-sm btn-primary" href="{{ url_for('auftraege.new_auftrag', kunde_id=kunde.id, revision_id=revision.id) }}">+ Auftrag für Revision</a>
+  {% endif %}
+</div>
+{% if auftraege %}
+<div class="card mb-4">
+  <div class="table-responsive">
+    <table class="table table-kompakt table-sm m-0">
+      <thead class="table-light">
+        <tr>
+          <th>Datum</th>
+          <th>Titel</th>
+          <th>Zugewiesen an</th>
+          <th>Termin / Frist</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in auftraege %}
+        <tr>
+          <td>{{ a.erteilungsdatum }}</td>
+          <td><a href="{{ url_for('auftraege.detail', auftrag_id=a.id) }}">{{ a.titel }}</a></td>
+          <td>{{ a.zugewiesen_an|mitarbeiter_name or '—' }}</td>
+          <td>
+            {% if a.termin %}📅 {{ a.termin|replace('T', ' · ') }}
+            {% elif a.zu_erledigen_bis %}bis {{ a.zu_erledigen_bis }}
+            {% else %}—{% endif %}
+          </td>
+          <td>
+            {% if a.status == 'offen' %}<span class="badge bg-secondary">{{ auftrag_status_label[a.status] }}</span>
+            {% elif a.status == 'in_arbeit' %}<span class="badge bg-warning text-dark">{{ auftrag_status_label[a.status] }}</span>
+            {% elif a.status == 'erledigt' %}<span class="badge bg-success">{{ auftrag_status_label[a.status] }}</span>
+            {% elif a.status == 'abgerechnet' %}<span class="badge bg-dark">{{ auftrag_status_label[a.status] }}</span>
+            {% endif %}
+          </td>
+          <td class="text-end"><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('auftraege.detail', auftrag_id=a.id) }}">›</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="alert alert-light border">
+  Noch keine Aufträge zugeordnet.
+  {% if darf_aendern and kunde %}
+  <a href="{{ url_for('auftraege.new_auftrag', kunde_id=kunde.id, revision_id=revision.id) }}">Ersten Auftrag anlegen →</a>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if darf_aendern %}
+<form method="post" action="{{ url_for('revisionen.delete_revision', revision_id=revision.id) }}"
+      class="mt-5"
+      onsubmit="return confirm('Revision „{{ (revision.titel or '')|e }}“ wirklich löschen?\n\nDie zugeordneten Aufträge bleiben erhalten — nur die Verknüpfung wird gelöst.');">
+  <button type="submit" class="btn btn-sm btn-outline-danger">Revision löschen</button>
+  <span class="text-muted small ms-2">Aufträge bleiben erhalten.</span>
+</form>
+{% endif %}
+{% endblock %}
