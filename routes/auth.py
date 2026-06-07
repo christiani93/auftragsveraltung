@@ -70,12 +70,18 @@ def new_user_route():
     password = request.form.get("password", "")
     name = request.form.get("name", "").strip()
     role = request.form.get("role", "monteur")
+    # Default: User muss das Initial-Passwort beim ersten Login aendern.
+    # Admin kann das via Checkbox 'pw_change_optional' ausschalten.
+    force_change = request.form.get("pw_change_optional") != "on"
     if not username or not password:
         flash("Username und Passwort erforderlich.", "warning")
         return redirect(url_for("auth.user_list"))
     try:
-        create_user(username, password, name=name, role=role)
-        flash(f"User „{username}“ angelegt.", "success")
+        create_user(username, password, name=name, role=role, force_change_on_next_login=force_change)
+        if force_change:
+            flash(f"User „{username}“ angelegt — muss das Passwort beim ersten Login ändern.", "success")
+        else:
+            flash(f"User „{username}“ angelegt.", "success")
     except ValueError as e:
         flash(str(e), "warning")
     return redirect(url_for("auth.user_list"))

@@ -105,7 +105,8 @@ def find_user(username: str) -> Optional[User]:
     return None
 
 
-def create_user(username: str, password: str, name: str = "", role: str = "monteur") -> User:
+def create_user(username: str, password: str, name: str = "", role: str = "monteur",
+                force_change_on_next_login: bool = False) -> User:
     if find_user(username):
         raise ValueError(f"User „{username}“ existiert bereits.")
     role = _normalize_role(role)
@@ -116,6 +117,7 @@ def create_user(username: str, password: str, name: str = "", role: str = "monte
         "name": name or username,
         "role": role,
         "password_hash": generate_password_hash(password),
+        "passwort_aendern_pflicht": bool(force_change_on_next_login),
     }
     users_store.create(data)
     return User(data)
