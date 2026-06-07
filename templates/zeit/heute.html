@@ -198,45 +198,49 @@
 <div class="card mb-3">
   <div class="card-header d-flex justify-content-between align-items-center">
     <strong>{{ (daten.username|mitarbeiter_name) or '— ohne Mitarbeiter —' }}</strong>
-    <span class="badge bg-primary">{{ '%.2f'|format(daten.summe) }} h</span>
+    <span class="badge bg-primary fs-6">{{ '%.2f'|format(daten.summe) }} h</span>
   </div>
-  <div class="table-responsive">
-    <table class="table table-sm table-kompakt m-0">
-      <thead class="table-light">
-        <tr>
-          <th>Von</th>
-          <th>Bis</th>
-          <th class="text-end">Stunden</th>
-          <th>Auftrag / Kunde</th>
-          <th>Tätigkeit</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for row in daten.eintraege %}
-        <tr>
-          <td>{{ row.z.von_zeit or '—' }}</td>
-          <td>{{ row.z.bis_zeit or '—' }}</td>
-          <td class="text-end fw-semibold">{{ '%.2f'|format(row.z.dauer_h) }}</td>
-          <td>
-            {% if row.auftrag %}
-              <a href="{{ url_for('auftraege.detail', auftrag_id=row.auftrag.id) }}">{{ row.auftrag.titel }}</a>
-              {% if row.kunde %}<div class="text-muted small">{{ row.kunde.name }}</div>{% endif %}
-            {% else %}<span class="text-muted">— ohne Auftrag —</span>{% endif %}
-          </td>
-          <td>
-            {{ row.z.taetigkeit or '' }}
-            {% if row.z.via_stempelung %}<span class="badge bg-light text-muted ms-1" title="Über Stempelfunktion erfasst">⏱</span>{% endif %}
-            {% if row.z.notizen %}<div class="text-muted small">{{ row.z.notizen }}</div>{% endif %}
-          </td>
-          <td class="text-end">
-            {% if row.auftrag %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('auftraege.detail', auftrag_id=row.auftrag.id) }}">›</a>{% endif %}
-          </td>
-        </tr>
+  <ul class="list-group list-group-flush">
+    {% for kb in daten.kunden %}
+    <li class="list-group-item">
+      <div class="d-flex justify-content-between align-items-center mb-1">
+        <div>
+          <strong>
+            {% if kb.kunde %}<a href="{{ url_for('customers.detail', kunde_id=kb.kunde.id) }}" class="text-decoration-none">{{ kb.kunde.name }}</a>
+            {% else %}<span class="text-muted">— ohne Kunde —</span>{% endif %}
+          </strong>
+          <span class="text-muted small ms-2">{{ kb.von or '—' }}–{{ kb.bis or '—' }}</span>
+        </div>
+        <span class="badge bg-secondary">{{ '%.2f'|format(kb.summe) }} h</span>
+      </div>
+      <ul class="list-group list-group-flush ms-3">
+        {% for ab in kb.auftraege %}
+        <li class="list-group-item border-0 px-2 py-1">
+          <div class="d-flex justify-content-between align-items-start">
+            <div class="flex-grow-1">
+              <span class="text-muted small me-2">{{ ab.von or '—' }}–{{ ab.bis or '—' }}</span>
+              {% if ab.auftrag %}
+                <a href="{{ url_for('auftraege.detail', auftrag_id=ab.auftrag.id) }}">{{ ab.auftrag.titel }}</a>
+              {% else %}<span class="text-muted">— ohne Auftrag —</span>{% endif %}
+              {% if ab.eintraege|length > 1 %}<span class="badge bg-light text-muted ms-1">{{ ab.eintraege|length }} Buchungen</span>{% endif %}
+              {% set taetigkeiten = ab.eintraege|map(attribute='z.taetigkeit')|select|map('trim')|reject('eq', '')|list %}
+              {% if taetigkeiten %}<div class="text-muted small">{{ taetigkeiten|join(' · ') }}</div>{% endif %}
+            </div>
+            <span class="fw-semibold">{{ '%.2f'|format(ab.summe) }} h</span>
+          </div>
+          {% if ab.eintraege|length > 1 %}
+          <div class="ms-3 small text-muted">
+            {% for row in ab.eintraege %}
+            <div>{{ row.z.von_zeit or '—' }}–{{ row.z.bis_zeit or '—' }} · {{ '%.2f'|format(row.z.dauer_h) }} h{% if row.z.taetigkeit %} · {{ row.z.taetigkeit }}{% endif %}{% if row.z.via_stempelung %} ⏱{% endif %}</div>
+            {% endfor %}
+          </div>
+          {% endif %}
+        </li>
         {% endfor %}
-      </tbody>
-    </table>
-  </div>
+      </ul>
+    </li>
+    {% endfor %}
+  </ul>
 </div>
 {% endfor %}
 

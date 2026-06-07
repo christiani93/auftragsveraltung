@@ -254,20 +254,58 @@ def heute():
             "kunde": kunden_idx.get(a.get("kunde_id")) if a else None,
         })
 
-    # Gruppieren pro Mitarbeiter (Key = username, Anzeige-Name kommt im Template via Filter)
+    # Gruppieren: Mitarbeiter -> Kunde -> Auftrag (Hierarchie fuer Tagesblick)
     pro_mitarbeiter: dict[str, dict] = {}
     for row in sichtbare:
         mit = row["z"].get("mitarbeiter") or ""
         if mit not in pro_mitarbeiter:
-            pro_mitarbeiter[mit] = {"username": mit, "eintraege": [], "summe": 0.0}
-        pro_mitarbeiter[mit]["eintraege"].append(row)
+            pro_mitarbeiter[mit] = {"username": mit, "summe": 0.0, "_kunden": {}}
         try:
-            pro_mitarbeiter[mit]["summe"] += float(row["z"].get("dauer_h") or 0)
+            dauer = float(row["z"].get("dauer_h") or 0)
         except (TypeError, ValueError):
-            pass
+            dauer = 0.0
+        pro_mitarbeiter[mit]["summe"] += dauer
+        kbuckets = pro_mitarbeiter[mit]["_kunden"]
+        kunde_id = row["kunde"]["id"] if row["kunde"] else ""
+        if kunde_id not in kbuckets:
+            kbuckets[kunde_id] = {"kunde": row["kunde"], "summe": 0.0, "_auftraege": {}}
+        kb = kbuckets[kunde_id]
+        kb["summe"] += dauer
+        auftrag_id = row["auftrag"]["id"] if row["auftrag"] else ""
+        if auftrag_id not in kb["_auftraege"]:
+            kb["_auftraege"][auftrag_id] = {"auftrag": row["auftrag"], "summe": 0.0, "eintraege": []}
+        ab = kb["_auftraege"][auftrag_id]
+        ab["summe"] += dauer
+        ab["eintraege"].append(row)
+
+    def _von_bis(rows):
+        v = [r["z"].get("von_zeit") for r in rows if r["z"].get("von_zeit")]
+        b = [r["z"].get("bis_zeit") for r in rows if r["z"].get("bis_zeit")]
+        return (min(v) if v else None, max(b) if b else None)
+
+    # _kunden/_auftraege-Dicts zu sortierten Listen mit Von/Bis ausrechnen
     for daten in pro_mitarbeiter.values():
-        daten["eintraege"].sort(key=lambda r: r["z"].get("von_zeit") or "")
         daten["summe"] = round(daten["summe"], 2)
+        kunden_liste = []
+        for kb in daten["_kunden"].values():
+            alle_eintraege_k = [r for ab in kb["_auftraege"].values() for r in ab["eintraege"]]
+            kb_von, kb_bis = _von_bis(alle_eintraege_k)
+            kb["von"], kb["bis"] = kb_von, kb_bis
+            kb["summe"] = round(kb["summe"], 2)
+            auftraege_liste = []
+            for ab in kb["_auftraege"].values():
+                ab["eintraege"].sort(key=lambda r: r["z"].get("von_zeit") or "")
+                ab_von, ab_bis = _von_bis(ab["eintraege"])
+                ab["von"], ab["bis"] = ab_von, ab_bis
+                ab["summe"] = round(ab["summe"], 2)
+                auftraege_liste.append(ab)
+            auftraege_liste.sort(key=lambda ab: ab["von"] or "")
+            kb["auftraege"] = auftraege_liste
+            del kb["_auftraege"]
+            kunden_liste.append(kb)
+        kunden_liste.sort(key=lambda kb: kb["von"] or "")
+        daten["kunden"] = kunden_liste
+        del daten["_kunden"]
 
     # Aktive Stempelung des "gewaehlten" Users (Karte oben)
     aktive_fuer_karte = aktive_stempelung_von(stempel_fuer)
