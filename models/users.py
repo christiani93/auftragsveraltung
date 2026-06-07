@@ -83,6 +83,12 @@ class User(UserMixin):
         """Admin + Projektleiter sehen alles. Monteur nur eigene + unzugewiesene."""
         return self.role in ("admin", "projektleiter")
 
+    @property
+    def passwort_aendern_pflicht(self) -> bool:
+        """True wenn der User sein Passwort beim naechsten Login zwingend aendern muss
+        (z.B. weil Admin ihm ein Ersatz-Passwort vergeben hat)."""
+        return bool(self._data.get("passwort_aendern_pflicht"))
+
     def check_password(self, password: str) -> bool:
         h = self._data.get("password_hash")
         if not h:
@@ -115,11 +121,18 @@ def create_user(username: str, password: str, name: str = "", role: str = "monte
     return User(data)
 
 
-def set_password(username: str, new_password: str) -> bool:
+def set_password(username: str, new_password: str, force_change_on_next_login: bool = False) -> bool:
+    """Setzt das Passwort. Wenn force_change_on_next_login=True (Admin-Reset),
+    wird das Flag passwort_aendern_pflicht gesetzt — der User wird beim naechsten
+    Login auf die Profil-Seite gezwungen, bis er es selbst aendert."""
     user = find_user(username)
     if not user:
         return False
-    users_store.update(user.record_id, {"password_hash": generate_password_hash(new_password)})
+    updates = {
+        "password_hash": generate_password_hash(new_password),
+        "passwort_aendern_pflicht": bool(force_change_on_next_login),
+    }
+    users_store.update(user.record_id, updates)
     return True
 
 

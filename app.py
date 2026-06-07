@@ -141,9 +141,15 @@ def create_app() -> Flask:
         # crashguard /feedback (Bug/Wunsch-Meldung) ist bewusst public
         if request.endpoint and request.endpoint.startswith("_crashguard_feedback_"):
             return None
-        if current_user.is_authenticated:
-            return None
-        return redirect(url_for("auth.login", next=request.path))
+        if not current_user.is_authenticated:
+            return redirect(url_for("auth.login", next=request.path))
+        # Hat der Admin ein Ersatzpasswort vergeben, zwingen wir den User auf
+        # die Profil-Seite, bis er es selbst aendert.
+        if getattr(current_user, "passwort_aendern_pflicht", False):
+            erlaubt = {"auth.profil", "auth.change_password_route", "auth.logout"}
+            if request.endpoint not in erlaubt:
+                return redirect(url_for("auth.profil"))
+        return None
 
     @app.route("/")
     def index():

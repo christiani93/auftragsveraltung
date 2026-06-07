@@ -103,17 +103,40 @@ def change_role_route(username: str):
 @login_required
 def change_password_route(username: str):
     # Admin kann jeden, User nur sich selbst
-    if not current_user.is_admin and current_user.username != username:
+    is_self_change = current_user.username == username
+    if not current_user.is_admin and not is_self_change:
         abort(403)
     new_password = request.form.get("new_password", "")
     if len(new_password) < 6:
         flash("Passwort muss mindestens 6 Zeichen haben.", "warning")
     elif set_password(username, new_password):
+        # Self-change loescht die Pflicht-Flag (User hat selbst gesetzt),
+        # Admin-change auf fremde User aktiviert sie (Ersatzpasswort).
         flash(f"Passwort für „{username}“ geändert.", "success")
     else:
         flash("User nicht gefunden.", "warning")
-    target = url_for("auth.user_list") if current_user.is_admin else url_for("kontrolle.dashboard")
-    return redirect(target)
+    if is_self_change:
+        return redirect(url_for("kontrolle.dashboard"))
+    return redirect(url_for("auth.user_list"))
+
+
+@bp.route("/users/<username>/ersatzpasswort", methods=["POST"])
+@login_required
+def reset_password_route(username: str):
+    """Admin vergibt ein Ersatzpasswort an einen User. Der User wird beim naechsten
+    Login zwingend auf die Profil-Seite umgeleitet, bis er es selbst aendert."""
+    _require_admin()
+    if current_user.username == username:
+        flash("Setze für dich selbst kein Ersatzpasswort — nutze die normale Passwort-Aenderung.", "warning")
+        return redirect(url_for("auth.user_list"))
+    new_password = request.form.get("new_password", "")
+    if len(new_password) < 6:
+        flash("Ersatzpasswort muss mindestens 6 Zeichen haben.", "warning")
+    elif set_password(username, new_password, force_change_on_next_login=True):
+        flash(f"Ersatzpasswort für „{username}“ vergeben — der User muss es beim nächsten Login ändern.", "success")
+    else:
+        flash("User nicht gefunden.", "warning")
+    return redirect(url_for("auth.user_list"))
 
 
 @bp.route("/users/<username>/loeschen", methods=["POST"])

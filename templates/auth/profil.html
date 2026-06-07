@@ -3,6 +3,14 @@
 {% block content %}
 <h1 class="h3 mb-3">Mein Profil</h1>
 
+{% if current_user.passwort_aendern_pflicht %}
+<div class="alert alert-warning border-warning">
+  <strong>Passwort-Änderung erforderlich.</strong>
+  Du hast aktuell ein Ersatzpasswort vom Administrator. Bitte vergib jetzt ein eigenes Passwort —
+  bis dahin sind die anderen Seiten gesperrt.
+</div>
+{% endif %}
+
 <div class="card card-body mb-3">
   <div><span class="text-muted">Username:</span> <code>{{ current_user.username }}</code></div>
   <div><span class="text-muted">Name:</span> {{ current_user.name }}</div>

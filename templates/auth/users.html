@@ -35,6 +35,16 @@
               </select>
               <button type="submit" class="btn btn-sm btn-outline-primary">Rolle setzen</button>
             </form>
+            <form method="post" action="{{ url_for('auth.reset_password_route', username=u.username) }}"
+                  class="d-inline-flex align-items-center gap-1 ms-1"
+                  onsubmit="return confirm('Ersatzpasswort für „{{ u.username }}“ vergeben?\n\nDer User muss es beim nächsten Login ändern.');">
+              <input type="text" name="new_password" class="form-control form-control-sm" style="width: 150px;"
+                     placeholder="Ersatzpasswort" minlength="6" required>
+              <button type="submit" class="btn btn-sm btn-outline-warning">Ersatzpasswort</button>
+            </form>
+            {% if u.passwort_aendern_pflicht %}
+            <span class="badge bg-warning text-dark ms-1" title="User hat ein Ersatzpasswort und muss es beim nächsten Login ändern">⚠ muss ändern</span>
+            {% endif %}
             {% endif %}
             <form method="post" action="{{ url_for('auth.delete_user_route', username=u.username) }}"
                   class="d-inline ms-1" onsubmit="return confirm('User „{{ u.username }}“ löschen?');">
