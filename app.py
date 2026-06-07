@@ -155,6 +155,11 @@ def create_app() -> Flask:
     def index():
         return redirect(url_for("kontrolle.dashboard"))
 
+    @app.route("/hilfe")
+    def hilfe():
+        from flask import render_template as _rt
+        return _rt("hilfe.html")
+
     @app.route("/sw.js")
     def service_worker():
         response = send_from_directory(app.static_folder, "sw.js")

@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Hilfe{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <h1 class="h3 m-0">Hilfe & Übersicht</h1>
+  <a class="btn btn-sm btn-outline-secondary" href="/feedback">🐞 Bug / Wunsch melden</a>
+</div>
+
+<div class="card card-body mb-3 bg-light">
+  <strong>Kurz gesagt:</strong>
+  Diese App verwaltet <em>Kunden</em>, ihre <em>Anlagen/Anlagenteile</em>, daraus entstehende <em>Aufträge</em>,
+  die Zeit-Erfassung darauf (Stempeluhr + manuelle Buchungen), <em>Messprotokolle</em> für die Kontrolle
+  sowie <em>Revisionen</em> (z.B. Betriebsferien) als Bündelung mehrerer Aufträge.
+</div>
+
+<div class="row g-3">
+
+<div class="col-md-6">
+<div class="card card-body h-100">
+<h2 class="h5">Rollen</h2>
+<ul class="mb-0">
+  <li><strong>Admin</strong> — sieht alles, kann Benutzer anlegen/verwalten, Aufträge löschen, Ersatzpasswörter vergeben, beim Stempeln für andere stempeln.</li>
+  <li><strong>Projektleiter</strong> — sieht alle Aufträge, kann Mitarbeiter Aufträgen zuweisen.</li>
+  <li><strong>Monteur</strong> — sieht nur Aufträge die ihm zugewiesen sind oder unzugewiesen, plus alle Aufträge der Revisionen, in denen er als Mitarbeiter eingetragen ist.</li>
+</ul>
+</div>
+</div>
+
+<div class="col-md-6">
+<div class="card card-body h-100">
+<h2 class="h5">Passwort + Login</h2>
+<ul class="mb-0">
+  <li>Login mit Username (Kurzform, z.B. <code>Mueller</code>) — angezeigt wird überall der Anzeigename.</li>
+  <li>Passwort selbst ändern: <em>👤 Dropdown → Mein Profil</em>.</li>
+  <li>Admin kann ein <strong>Ersatzpasswort</strong> vergeben (Benutzer-Verwaltung). Der User muss es beim nächsten Login zwingend ändern.</li>
+  <li>Neue User müssen ihr Initial-Passwort beim ersten Login ebenfalls ändern (außer der Admin schaltet das beim Anlegen explizit aus).</li>
+</ul>
+</div>
+</div>
+
+<div class="col-md-6">
+<div class="card card-body h-100">
+<h2 class="h5">Kunden & Kontaktpersonen</h2>
+<ul class="mb-0">
+  <li><strong>Stammkunde</strong>-Häkchen → erscheint im Dashboard, hat Kontroll-Intervall in Monaten.</li>
+  <li>Pro Kunde mehrere <strong>Kontaktpersonen</strong> (Name, Funktion, Telefon, E-Mail). Beim Auftrag-Anlegen kann eine Kontaktperson als „Erteilt von" + Telefon übernommen werden.</li>
+  <li>Anlagen und Anlagenteile (Verteilung, Stromkreise) werden pro Kunde gepflegt.</li>
+</ul>
+</div>
+</div>
+
+<div class="col-md-6">
+<div class="card card-body h-100">
+<h2 class="h5">Aufträge</h2>
+<ul class="mb-0">
+  <li>Status: <span class="badge bg-secondary">Offen</span> · <span class="badge bg-warning text-dark">In Arbeit</span> · <span class="badge bg-success">Erledigt</span> · <span class="badge bg-dark">Abgerechnet</span> (Archiv, in Liste ausgeblendet).</li>
+  <li><strong>Zugewiesen an</strong> — Monteur sieht den Auftrag nur wenn er zugewiesen ist oder das Feld leer ist.</li>
+  <li><strong>Zu erledigen bis</strong> (Frist) — wird im Detail rot markiert wenn überfällig.</li>
+  <li><strong>Termin</strong> — konkreter Vor-Ort-Termin (Datum + Uhrzeit).</li>
+  <li>Mehrere <strong>Bilder</strong> hochladen — werden automatisch auf 1920 px / JPEG verkleinert (auch iPhone-HEIC).</li>
+</ul>
+</div>
+</div>
+
+<div class="col-md-6">
+<div class="card card-body h-100">
+<h2 class="h5">Revisionen (Großaufträge)</h2>
+<ul class="mb-0">
+  <li>Pro Kunde planbar — typisch Betriebsferien-Zeitraum. Mit <strong>ToDo-Liste</strong> und Liste der zugeordneten Aufträge.</li>
+  <li><strong>Beteiligte Mitarbeiter</strong> sehen alle Aufträge der Revision, auch wenn sie ihnen nicht direkt zugewiesen sind.</li>
+  <li>Aufträge mit Revision-Zuordnung werden aus der Hauptliste <em>ausgeblendet</em> (nur in der Revision sichtbar) — Toggle „Revisions-Aufträge anzeigen" macht sie kurzzeitig sichtbar.</li>
+  <li>Default-Titel bei Neu: „Revision &lt;Jahr&gt;".</li>
+</ul>
+</div>
+</div>
+
+<div class="col-md-6">
+<div class="card card-body h-100">
+<h2 class="h5">Zeiterfassung & Stempeluhr</h2>
+<ul class="mb-0">
+  <li><strong>Einstempeln</strong> auf der Zeiterfassungs-Seite (auch ohne Auftrag möglich, kann nachträglich zugeordnet werden) oder direkt auf einem Auftrag-Detail.</li>
+  <li><strong>Auftrag wechseln</strong> beendet die aktuelle Buchung und startet sofort eine neue auf dem neuen Auftrag.</li>
+  <li><strong>Ausstempeln</strong> bucht die Zeit als Zeitbuchung am Auftrag.</li>
+  <li><strong>Pause nachträglich einfügen</strong>: in der Zeitbuchungs-Tabelle pro Buchung Von/Bis eingeben — die Dauer wird automatisch reduziert.</li>
+  <li>Admin kann mit „Stempeln für: [User]" für einen anderen Mitarbeiter stempeln.</li>
+  <li><strong>Tagesblick</strong> gruppiert pro Mitarbeiter → pro Kunde (mit Block-Zeit) → pro Auftrag.</li>
+</ul>
+</div>
+</div>
+
+<div class="col-md-6">
+<div class="card card-body h-100">
+<h2 class="h5">Messprotokolle (NIN/SiNa)</h2>
+<ul class="mb-0">
+  <li>Pro Anlage + optional pro Anlagenteil können Messprotokolle erfasst werden (Auslösezeit, R Iso, Ik, Drehrichtung etc.).</li>
+  <li>Messgeräte werden separat verwaltet (Kalibrierdaten). User sieht nur eigene Geräte, Admin sieht alle.</li>
+  <li>PDF-Export pro Protokoll + pro Kunde (alle Aufträge mit Zeitbuchungen).</li>
+</ul>
+</div>
+</div>
+
+<div class="col-md-6">
+<div class="card card-body h-100">
+<h2 class="h5">Kontroll-Übersicht</h2>
+<ul class="mb-0">
+  <li>Dashboard zeigt Stammkunden mit offenen Kontrollen / Mängeln — sortiert nach Dringlichkeit.</li>
+  <li>Pro Stammkunde kompakte Übersicht für den Elektrokontrolleur-Besuch.</li>
+</ul>
+</div>
+</div>
+
+<div class="col-12">
+<div class="card card-body">
+<h2 class="h5">Bug oder Wunsch melden</h2>
+<p class="mb-2">Wenn etwas nicht funktioniert oder ein Feature fehlt:</p>
+<a href="/feedback" class="btn btn-warning">🐞 Bug / Wunsch melden</a>
+<span class="text-muted ms-2 small">Das Formular schickt den Stand der aktuellen Seite + deine Notiz an den Entwickler.</span>
+</div>
+</div>
+
+</div>
+{% endblock %}
