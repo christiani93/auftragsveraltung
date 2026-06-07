@@ -106,7 +106,7 @@ def new_revision(kunde_id: str):
         return redirect(url_for("revisionen.detail", revision_id=record["id"]))
     # GET: leeres Formular, Standard-Titel mit Jahr
     default = {
-        "titel": f"Betriebsferien {date.today().year}",
+        "titel": f"Revision {date.today().year}",
         "status": "geplant",
     }
     return render_template(
