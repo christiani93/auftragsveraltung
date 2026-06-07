@@ -23,6 +23,7 @@ from models.repos import (
     anlagenteile_fuer_anlage,
     auftraege,
     dauer_aus_zeitspanne,
+    ist_mitarbeiter_in_revision,
     kunden,
     revisionen,
     revisionen_fuer_kunde,
@@ -110,14 +111,19 @@ def _form_to_auftrag(form) -> dict:
 
 
 def _darf_auftrag_sehen(auftrag: dict) -> bool:
-    """Sichtbarkeitsregel: Admin/Projektleiter sehen alles, Monteur nur eigene + unzugewiesene."""
+    """Sichtbarkeitsregel: Admin/Projektleiter sehen alles, Monteur sieht eigene +
+    unzugewiesene + Aufträge von Revisionen, in denen er als Mitarbeiter eingetragen ist.
+    """
     if not current_user.is_authenticated:
         return False
     if current_user.sieht_alle_auftraege:
         return True
+    # Revisions-Mitgliedschaft hat Vorrang — Mitarbeiter sieht alle Auftraege der Revision
+    if ist_mitarbeiter_in_revision(auftrag.get("revision_id"), current_user.username):
+        return True
     zugewiesen = (auftrag.get("zugewiesen_an") or "").strip()
     if not zugewiesen:
-        return True  # unzugewiesen → für alle Monteure sichtbar
+        return True
     return zugewiesen.lower() == current_user.username.lower()
 
 
@@ -136,15 +142,25 @@ def _teile_strukturiert(kunde_id: str):
 @bp.route("/")
 def list_auftraege():
     archiv_anzeigen = request.args.get("archiv") == "1"
+    revisionen_anzeigen = request.args.get("revisionen") == "1"
     alle = sorted(auftraege.list(), key=lambda a: a.get("erteilungsdatum", ""), reverse=True)
     sichtbar_alle = [a for a in alle if _darf_auftrag_sehen(a)]
+    # Default: in Revisionen gebuendelte Auftraege ausblenden (sind 'Grossauftrag' der Revision)
+    if not revisionen_anzeigen:
+        sichtbar_alle = [a for a in sichtbar_alle if not a.get("revision_id")]
     if archiv_anzeigen:
         sichtbar = sichtbar_alle
     else:
         sichtbar = [a for a in sichtbar_alle if a.get("status") not in AUFTRAG_STATUS_ARCHIVIERT]
     anzahl_archiviert = sum(1 for a in sichtbar_alle if a.get("status") in AUFTRAG_STATUS_ARCHIVIERT)
+    anzahl_in_revision = sum(1 for a in alle if a.get("revision_id") and _darf_auftrag_sehen(a))
     kunden_idx = {k["id"]: k for k in kunden.list()}
-    rows = [{"auftrag": a, "kunde": kunden_idx.get(a.get("kunde_id"))} for a in sichtbar]
+    rev_idx = {r["id"]: r for r in revisionen.list()}
+    rows = [{
+        "auftrag": a,
+        "kunde": kunden_idx.get(a.get("kunde_id")),
+        "revision": rev_idx.get(a.get("revision_id") or ""),
+    } for a in sichtbar]
     return render_template(
         "auftraege/list.html",
         rows=rows,
@@ -154,6 +170,8 @@ def list_auftraege():
         anzahl_sichtbar=len(sichtbar),
         anzahl_archiviert=anzahl_archiviert,
         archiv_anzeigen=archiv_anzeigen,
+        anzahl_in_revision=anzahl_in_revision,
+        revisionen_anzeigen=revisionen_anzeigen,
     )
 
 

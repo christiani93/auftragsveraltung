@@ -180,6 +180,18 @@ def auftraege_in_revision(revision_id: str) -> List[Dict[str, Any]]:
     return [a for a in auftraege.list() if a.get("revision_id") == revision_id]
 
 
+def ist_mitarbeiter_in_revision(revision_id: Optional[str], username: str) -> bool:
+    """True wenn der Username in der Mitarbeiter-Liste der Revision steht."""
+    if not revision_id or not username:
+        return False
+    rev = revisionen.get(revision_id)
+    if not rev:
+        return False
+    liste = rev.get("mitarbeiter") or []
+    uname_lc = username.lower()
+    return any((m or "").lower() == uname_lc for m in liste)
+
+
 def messgeraete_fuer_user(username: str, ist_admin: bool = False) -> List[Dict[str, Any]]:
     """Liefert die fuer den aktuellen User sichtbaren Messgeraete.
     Admin sieht alle, andere User nur ihre eigenen (owner == username) plus

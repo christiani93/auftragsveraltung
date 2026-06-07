@@ -18,6 +18,7 @@ from models.repos import (
     aktive_stempelung_von,
     alle_aktiven_stempelungen,
     auftraege,
+    ist_mitarbeiter_in_revision,
     kunden,
     stempelungen,
     zeitbuchungen,
@@ -32,6 +33,8 @@ def _darf_auftrag_sehen(auftrag: dict) -> bool:
     if not current_user.is_authenticated:
         return False
     if current_user.sieht_alle_auftraege:
+        return True
+    if ist_mitarbeiter_in_revision(auftrag.get("revision_id"), current_user.username):
         return True
     zugewiesen = (auftrag.get("zugewiesen_an") or "").strip()
     if not zugewiesen:

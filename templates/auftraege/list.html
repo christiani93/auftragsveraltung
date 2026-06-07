@@ -6,10 +6,17 @@
     {% if gefiltert %}<small class="text-muted fs-6 ms-2">(nur eigene + unzugewiesene · {{ anzahl_sichtbar }}/{{ anzahl_total }})</small>{% endif %}
   </h1>
   <div class="d-flex gap-2 flex-wrap">
-    {% if archiv_anzeigen %}
-      <a href="{{ url_for('auftraege.list_auftraege') }}" class="btn btn-outline-secondary">Archiv ausblenden</a>
+    {% if revisionen_anzeigen %}
+      <a href="{{ url_for('auftraege.list_auftraege', archiv='1' if archiv_anzeigen else None) }}" class="btn btn-outline-secondary">Revisions-Aufträge ausblenden</a>
     {% else %}
-      <a href="{{ url_for('auftraege.list_auftraege', archiv='1') }}" class="btn btn-outline-secondary">
+      <a href="{{ url_for('auftraege.list_auftraege', revisionen='1', archiv='1' if archiv_anzeigen else None) }}" class="btn btn-outline-secondary">
+        Revisions-Aufträge anzeigen{% if anzahl_in_revision %} ({{ anzahl_in_revision }}){% endif %}
+      </a>
+    {% endif %}
+    {% if archiv_anzeigen %}
+      <a href="{{ url_for('auftraege.list_auftraege', revisionen='1' if revisionen_anzeigen else None) }}" class="btn btn-outline-secondary">Archiv ausblenden</a>
+    {% else %}
+      <a href="{{ url_for('auftraege.list_auftraege', archiv='1', revisionen='1' if revisionen_anzeigen else None) }}" class="btn btn-outline-secondary">
         Archiv anzeigen{% if anzahl_archiviert %} ({{ anzahl_archiviert }}){% endif %}
       </a>
     {% endif %}
@@ -37,7 +44,10 @@
         <tr>
           <td>{{ r.auftrag.erteilungsdatum }}</td>
           <td>{% if r.kunde %}<a href="{{ url_for('customers.detail', kunde_id=r.kunde.id) }}">{{ r.kunde.name }}</a>{% else %}—{% endif %}</td>
-          <td><a href="{{ url_for('auftraege.detail', auftrag_id=r.auftrag.id) }}" class="fw-semibold text-decoration-none">{{ r.auftrag.titel }}</a></td>
+          <td>
+            <a href="{{ url_for('auftraege.detail', auftrag_id=r.auftrag.id) }}" class="fw-semibold text-decoration-none">{{ r.auftrag.titel }}</a>
+            {% if r.revision %}<a href="{{ url_for('revisionen.detail', revision_id=r.revision.id) }}" class="badge bg-info text-decoration-none ms-1" title="Teil der Revision">↻ {{ r.revision.titel }}</a>{% endif %}
+          </td>
           <td>{{ r.auftrag.erteilt_von or '—' }}</td>
           <td>{{ r.auftrag.anlagenteil_ids|length }}</td>
           <td>
