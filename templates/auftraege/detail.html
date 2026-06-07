@@ -261,8 +261,36 @@
           </td>
           <td>{{ z.von_zeit or '—' }}</td>
           <td>{{ z.bis_zeit or '—' }}</td>
-          <td class="text-end fw-semibold">{{ '%.2f'|format(z.dauer_h) }}</td>
-          <td>{{ z.taetigkeit or '' }}{% if z.notizen %}<div class="text-muted small">{{ z.notizen }}</div>{% endif %}</td>
+          <td class="text-end">
+            <div class="fw-semibold">{{ '%.2f'|format(z.dauer_h) }}</div>
+            {% if z.pause_h_abgezogen %}
+            <div class="text-muted small">
+              brutto {{ '%.2f'|format(z.brutto_h) }} · −{{ '%.2f'|format(z.pause_h_abgezogen) }} Pause
+            </div>
+            {% endif %}
+          </td>
+          <td>
+            {{ z.taetigkeit or '' }}
+            {% if z.notizen %}<div class="text-muted small">{{ z.notizen }}</div>{% endif %}
+            {% if z.pause_von %}
+            <div class="small mt-1">
+              <span class="badge bg-light text-muted">☕ Pause {{ z.pause_von }}–{{ z.pause_bis }}</span>
+              <form method="post" action="{{ url_for('auftraege.delete_pause', zeitbuchung_id=z.id) }}"
+                    class="d-inline ms-1" onsubmit="return confirm('Pause entfernen? Buchung wird wieder Brutto-Dauer haben.');">
+                <button type="submit" class="btn btn-sm btn-link p-0 text-danger" style="font-size: 0.75rem;">entfernen</button>
+              </form>
+            </div>
+            {% elif z.von_zeit and z.bis_zeit %}
+            <form method="post" action="{{ url_for('auftraege.set_pause', zeitbuchung_id=z.id) }}"
+                  class="d-flex gap-1 align-items-center mt-1" style="font-size: 0.8rem;">
+              <span class="text-muted">+ Pause:</span>
+              <input type="time" name="pause_von" class="form-control form-control-sm" style="width: 90px;" required>
+              <span class="text-muted">–</span>
+              <input type="time" name="pause_bis" class="form-control form-control-sm" style="width: 90px;" required>
+              <button type="submit" class="btn btn-sm btn-outline-secondary">setzen</button>
+            </form>
+            {% endif %}
+          </td>
           <td class="text-end">
             <form method="post" action="{{ url_for('auftraege.delete_zeitbuchung', zeitbuchung_id=z.id) }}"
                   class="d-inline" onsubmit="return confirm('Zeitbuchung löschen?');">

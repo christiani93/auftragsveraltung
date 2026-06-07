@@ -369,6 +369,95 @@ def set_zeitbuchung_mitarbeiter(zeitbuchung_id: str):
     return redirect(url_for("auftraege.detail", auftrag_id=z.get("auftrag_id")) if z.get("auftrag_id") else url_for("auftraege.list_auftraege"))
 
 
+def _hhmm_to_minutes(value: str) -> int | None:
+    try:
+        h, m = value.split(":")
+        h, m = int(h), int(m)
+    except (ValueError, AttributeError):
+        return None
+    if not (0 <= h <= 23 and 0 <= m <= 59):
+        return None
+    return h * 60 + m
+
+
+@bp.route("/zeit/<zeitbuchung_id>/pause", methods=["POST"])
+def set_pause(zeitbuchung_id: str):
+    """Fuegt einer bestehenden Zeitbuchung eine Pause (von/bis) hinzu. Die
+    dauer_h wird um die Pausen-Dauer reduziert; brutto_h und pause_h_abgezogen
+    werden zur Dokumentation mitgespeichert (ueberschreiben evtl. bestehende
+    Pause-Werte, max. 1 Pause pro Buchung)."""
+    z = zeitbuchungen.get(zeitbuchung_id)
+    if not z:
+        abort(404)
+    auftrag = auftraege.get(z.get("auftrag_id") or "")
+    if auftrag and not _darf_auftrag_sehen(auftrag):
+        abort(403)
+
+    von_zeit = z.get("von_zeit")
+    bis_zeit = z.get("bis_zeit")
+    if not von_zeit or not bis_zeit:
+        flash("Pause nur bei Buchungen mit Von/Bis-Zeit moeglich.", "warning")
+        return redirect(url_for("auftraege.detail", auftrag_id=z.get("auftrag_id")) if z.get("auftrag_id") else url_for("auftraege.list_auftraege"))
+
+    p_von = request.form.get("pause_von", "").strip()
+    p_bis = request.form.get("pause_bis", "").strip()
+    pv_min = _hhmm_to_minutes(p_von)
+    pb_min = _hhmm_to_minutes(p_bis)
+    bv_min = _hhmm_to_minutes(von_zeit)
+    bb_min = _hhmm_to_minutes(bis_zeit)
+    if pv_min is None or pb_min is None:
+        flash("Pause-Zeit ungueltig (HH:MM erwartet).", "warning")
+        return redirect(url_for("auftraege.detail", auftrag_id=z.get("auftrag_id")))
+    if pb_min <= pv_min:
+        flash("Pause-Ende muss nach dem Pause-Beginn liegen.", "warning")
+        return redirect(url_for("auftraege.detail", auftrag_id=z.get("auftrag_id")))
+    if bv_min is None or bb_min is None or pv_min < bv_min or pb_min > bb_min:
+        flash(f"Pause muss innerhalb der Buchungs-Zeit ({von_zeit}–{bis_zeit}) liegen.", "warning")
+        return redirect(url_for("auftraege.detail", auftrag_id=z.get("auftrag_id")))
+
+    pause_h = round((pb_min - pv_min) / 60.0, 2)
+    # Brutto = was VOR diesem Pause-Eingriff galt; falls schon eine Pause war,
+    # ist brutto_h der gespeicherte Wert, sonst die aktuelle dauer_h.
+    brutto_h = float(z.get("brutto_h") if z.get("brutto_h") is not None else z.get("dauer_h") or 0)
+    netto_h = round(max(0.0, brutto_h - pause_h), 2)
+    zeitbuchungen.update(zeitbuchung_id, {
+        "pause_von": p_von,
+        "pause_bis": p_bis,
+        "pause_h_abgezogen": pause_h,
+        "brutto_h": round(brutto_h, 2),
+        "dauer_h": netto_h,
+    })
+    flash(f"Pause {p_von}–{p_bis} ({pause_h} h) abgezogen — Buchung jetzt {netto_h} h netto.", "success")
+    return redirect(url_for("auftraege.detail", auftrag_id=z.get("auftrag_id")))
+
+
+@bp.route("/zeit/<zeitbuchung_id>/pause/loeschen", methods=["POST"])
+def delete_pause(zeitbuchung_id: str):
+    """Entfernt die Pause einer Zeitbuchung und setzt dauer_h zurueck auf brutto."""
+    z = zeitbuchungen.get(zeitbuchung_id)
+    if not z:
+        abort(404)
+    auftrag = auftraege.get(z.get("auftrag_id") or "")
+    if auftrag and not _darf_auftrag_sehen(auftrag):
+        abort(403)
+    if z.get("pause_von") is None and z.get("pause_h_abgezogen") is None:
+        flash("Keine Pause gesetzt.", "warning")
+        return redirect(url_for("auftraege.detail", auftrag_id=z.get("auftrag_id")))
+    brutto_h = z.get("brutto_h")
+    if brutto_h is None:
+        # Fallback: dauer + abgezogene Pause
+        brutto_h = (z.get("dauer_h") or 0) + (z.get("pause_h_abgezogen") or 0)
+    zeitbuchungen.update(zeitbuchung_id, {
+        "pause_von": None,
+        "pause_bis": None,
+        "pause_h_abgezogen": None,
+        "brutto_h": None,
+        "dauer_h": round(float(brutto_h), 2),
+    })
+    flash("Pause entfernt.", "info")
+    return redirect(url_for("auftraege.detail", auftrag_id=z.get("auftrag_id")))
+
+
 @bp.route("/zeit/<zeitbuchung_id>/loeschen", methods=["POST"])
 def delete_zeitbuchung(zeitbuchung_id: str):
     z = zeitbuchungen.get(zeitbuchung_id)
