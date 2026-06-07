@@ -67,6 +67,28 @@
       </div>
     </div>
   </div>
+  {% if auftrag.zu_erledigen_bis %}
+  {% set ueberfaellig = auftrag.zu_erledigen_bis < today_iso and auftrag.status not in ('erledigt', 'abgerechnet') %}
+  <div class="col-md-3">
+    <div class="card card-body {% if ueberfaellig %}border-danger{% endif %}">
+      <div class="text-muted small">Zu erledigen bis</div>
+      <div class="fw-semibold {% if ueberfaellig %}text-danger{% endif %}">
+        {{ auftrag.zu_erledigen_bis }}
+        {% if ueberfaellig %}<span class="badge bg-danger ms-1">überfällig</span>{% endif %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+  {% if auftrag.termin %}
+  <div class="col-md-3">
+    <div class="card card-body border-primary">
+      <div class="text-muted small">Termin beim Kunden</div>
+      <div class="fw-semibold text-primary">
+        📅 {{ auftrag.termin|replace('T', ' · ') }}
+      </div>
+    </div>
+  </div>
+  {% endif %}
   <div class="col-md-3">
     <div class="card card-body">
       <div class="text-muted small">Schnellaktion</div>

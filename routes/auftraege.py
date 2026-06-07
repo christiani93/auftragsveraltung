@@ -100,6 +100,8 @@ def _form_to_auftrag(form) -> dict:
         "zugewiesen_an": form.get("zugewiesen_an", "").strip(),
         "status": form.get("status", "offen") if form.get("status") in AUFTRAG_STATUS else "offen",
         "erledigt_am": form.get("erledigt_am", "").strip() or None,
+        "zu_erledigen_bis": form.get("zu_erledigen_bis", "").strip() or None,
+        "termin": form.get("termin", "").strip() or None,
         "notizen": form.get("notizen", "").strip(),
     }
 

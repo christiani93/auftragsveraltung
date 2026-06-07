@@ -114,6 +114,17 @@
         <input type="date" name="erledigt_am" class="form-control" value="{{ auftrag.erledigt_am or '' }}">
       </div>
 
+      <div class="col-md-3">
+        <label class="form-label">Zu erledigen bis</label>
+        <input type="date" name="zu_erledigen_bis" class="form-control" value="{{ auftrag.zu_erledigen_bis or '' }}">
+        <small class="text-muted">Frist — z.B. Abnahmedatum.</small>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Termin (beim Kunden)</label>
+        <input type="datetime-local" name="termin" class="form-control" value="{{ auftrag.termin or '' }}">
+        <small class="text-muted">Konkreter Vor-Ort-Termin (Datum + Uhrzeit).</small>
+      </div>
+
       <div class="col-12">
         <label class="form-label">Beschreibung</label>
         <textarea name="beschreibung" class="form-control" rows="3" placeholder="Was ist zu tun?">{{ auftrag.beschreibung or '' }}</textarea>
