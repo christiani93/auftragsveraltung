@@ -52,6 +52,19 @@
 </div>
 {% endif %}
 
+<div class="card card-body mb-3">
+  <h6 class="text-muted small mb-2">Beteiligte Mitarbeiter
+    {% if darf_aendern %}<a href="{{ url_for('revisionen.edit_revision', revision_id=revision.id) }}" class="ms-2 small">(ändern)</a>{% endif %}
+  </h6>
+  {% if revision.mitarbeiter %}
+    {% for u in revision.mitarbeiter %}
+    <span class="badge bg-primary me-1">{{ u|mitarbeiter_name }}</span>
+    {% endfor %}
+  {% else %}
+    <span class="text-muted small">— noch niemand zugeordnet —{% if darf_aendern %} (im Bearbeiten-Formular hinzufügen){% endif %}</span>
+  {% endif %}
+</div>
+
 {# ============ ToDo-Liste ============ #}
 <div class="d-flex justify-content-between align-items-center mt-4 mb-2">
   <h2 class="h5 m-0">ToDos

@@ -1,13 +1,16 @@
 """Revisionen — geplante Wartungs-/Inspektionsphasen pro Kunde.
 
-Eine Revision ist typischerweise ein Zeitraum (z.B. die zweiwoechigen
-Betriebsferien eines Kunden), in dem mehrere Aufträge abgearbeitet werden.
-Pro Revision gibt es eine ToDo-Liste und eine Liste zugeordneter Aufträge.
+Eine Revision ist ein 'Grossauftrag' fuer einen Kunden — typischerweise
+die zweiwoechigen Betriebsferien — in dem mehrere Aufträge gebuendelt
+werden. Pro Revision gibt es eine ToDo-Liste, eine Liste zugeordneter
+Aufträge und eine Liste beteiligter Mitarbeiter.
 
-Sichtbarkeit: alle eingeloggten User koennen Revisionen LESEN. Schreibende
-Operationen (Anlegen, Aendern, Loeschen, Status, ToDos) sind Admin und
-Projektleiter vorbehalten — Monteure bekommen die zugewiesenen Aufträge
-ueber das normale Auftrags-Routing.
+Alle eingeloggten User koennen Revisionen anlegen, aendern, ToDos
+verwalten und beteiligte Mitarbeiter eintragen. Beteiligte Mitarbeiter
+sehen die in der Revision gebuendelten Aufträge, auch wenn diese ihnen
+nicht direkt zugewiesen sind. Auftraege in einer Revision sind aus der
+normalen Auftrags-Hauptliste ausgeblendet und nur ueber die Revision
+selbst sichtbar.
 """
 from __future__ import annotations
 
@@ -26,28 +29,25 @@ from models.repos import (
     revisionen,
     revisionen_fuer_kunde,
 )
+from models.users import list_users
 
 bp = Blueprint("revisionen", __name__)
-
-
-def _require_schreibrecht():
-    """Admin + Projektleiter duerfen Revisionen anlegen/aendern/loeschen."""
-    if not current_user.is_authenticated:
-        abort(401)
-    if not getattr(current_user, "sieht_alle_auftraege", False):
-        abort(403)
 
 
 def _form_to_revision(form, kunde_id: str) -> dict:
     status = form.get("status", "geplant")
     if status not in REVISION_STATUS:
         status = "geplant"
+    # Mitarbeiter-Liste: nur existierende Usernames akzeptieren (Form-Manipulations-Schutz)
+    erlaubte = {u.username for u in list_users()}
+    mitarbeiter = [m for m in form.getlist("mitarbeiter") if m in erlaubte]
     return {
         "kunde_id": kunde_id,
         "titel": form.get("titel", "").strip(),
         "von": form.get("von", "").strip() or None,
         "bis": form.get("bis", "").strip() or None,
         "status": status,
+        "mitarbeiter": mitarbeiter,
         "notizen": form.get("notizen", "").strip(),
     }
 
@@ -87,7 +87,6 @@ def list_revisionen():
 @bp.route("/kunden/<kunde_id>/neu", methods=["GET", "POST"])
 @login_required
 def new_revision(kunde_id: str):
-    _require_schreibrecht()
     kunde = kunden.get(kunde_id)
     if not kunde:
         abort(404)
@@ -99,6 +98,7 @@ def new_revision(kunde_id: str):
                 "revisionen/edit.html",
                 revision=data, neu=True, kunde=kunde,
                 status_optionen=REVISION_STATUS, status_label=REVISION_STATUS_LABEL,
+                alle_user=list_users(),
             )
         data["todos"] = []
         record = revisionen.create(data)
@@ -113,6 +113,7 @@ def new_revision(kunde_id: str):
         "revisionen/edit.html",
         revision=default, neu=True, kunde=kunde,
         status_optionen=REVISION_STATUS, status_label=REVISION_STATUS_LABEL,
+        alle_user=list_users(),
     )
 
 
@@ -136,14 +137,14 @@ def detail(revision_id: str):
         status_label=REVISION_STATUS_LABEL,
         status_optionen=REVISION_STATUS,
         auftrag_status_label=AUFTRAG_STATUS_LABEL,
-        darf_aendern=current_user.sieht_alle_auftraege,
+        darf_aendern=True,
+        alle_user=list_users(),
     )
 
 
 @bp.route("/<revision_id>/bearbeiten", methods=["GET", "POST"])
 @login_required
 def edit_revision(revision_id: str):
-    _require_schreibrecht()
     rev = revisionen.get(revision_id)
     if not rev:
         abort(404)
@@ -156,6 +157,7 @@ def edit_revision(revision_id: str):
                 "revisionen/edit.html",
                 revision={**rev, **data}, neu=False, kunde=kunde,
                 status_optionen=REVISION_STATUS, status_label=REVISION_STATUS_LABEL,
+                alle_user=list_users(),
             )
         revisionen.update(revision_id, data)
         flash("Revision gespeichert.", "success")
@@ -170,7 +172,6 @@ def edit_revision(revision_id: str):
 @bp.route("/<revision_id>/status", methods=["POST"])
 @login_required
 def set_status(revision_id: str):
-    _require_schreibrecht()
     rev = revisionen.get(revision_id)
     if not rev:
         abort(404)
@@ -186,7 +187,6 @@ def set_status(revision_id: str):
 @bp.route("/<revision_id>/loeschen", methods=["POST"])
 @login_required
 def delete_revision(revision_id: str):
-    _require_schreibrecht()
     rev = revisionen.get(revision_id)
     if not rev:
         abort(404)
@@ -212,7 +212,6 @@ def delete_revision(revision_id: str):
 @bp.route("/<revision_id>/todo/neu", methods=["POST"])
 @login_required
 def add_todo(revision_id: str):
-    _require_schreibrecht()
     rev = revisionen.get(revision_id)
     if not rev:
         abort(404)
@@ -233,7 +232,6 @@ def add_todo(revision_id: str):
 @bp.route("/<revision_id>/todo/<todo_id>/toggle", methods=["POST"])
 @login_required
 def toggle_todo(revision_id: str, todo_id: str):
-    _require_schreibrecht()
     rev = revisionen.get(revision_id)
     if not rev:
         abort(404)
@@ -249,7 +247,6 @@ def toggle_todo(revision_id: str, todo_id: str):
 @bp.route("/<revision_id>/todo/<todo_id>/loeschen", methods=["POST"])
 @login_required
 def delete_todo(revision_id: str, todo_id: str):
-    _require_schreibrecht()
     rev = revisionen.get(revision_id)
     if not rev:
         abort(404)

@@ -30,6 +30,23 @@
       </select>
     </div>
     <div class="col-12">
+      <label class="form-label">Beteiligte Mitarbeiter</label>
+      {% set zugeordnet = revision.mitarbeiter or [] %}
+      <div class="row g-2">
+        {% for u in alle_user %}
+        <div class="col-md-4 col-lg-3">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="mitarbeiter" value="{{ u.username }}"
+                   id="mit_{{ u.username }}"
+                   {% if u.username in zugeordnet %}checked{% endif %}>
+            <label class="form-check-label" for="mit_{{ u.username }}">{{ u.name }}</label>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      <small class="text-muted">Beteiligte Mitarbeiter sehen die Aufträge dieser Revision — auch ohne direkte Zuweisung.</small>
+    </div>
+    <div class="col-12">
       <label class="form-label">Notizen</label>
       <textarea name="notizen" class="form-control" rows="3"
                 placeholder="z.B. Werkstattbereich gesperrt, Ansprechpartner vor Ort, Material vorab bestellt …">{{ revision.notizen or '' }}</textarea>

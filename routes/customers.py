@@ -9,16 +9,19 @@ from models.repos import (
     anlagen_fuer_kunde,
     auftraege_fuer_kunde,
     auftraege_in_revision,
+    ist_mitarbeiter_in_revision,
     kunden,
     revisionen_fuer_kunde,
 )
 
 
 def _darf_auftrag_sehen(auftrag: dict) -> bool:
-    """Spiegelt routes/auftraege.py — Monteur sieht nur eigene + unzugewiesene."""
+    """Spiegelt routes/auftraege.py._darf_auftrag_sehen."""
     if not current_user.is_authenticated:
         return False
     if current_user.sieht_alle_auftraege:
+        return True
+    if ist_mitarbeiter_in_revision(auftrag.get("revision_id"), current_user.username):
         return True
     zugewiesen = (auftrag.get("zugewiesen_an") or "").strip()
     if not zugewiesen:
@@ -90,7 +93,8 @@ def detail(kunde_id: str):
     if not kunde:
         abort(404)
     auftraege_dieses_kunden = sorted(
-        [a for a in auftraege_fuer_kunde(kunde_id) if _darf_auftrag_sehen(a)],
+        [a for a in auftraege_fuer_kunde(kunde_id)
+         if _darf_auftrag_sehen(a) and not a.get("revision_id")],
         key=lambda a: (a.get("status") != "offen", a.get("status") != "in_arbeit", a.get("erteilungsdatum", "")),
     )
     # Revisionen mit Counts vorbereiten
@@ -110,7 +114,7 @@ def detail(kunde_id: str):
         auftrag_status_label=AUFTRAG_STATUS_LABEL,
         revisionen=rev_rows,
         revision_status_label=REVISION_STATUS_LABEL,
-        darf_revision_anlegen=current_user.is_authenticated and current_user.sieht_alle_auftraege,
+        darf_revision_anlegen=current_user.is_authenticated,
     )
 
 
