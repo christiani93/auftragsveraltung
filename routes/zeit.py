@@ -50,6 +50,31 @@ def _parse_dt(value: str) -> datetime:
         return datetime.now()
 
 
+# Quantisierung der Stempel-Zeitpunkte auf Viertelstunden:
+# - Einstempeln (Start eines Blocks) wird ABGERUNDET zur vorigen 15-Min-Marke.
+# - Ausstempeln und Umstempeln (Ende eines Blocks) wird AUFGERUNDET zur naechsten
+#   15-Min-Marke. Wenn der Zeitpunkt bereits exakt auf einer Viertelstunde liegt,
+#   bleibt er unveraendert.
+# Beim Umstempeln entsteht so zwischen alt-Ende und neu-Start eine moegliche
+# 15-Minuten-Ueberlappung (zugunsten des Mitarbeiters).
+QUANTUM_MINUTEN = 15
+
+
+def _runde_ab_viertelstunde(dt: datetime) -> datetime:
+    return dt.replace(minute=(dt.minute // QUANTUM_MINUTEN) * QUANTUM_MINUTEN, second=0, microsecond=0)
+
+
+def _runde_auf_viertelstunde(dt: datetime) -> datetime:
+    if dt.second == 0 and dt.microsecond == 0 and dt.minute % QUANTUM_MINUTEN == 0:
+        return dt
+    total_min = dt.hour * 60 + dt.minute
+    naechste = ((total_min // QUANTUM_MINUTEN) + 1) * QUANTUM_MINUTEN
+    if naechste >= 24 * 60:
+        # Edge: kurz vor Mitternacht → auf 00:00 des Folgetags
+        return (dt + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    return dt.replace(hour=naechste // 60, minute=naechste % 60, second=0, microsecond=0)
+
+
 def _validierter_auftrag(auftrag_id: str) -> dict | None:
     if not auftrag_id:
         return None
@@ -77,12 +102,13 @@ def _ziel_mitarbeiter() -> tuple[str, str]:
 def _stempelung_abschliessen(aktive: dict, taetigkeit_override: str = "", notizen: str = "") -> float:
     """Erzeugt eine Zeitbuchung aus der aktiven Stempelung, loescht die Stempelung.
 
+    Ende-Zeit wird auf die naechste Viertelstunde aufgerundet (Aus-/Umstempeln).
     Liefert die gebuchte Dauer in Stunden (brutto, kein Pausen-Abzug).
     """
     start = _parse_dt(aktive.get("start", ""))
-    ende = datetime.now()
+    ende = _runde_auf_viertelstunde(datetime.now())
     if ende <= start:
-        ende = start + timedelta(minutes=1)
+        ende = start + timedelta(minutes=QUANTUM_MINUTEN)
     dauer_min = (ende - start).total_seconds() / 60.0
     dauer_h = round(dauer_min / 60.0, 2)
 
@@ -122,7 +148,7 @@ def stempel_start():
         "mitarbeiter": ziel_user,
         "mitarbeiter_name": ziel_name,
         "auftrag_id": auftrag_id,
-        "start": datetime.now().isoformat(timespec="seconds"),
+        "start": _runde_ab_viertelstunde(datetime.now()).isoformat(timespec="seconds"),
         "taetigkeit": request.form.get("taetigkeit", "").strip(),
     })
     wer = "Eingestempelt" if ziel_user == current_user.username else f"{ziel_name} eingestempelt"
@@ -155,7 +181,7 @@ def stempel_wechsel():
         "mitarbeiter": ziel_user,
         "mitarbeiter_name": ziel_name,
         "auftrag_id": neuer_auftrag_id,
-        "start": datetime.now().isoformat(timespec="seconds"),
+        "start": _runde_ab_viertelstunde(datetime.now()).isoformat(timespec="seconds"),
         "taetigkeit": taetigkeit_neu,
     })
     flash("Neuer Block laeuft.", "success")
