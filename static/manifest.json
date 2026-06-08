@@ -1,6 +1,6 @@
 {
-  "name": "Auftragsverwaltung",
-  "short_name": "Aufträge",
+  "name": "Serviceverwaltung",
+  "short_name": "Service",
   "description": "Kunden, Anlagen, Messprotokolle und Kontroll-Übersicht für den Elektroinstallateur-Alltag.",
   "start_url": "/",
   "scope": "/",

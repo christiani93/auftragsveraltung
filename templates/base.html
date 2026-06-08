@@ -6,10 +6,10 @@
   <meta name="theme-color" content="#212529">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="Aufträge">
+  <meta name="apple-mobile-web-app-title" content="Service">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="format-detection" content="telephone=yes">
-  <title>{% block title %}Auftragsverwaltung{% endblock %}{% if firma_name %} – {{ firma_name }}{% endif %}</title>
+  <title>{% block title %}Serviceverwaltung{% endblock %}{% if firma_name %} – {{ firma_name }}{% endif %}</title>
   <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
   <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='icon.svg') }}">
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon.svg') }}">
@@ -21,7 +21,7 @@
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-3">
   <div class="container-fluid">
     <a class="navbar-brand" href="{{ url_for('kontrolle.dashboard') }}">
-      ⚡ Auftragsverwaltung{% if firma_name %} <span class="text-secondary small ms-2">{{ firma_name }}</span>{% endif %}
+      ⚡ Serviceverwaltung{% if firma_name %} <span class="text-secondary small ms-2">{{ firma_name }}</span>{% endif %}
     </a>
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav">
       <span class="navbar-toggler-icon"></span>

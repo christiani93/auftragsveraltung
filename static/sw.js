@@ -2,7 +2,7 @@
 // Cached die App-Shell + statische Assets (network-first für Datenrouten).
 // Achtung: Daten sind nicht offline editierbar — der PC-Server muss laufen.
 
-const CACHE_NAME = "auftragsverwaltung-v2";
+const CACHE_NAME = "auftragsverwaltung-v3";
 const APP_SHELL = [
   "/static/style.css",
   "/static/icon.svg",
