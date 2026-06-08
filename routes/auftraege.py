@@ -369,6 +369,94 @@ def set_zeitbuchung_mitarbeiter(zeitbuchung_id: str):
     return redirect(url_for("auftraege.detail", auftrag_id=z.get("auftrag_id")) if z.get("auftrag_id") else url_for("auftraege.list_auftraege"))
 
 
+@bp.route("/zeit/<zeitbuchung_id>/bearbeiten", methods=["GET", "POST"])
+def edit_zeitbuchung(zeitbuchung_id: str):
+    """Editiert alle Felder einer Zeitbuchung. Datum/Von/Bis/Dauer/Taetigkeit/
+    Notizen + Mitarbeiter (Admin/Projektleiter) + Pause (von/bis)."""
+    z = zeitbuchungen.get(zeitbuchung_id)
+    if not z:
+        abort(404)
+    auftrag = auftraege.get(z.get("auftrag_id") or "")
+    if auftrag and not _darf_auftrag_sehen(auftrag):
+        abort(403)
+
+    if request.method == "POST":
+        # Pflichtfelder: Datum, plus entweder Von+Bis oder Dauer direkt
+        datum = request.form.get("datum", "").strip() or date.today().isoformat()
+        von = request.form.get("von_zeit", "").strip() or None
+        bis = request.form.get("bis_zeit", "").strip() or None
+        dauer_str = request.form.get("dauer_h", "").strip()
+        dauer = None
+        if dauer_str:
+            try:
+                dauer = round(float(dauer_str.replace(",", ".")), 2)
+            except ValueError:
+                dauer = None
+        if dauer is None and von and bis:
+            dauer = dauer_aus_zeitspanne(von, bis)
+        if not dauer or dauer <= 0:
+            flash("Bitte Stunden oder gueltige Von/Bis-Zeiten angeben.", "warning")
+            return redirect(url_for("auftraege.edit_zeitbuchung", zeitbuchung_id=zeitbuchung_id))
+
+        # Mitarbeiter: Admin/PL darf aendern, Monteur behaelt den bestehenden Wert
+        if current_user.sieht_alle_auftraege:
+            mitarbeiter = request.form.get("mitarbeiter", "").strip()
+        else:
+            mitarbeiter = z.get("mitarbeiter") or ""
+
+        # Pause: von/bis aus Form (beide leer = keine Pause)
+        p_von = request.form.get("pause_von", "").strip()
+        p_bis = request.form.get("pause_bis", "").strip()
+        pause_h = None
+        pause_setzen = False
+        if p_von and p_bis:
+            pv = _hhmm_to_minutes(p_von)
+            pb = _hhmm_to_minutes(p_bis)
+            bv = _hhmm_to_minutes(von) if von else None
+            bb = _hhmm_to_minutes(bis) if bis else None
+            if pv is None or pb is None or pb <= pv:
+                flash("Pause-Zeit ungueltig — Pause wird ignoriert.", "warning")
+            elif bv is None or bb is None or pv < bv or pb > bb:
+                flash("Pause muss innerhalb des Buchungs-Zeitfensters liegen — Pause wird ignoriert.", "warning")
+            else:
+                pause_h = round((pb - pv) / 60.0, 2)
+                pause_setzen = True
+
+        # Brutto/Netto-Berechnung: gegebene Dauer ist brutto (vor Pause)
+        if pause_setzen:
+            brutto_h = round(float(dauer), 2)
+            netto_h = round(max(0.0, brutto_h - pause_h), 2)
+            updates = {
+                "datum": datum, "mitarbeiter": mitarbeiter,
+                "von_zeit": von, "bis_zeit": bis,
+                "dauer_h": netto_h, "brutto_h": brutto_h,
+                "pause_von": p_von, "pause_bis": p_bis, "pause_h_abgezogen": pause_h,
+                "taetigkeit": request.form.get("taetigkeit", "").strip(),
+                "notizen": request.form.get("notizen", "").strip(),
+            }
+        else:
+            # keine Pause -> Pause-Felder loeschen, brutto_h ebenfalls
+            updates = {
+                "datum": datum, "mitarbeiter": mitarbeiter,
+                "von_zeit": von, "bis_zeit": bis,
+                "dauer_h": round(float(dauer), 2),
+                "brutto_h": None,
+                "pause_von": None, "pause_bis": None, "pause_h_abgezogen": None,
+                "taetigkeit": request.form.get("taetigkeit", "").strip(),
+                "notizen": request.form.get("notizen", "").strip(),
+            }
+        zeitbuchungen.update(zeitbuchung_id, updates)
+        flash("Zeitbuchung gespeichert.", "success")
+        return redirect(url_for("auftraege.detail", auftrag_id=z.get("auftrag_id")) if z.get("auftrag_id") else url_for("auftraege.list_auftraege"))
+
+    moegliche_mitarbeiter = list_users() if current_user.sieht_alle_auftraege else []
+    return render_template(
+        "auftraege/zeit_edit.html",
+        z=z, auftrag=auftrag,
+        moegliche_mitarbeiter=moegliche_mitarbeiter,
+    )
+
+
 def _hhmm_to_minutes(value: str) -> int | None:
     try:
         h, m = value.split(":")

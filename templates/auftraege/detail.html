@@ -292,8 +292,10 @@
             {% endif %}
           </td>
           <td class="text-end">
+            <a href="{{ url_for('auftraege.edit_zeitbuchung', zeitbuchung_id=z.id) }}"
+               class="btn btn-sm btn-outline-secondary" title="Bearbeiten">✎</a>
             <form method="post" action="{{ url_for('auftraege.delete_zeitbuchung', zeitbuchung_id=z.id) }}"
-                  class="d-inline" onsubmit="return confirm('Zeitbuchung löschen?');">
+                  class="d-inline ms-1" onsubmit="return confirm('Zeitbuchung löschen?');">
               <button type="submit" class="btn btn-sm btn-outline-danger">×</button>
             </form>
           </td>

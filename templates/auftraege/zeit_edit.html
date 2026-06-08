@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Zeitbuchung bearbeiten{% endblock %}
+{% block content %}
+<div class="text-muted small mb-2">
+  {% if auftrag %}<a href="{{ url_for('auftraege.detail', auftrag_id=auftrag.id) }}">{{ auftrag.titel }}</a> › {% endif %}Zeitbuchung bearbeiten
+</div>
+<h1 class="h3 mb-3">Zeitbuchung bearbeiten</h1>
+
+<form method="post" class="card card-body">
+  <div class="row g-3">
+    <div class="col-md-3">
+      <label class="form-label">Datum *</label>
+      <input type="date" name="datum" class="form-control" value="{{ z.datum or '' }}" required>
+    </div>
+    {% if current_user.sieht_alle_auftraege %}
+    <div class="col-md-4">
+      <label class="form-label">Mitarbeiter</label>
+      <select name="mitarbeiter" class="form-select">
+        <option value="">— nicht zugeordnet —</option>
+        {% for u in moegliche_mitarbeiter %}
+        <option value="{{ u.username }}" {% if z.mitarbeiter == u.username %}selected{% endif %}>{{ u.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% else %}
+    <div class="col-md-4">
+      <label class="form-label">Mitarbeiter</label>
+      <input type="text" class="form-control" value="{{ z.mitarbeiter|mitarbeiter_name }}" readonly>
+    </div>
+    {% endif %}
+
+    <div class="col-md-2">
+      <label class="form-label">Von</label>
+      <input type="time" name="von_zeit" class="form-control" value="{{ z.von_zeit or '' }}">
+    </div>
+    <div class="col-md-2">
+      <label class="form-label">Bis</label>
+      <input type="time" name="bis_zeit" class="form-control" value="{{ z.bis_zeit or '' }}">
+    </div>
+    <div class="col-md-2">
+      <label class="form-label">Stunden</label>
+      <input type="text" inputmode="decimal" name="dauer_h" class="form-control"
+             value="{{ '%.2f'|format(z.brutto_h) if z.brutto_h is not none else '%.2f'|format(z.dauer_h) if z.dauer_h is not none else '' }}"
+             placeholder="oder leer">
+      <small class="text-muted">Direkt eingeben oder aus Von/Bis ableiten lassen. Bei Pause = Brutto.</small>
+    </div>
+
+    <div class="col-md-3">
+      <label class="form-label">Pause Von</label>
+      <input type="time" name="pause_von" class="form-control" value="{{ z.pause_von or '' }}">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Pause Bis</label>
+      <input type="time" name="pause_bis" class="form-control" value="{{ z.pause_bis or '' }}">
+      <small class="text-muted">Beide leer = keine Pause.</small>
+    </div>
+
+    <div class="col-12">
+      <label class="form-label">Tätigkeit</label>
+      <input type="text" name="taetigkeit" class="form-control" value="{{ z.taetigkeit or '' }}">
+    </div>
+    <div class="col-12">
+      <label class="form-label">Notizen</label>
+      <textarea name="notizen" class="form-control" rows="2">{{ z.notizen or '' }}</textarea>
+    </div>
+  </div>
+
+  <div class="mt-4 d-flex gap-2 justify-content-between flex-wrap">
+    <div class="d-flex gap-2">
+      <button type="submit" class="btn btn-primary">Speichern</button>
+      {% if auftrag %}
+      <a class="btn btn-outline-secondary" href="{{ url_for('auftraege.detail', auftrag_id=auftrag.id) }}">Abbrechen</a>
+      {% endif %}
+    </div>
+    <form method="post" action="{{ url_for('auftraege.delete_zeitbuchung', zeitbuchung_id=z.id) }}"
+          onsubmit="return confirm('Zeitbuchung wirklich löschen?');">
+      <button type="submit" class="btn btn-outline-danger">Buchung löschen</button>
+    </form>
+  </div>
+</form>
+{% endblock %}
