@@ -203,6 +203,11 @@ def _random_password(length: int = 16) -> str:
     return "".join(secrets.choice(alphabet) for _ in range(length))
 
 
+# Public-Wrapper damit Routes nicht auf den underscore-Namen zugreifen muessen.
+def generate_initial_password(length: int = 12) -> str:
+    return _random_password(length)
+
+
 def list_users() -> list[User]:
     return [User(d) for d in users_store.list()]
 

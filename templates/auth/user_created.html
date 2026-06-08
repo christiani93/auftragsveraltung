@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}User „{{ username }}" angelegt{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <h1 class="h3 m-0">✓ User angelegt</h1>
+  <a class="btn btn-outline-secondary" href="{{ url_for('auth.user_list') }}">Zur User-Liste</a>
+</div>
+
+<div class="alert alert-success">
+  <strong>{{ name }}</strong> wurde als <em>{{ role_label }}</em> angelegt.
+  {% if force_change %}<br>Der User muss das Initial-Passwort beim ersten Login zwingend ändern.{% endif %}
+</div>
+
+<div class="card card-body mb-3">
+  <h2 class="h5 mb-3">Zugangsdaten zum Weiterleiten</h2>
+  <p class="text-muted small mb-3">
+    Bitte einmalig kopieren und sicher an den User übermitteln (Signal, Telefon, persönlich).
+    Aus Sicherheitsgründen werden die Daten <strong>nicht erneut</strong> angezeigt — wenn nötig kann ein
+    neues Ersatzpasswort in der User-Liste vergeben werden.
+  </p>
+
+  <div class="row g-3">
+    <div class="col-md-6">
+      <label class="form-label small text-muted mb-1">Username</label>
+      <div class="input-group">
+        <input type="text" id="copy-username" class="form-control font-monospace" value="{{ username }}" readonly>
+        <button type="button" class="btn btn-outline-secondary" data-copy="copy-username">Kopieren</button>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <label class="form-label small text-muted mb-1">Initial-Passwort</label>
+      <div class="input-group">
+        <input type="text" id="copy-password" class="form-control font-monospace" value="{{ password }}" readonly>
+        <button type="button" class="btn btn-outline-secondary" data-copy="copy-password">Kopieren</button>
+      </div>
+    </div>
+    <div class="col-12">
+      <label class="form-label small text-muted mb-1">Username + Passwort kombiniert</label>
+      <div class="input-group">
+        <input type="text" id="copy-both" class="form-control font-monospace"
+               value="Username: {{ username }} / Passwort: {{ password }}" readonly>
+        <button type="button" class="btn btn-primary" data-copy="copy-both">Kopieren</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="text-muted small mt-3" id="copy-status"></div>
+</div>
+
+<script>
+(function() {
+  const status = document.getElementById('copy-status');
+  document.querySelectorAll('[data-copy]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const inp = document.getElementById(btn.dataset.copy);
+      if (!inp) return;
+      try {
+        await navigator.clipboard.writeText(inp.value);
+        status.textContent = '✓ Kopiert: ' + inp.value;
+      } catch (e) {
+        // Fallback fuer aeltere Browser
+        inp.select();
+        document.execCommand('copy');
+        status.textContent = '✓ Kopiert (Fallback)';
+      }
+      setTimeout(() => { status.textContent = ''; }, 4000);
+    });
+  });
+})();
+</script>
+{% endblock %}

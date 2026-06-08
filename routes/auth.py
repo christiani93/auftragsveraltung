@@ -10,6 +10,7 @@ from models.users import (
     create_user,
     delete_user,
     find_user,
+    generate_initial_password,
     list_users,
     set_password,
     set_role,
@@ -67,24 +68,34 @@ def user_list():
 def new_user_route():
     _require_admin()
     username = request.form.get("username", "").strip()
-    password = request.form.get("password", "")
+    password = (request.form.get("password") or "").strip()
     name = request.form.get("name", "").strip()
     role = request.form.get("role", "monteur")
     # Default: User muss das Initial-Passwort beim ersten Login aendern.
     # Admin kann das via Checkbox 'pw_change_optional' ausschalten.
     force_change = request.form.get("pw_change_optional") != "on"
-    if not username or not password:
-        flash("Username und Passwort erforderlich.", "warning")
+    if not username:
+        flash("Username erforderlich.", "warning")
+        return redirect(url_for("auth.user_list"))
+    # PW leer -> Server generiert ein sicheres Initial-Passwort
+    if not password:
+        password = generate_initial_password(12)
+    elif len(password) < 6:
+        flash("Passwort muss mindestens 6 Zeichen haben.", "warning")
         return redirect(url_for("auth.user_list"))
     try:
         create_user(username, password, name=name, role=role, force_change_on_next_login=force_change)
-        if force_change:
-            flash(f"User „{username}“ angelegt — muss das Passwort beim ersten Login ändern.", "success")
-        else:
-            flash(f"User „{username}“ angelegt.", "success")
     except ValueError as e:
         flash(str(e), "warning")
-    return redirect(url_for("auth.user_list"))
+        return redirect(url_for("auth.user_list"))
+    # Bestaetigungs-Seite mit Username + Passwort zum Copy/Weiterleiten
+    return render_template(
+        "auth/user_created.html",
+        username=username, password=password,
+        name=name or username,
+        role_label=USER_ROLE_LABEL.get(role, role),
+        force_change=force_change,
+    )
 
 
 @bp.route("/users/<username>/rolle", methods=["POST"])
