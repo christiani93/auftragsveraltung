@@ -40,7 +40,7 @@
     <div class="col-md-2">
       <label class="form-label">Stunden</label>
       <input type="text" inputmode="decimal" name="dauer_h" class="form-control"
-             value="{{ '%.2f'|format(z.brutto_h) if z.brutto_h is not none else '%.2f'|format(z.dauer_h) if z.dauer_h is not none else '' }}"
+             value="{{ '%.2f'|format(z.get('brutto_h')) if z.get('brutto_h') is not none else '%.2f'|format(z.get('dauer_h')) if z.get('dauer_h') is not none else '' }}"
              placeholder="oder leer">
       <small class="text-muted">Direkt eingeben oder aus Von/Bis ableiten lassen. Bei Pause = Brutto.</small>
     </div>
