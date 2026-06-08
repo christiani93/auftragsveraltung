@@ -50,29 +50,39 @@ def _parse_dt(value: str) -> datetime:
         return datetime.now()
 
 
-# Quantisierung der Stempel-Zeitpunkte auf Viertelstunden:
-# - Einstempeln (Start eines Blocks) wird ABGERUNDET zur vorigen 15-Min-Marke.
-# - Ausstempeln und Umstempeln (Ende eines Blocks) wird AUFGERUNDET zur naechsten
-#   15-Min-Marke. Wenn der Zeitpunkt bereits exakt auf einer Viertelstunde liegt,
-#   bleibt er unveraendert.
-# Beim Umstempeln entsteht so zwischen alt-Ende und neu-Start eine moegliche
-# 15-Minuten-Ueberlappung (zugunsten des Mitarbeiters).
+# Quantisierung der Stempel-Zeitpunkte auf Viertelstunden mit Toleranz-Filter:
+# - Einstempeln (Start): 5 Min vor und 10 Min nach Viertelstunden-Punkt T → T.
+#   D.h. :11..:14 rundet auf nächstes T, :00..:10 auf voriges T.
+# - Ausstempeln (Ende): 10 Min vor und 5 Min nach T → T.
+#   D.h. :06..:14 rundet auf nächstes T, :00..:05 auf voriges T.
+# - Umstempeln: EIN Zeitpunkt fuer Ende_alt und Start_neu — gleicher Wert, kein
+#   Gap und keine Ueberlappung. Wir nehmen den Ausstempel-Filter dafuer.
 QUANTUM_MINUTEN = 15
 
 
-def _runde_ab_viertelstunde(dt: datetime) -> datetime:
+def _abrunden_voriges_q(dt: datetime) -> datetime:
     return dt.replace(minute=(dt.minute // QUANTUM_MINUTEN) * QUANTUM_MINUTEN, second=0, microsecond=0)
 
 
-def _runde_auf_viertelstunde(dt: datetime) -> datetime:
-    if dt.second == 0 and dt.microsecond == 0 and dt.minute % QUANTUM_MINUTEN == 0:
-        return dt
-    total_min = dt.hour * 60 + dt.minute
-    naechste = ((total_min // QUANTUM_MINUTEN) + 1) * QUANTUM_MINUTEN
-    if naechste >= 24 * 60:
-        # Edge: kurz vor Mitternacht → auf 00:00 des Folgetags
-        return (dt + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
-    return dt.replace(hour=naechste // 60, minute=naechste % 60, second=0, microsecond=0)
+def _aufrunden_naechstes_q(dt: datetime, offset: int) -> datetime:
+    """Hebt dt um (QUANTUM_MINUTEN - offset) Minuten an. Setzt Sekunden/Microsekunden auf 0."""
+    return (dt + timedelta(minutes=QUANTUM_MINUTEN - offset)).replace(second=0, microsecond=0)
+
+
+def _runde_einstempel(dt: datetime) -> datetime:
+    """5 Min vor / 10 Min nach Viertelstunde → Viertelstunde."""
+    offset = dt.minute % QUANTUM_MINUTEN
+    if offset > 10:  # 11..14 → aufrunden (in der 5-Min-Vor-Zone des naechsten T)
+        return _aufrunden_naechstes_q(dt, offset)
+    return _abrunden_voriges_q(dt)
+
+
+def _runde_ausstempel(dt: datetime) -> datetime:
+    """10 Min vor / 5 Min nach Viertelstunde → Viertelstunde."""
+    offset = dt.minute % QUANTUM_MINUTEN
+    if offset > 5:  # 6..14 → aufrunden (in der 10-Min-Vor-Zone des naechsten T)
+        return _aufrunden_naechstes_q(dt, offset)
+    return _abrunden_voriges_q(dt)
 
 
 def _validierter_auftrag(auftrag_id: str) -> dict | None:
@@ -99,14 +109,16 @@ def _ziel_mitarbeiter() -> tuple[str, str]:
     return current_user.username, current_user.name
 
 
-def _stempelung_abschliessen(aktive: dict, taetigkeit_override: str = "", notizen: str = "") -> float:
+def _stempelung_abschliessen(aktive: dict, ende_dt: datetime, taetigkeit_override: str = "", notizen: str = "") -> float:
     """Erzeugt eine Zeitbuchung aus der aktiven Stempelung, loescht die Stempelung.
 
-    Ende-Zeit wird auf die naechste Viertelstunde aufgerundet (Aus-/Umstempeln).
+    Der Caller liefert den Ende-Zeitpunkt — beim normalen Ausstempeln ist das
+    _runde_ausstempel(now), beim Umstempeln derselbe Wert wie der Start des
+    Folge-Blocks (kein Gap/Ueberlappung).
     Liefert die gebuchte Dauer in Stunden (brutto, kein Pausen-Abzug).
     """
     start = _parse_dt(aktive.get("start", ""))
-    ende = _runde_auf_viertelstunde(datetime.now())
+    ende = ende_dt
     if ende <= start:
         ende = start + timedelta(minutes=QUANTUM_MINUTEN)
     dauer_min = (ende - start).total_seconds() / 60.0
@@ -148,7 +160,7 @@ def stempel_start():
         "mitarbeiter": ziel_user,
         "mitarbeiter_name": ziel_name,
         "auftrag_id": auftrag_id,
-        "start": _runde_ab_viertelstunde(datetime.now()).isoformat(timespec="seconds"),
+        "start": _runde_einstempel(datetime.now()).isoformat(timespec="seconds"),
         "taetigkeit": request.form.get("taetigkeit", "").strip(),
     })
     wer = "Eingestempelt" if ziel_user == current_user.username else f"{ziel_name} eingestempelt"
@@ -172,8 +184,11 @@ def stempel_wechsel():
     aktive = aktive_stempelung_von(ziel_user)
     taetigkeit_neu = request.form.get("taetigkeit", "").strip()
 
+    # Wechsel: EIN Zeitpunkt fuer Ende_alt und Start_neu — kein Gap/Ueberlappung.
+    wechsel_zp = _runde_ausstempel(datetime.now())
+
     if aktive:
-        dauer_h = _stempelung_abschliessen(aktive)
+        dauer_h = _stempelung_abschliessen(aktive, wechsel_zp)
         praefix = "Umgestempelt" if ziel_user == current_user.username else f"{ziel_name} umgestempelt"
         flash(f"{praefix} — vorheriger Block: {dauer_h} h.", "info")
 
@@ -181,7 +196,7 @@ def stempel_wechsel():
         "mitarbeiter": ziel_user,
         "mitarbeiter_name": ziel_name,
         "auftrag_id": neuer_auftrag_id,
-        "start": _runde_ab_viertelstunde(datetime.now()).isoformat(timespec="seconds"),
+        "start": wechsel_zp.isoformat(timespec="seconds"),
         "taetigkeit": taetigkeit_neu,
     })
     flash("Neuer Block laeuft.", "success")
@@ -199,6 +214,7 @@ def stempel_stop():
 
     dauer_h = _stempelung_abschliessen(
         aktive,
+        _runde_ausstempel(datetime.now()),
         taetigkeit_override=request.form.get("taetigkeit", ""),
         notizen=request.form.get("notizen", ""),
     )
