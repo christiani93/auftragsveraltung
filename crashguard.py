@@ -50,11 +50,21 @@ from datetime import datetime, timezone
 
 __all__ = ["install", "init_flask", "report_manual", "install_feedback"]
 
-_VERSION = "1.2.0"
+_VERSION = "1.3.0"
 _cfg: dict = {}
 _installed = False
 _disabled = False
 _lock = threading.Lock()
+
+# Client-side Dedup: 1 Request mit Exception kann mehrere Reports triggern
+# (got_request_exception + Flask logger.exception + evtl. Error-Handler-Crash).
+# Wir merken uns die letzten paar Reports mit Stacktrace-Hash + Zeitstempel
+# und droppen Duplikate innerhalb des Fensters. Manual-Reports werden NIE
+# ge-dedupt (User-triggered = immer interessant).
+_DEDUP_WINDOW_S = 5.0     # Doppel-Reports innerhalb dieser Zeit als Duplikat behandeln
+_DEDUP_MAX_AGE_S = 60.0   # Alte Eintraege rauswerfen
+_dedup_recent: list[tuple[float, str]] = []  # (ts, key)
+_dedup_lock = threading.Lock()
 
 _TRUTHY = {"1", "true", "yes", "on"}
 
@@ -213,11 +223,46 @@ def _build(kind: str, exc: BaseException | None = None,
     }
 
 
+def _dedup_key(rep: dict) -> str | None:
+    """Liefert einen Dedup-Key, oder None wenn kein Dedup gewuenscht ist.
+    Manual/Bug/Wish bleiben durch (User-triggered, jeder Klick zaehlt).
+    Reports ohne Traceback werden auch nicht dedupt — typischerweise eigene
+    log.error('msg')-Aufrufe, die der User selbst raussucht."""
+    kind = rep.get("kind") or ""
+    if kind in ("manual", "bug", "wish"):
+        return None
+    tb = rep.get("traceback") or ""
+    if not tb:
+        return None
+    et = rep.get("exc_type") or ""
+    msg = (rep.get("message") or "")[:200]
+    # Letzte ~600 Zeichen vom Traceback — innere Frames sind aussagekraeftig
+    return f"{et}|{msg}|{tb[-600:]}"
+
+
+def _is_duplicate(key: str) -> bool:
+    """True wenn derselbe Stacktrace schon innerhalb von _DEDUP_WINDOW_S registriert
+    wurde. Side-effect: registriert den Key fuer kuenftige Checks."""
+    now = time.time()
+    with _dedup_lock:
+        _dedup_recent[:] = [(ts, k) for ts, k in _dedup_recent
+                            if now - ts < _DEDUP_MAX_AGE_S]
+        for ts, k in _dedup_recent:
+            if k == key and now - ts < _DEDUP_WINDOW_S:
+                return True
+        _dedup_recent.append((now, key))
+        return False
+
+
 def _emit(kind: str, exc=None, message=None, context=None, sync=False) -> None:
     if _disabled:
         return
     try:
-        _dispatch(_build(kind, exc=exc, message=message, context=context), sync=sync)
+        rep = _build(kind, exc=exc, message=message, context=context)
+        key = _dedup_key(rep)
+        if key and _is_duplicate(key):
+            return
+        _dispatch(rep, sync=sync)
     except Exception:
         pass  # niemals die Host-App stoeren
 
