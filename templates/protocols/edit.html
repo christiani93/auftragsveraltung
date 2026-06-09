@@ -95,9 +95,9 @@
           <tr>
             {% for f in messpunkt_felder %}
             <td>
-              {% if f.input == 'io' %}
+              {% if f.input in select_optionen %}
                 <select name="messpunkt_{{ f.name }}" class="form-select form-select-sm">
-                  {% for opt in io_optionen %}
+                  {% for opt in select_optionen[f.input] %}
                   <option value="{{ opt }}" {% if (m.get(f.name) or '') == opt %}selected{% endif %}>{{ opt or '—' }}</option>
                   {% endfor %}
                 </select>
@@ -125,9 +125,9 @@
   <tr>
     {% for f in messpunkt_felder %}
     <td>
-      {% if f.input == 'io' %}
+      {% if f.input in select_optionen %}
         <select name="messpunkt_{{ f.name }}" class="form-select form-select-sm">
-          {% for opt in io_optionen %}
+          {% for opt in select_optionen[f.input] %}
           <option value="{{ opt }}">{{ opt or '—' }}</option>
           {% endfor %}
         </select>

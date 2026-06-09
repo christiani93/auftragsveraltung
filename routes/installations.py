@@ -51,8 +51,9 @@ def _form_to_teil(form) -> dict:
         "sicherungsnr": form.get("sicherungsnr", "").strip(),
         "sicherungstyp": form.get("sicherungstyp", "").strip(),
         "fi_typ_ma": form.get("fi_typ_ma", "").strip(),
-        # Kontroll-Status
-        "kontroll_status": form.get("kontroll_status", "offen"),
+        # Kontroll-Status — neue Anlagenteile gelten als geprueft (Bestand);
+        # kontrollpflichtig werden sie erst, wenn ein Messprotokoll erstellt wird.
+        "kontroll_status": form.get("kontroll_status", "geprueft"),
         "letzte_kontrolle": form.get("letzte_kontrolle", "").strip(),
         "kontrolleur": form.get("kontrolleur", "").strip(),
         "notizen": form.get("notizen", "").strip(),
@@ -196,7 +197,7 @@ def new_teil(anlage_id: str):
     return render_template(
         "installations/teil_edit.html",
         **_teil_edit_context(
-            {"anlage_id": anlage_id, "kontroll_status": "offen", "parent_id": vorgewaehlt_parent},
+            {"anlage_id": anlage_id, "kontroll_status": "geprueft", "parent_id": vorgewaehlt_parent},
             anlage, neu=True,
         ),
     )

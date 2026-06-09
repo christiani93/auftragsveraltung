@@ -8,8 +8,8 @@ from flask import Blueprint, abort, flash, redirect, render_template, request, u
 from flask_login import current_user
 
 from models.repos import (
-    IO_OPTIONEN,
     MESSPUNKT_FELDER,
+    SELECT_OPTIONEN,
     anlagen,
     anlagenteile,
     anlagenteile_fuer_anlage,
@@ -34,7 +34,7 @@ def _messgeraet_ids_of(protokoll: dict) -> list[str]:
 bp = Blueprint("protocols", __name__)
 
 
-def _messpunkt_aus_teil(teil: dict, datum: str) -> dict:
+def _messpunkt_aus_teil(teil: dict, datum: str, pruefer: str = "") -> dict:
     """Erzeugt eine vorausgefüllte Messpunkt-Zeile aus einem Anlagenteil."""
     installation = teil.get("bezeichnung", "")
     if teil.get("beschreibung"):
@@ -52,9 +52,32 @@ def _messpunkt_aus_teil(teil: dict, datum: str) -> dict:
         "r_iso_mohm": "",
         "ik_ende_a": "",
         "drehrichtung": "",
-        "pruefer": "",
+        "pruefer": pruefer,
         "bemerkung": "",
     }
+
+
+def _markiere_kontrollpflichtig(data: dict) -> None:
+    """Nach Messprotokoll-Erstellung: betroffene Anlagenteile von 'geprueft'
+    auf 'offen' setzen — nur fuer Installationen, fuer die ein Messprotokoll
+    erstellt wurde, muss der Kontrolleur ran. Betroffen = explizit gewaehltes
+    Teil + die Anlagenteile des verknuepften Auftrags (gleiche Anlage). Bereits
+    'maengel'/'offen'-Teile bleiben unveraendert."""
+    anlage_id = data.get("anlage_id")
+    betroffen: set[str] = set()
+    if data.get("anlagenteil_id"):
+        betroffen.add(data["anlagenteil_id"])
+    if data.get("auftrag_id"):
+        auftrag = auftraege.get(data["auftrag_id"])
+        if auftrag:
+            for tid in auftrag.get("anlagenteil_ids", []):
+                teil = anlagenteile.get(tid)
+                if teil and teil.get("anlage_id") == anlage_id:
+                    betroffen.add(tid)
+    for tid in betroffen:
+        teil = anlagenteile.get(tid)
+        if teil and teil.get("kontroll_status") == "geprueft":
+            anlagenteile.update(tid, {"kontroll_status": "offen"})
 
 
 def _parse_messpunkte(form) -> list[dict]:
@@ -120,32 +143,39 @@ def new_protocol():
                 alle_anlagen=anlagen.list(),
                 alle_messgeraete=messgeraete_fuer_user(current_user.username, current_user.is_admin),
                 teile_der_anlage=anlagenteile_fuer_anlage(anlage_id) if anlage else [],
-                messpunkt_felder=MESSPUNKT_FELDER, io_optionen=IO_OPTIONEN, neu=True,
+                messpunkt_felder=MESSPUNKT_FELDER, select_optionen=SELECT_OPTIONEN, neu=True,
             )
         record = messprotokolle.create(data)
+        _markiere_kontrollpflichtig(data)
         flash("Messprotokoll gespeichert.", "success")
         return redirect(url_for("protocols.detail", protokoll_id=record["id"]))
 
     # Vorausfüllen: wenn Auftrag mitgegeben, eine Zeile pro betroffenem Teil
     # dieser Anlage anlegen mit allen statischen Daten.
     datum_heute = date.today().isoformat()
+    default_pruefer = current_user.name
     if auftrag and anlage:
         teile_idx = {t["id"]: t for t in anlagenteile.list()}
         relevante_teile = [
             teile_idx[tid] for tid in auftrag.get("anlagenteil_ids", [])
             if tid in teile_idx and teile_idx[tid].get("anlage_id") == anlage_id
         ]
-        messungen = [_messpunkt_aus_teil(t, datum_heute) for t in relevante_teile]
+        messungen = [_messpunkt_aus_teil(t, datum_heute, default_pruefer) for t in relevante_teile]
         if not messungen:
-            messungen = [{} for _ in range(3)]
+            messungen = [{"pruefer": default_pruefer} for _ in range(3)]
         protokoll = {
             "datum": datum_heute,
             "auftrag_id": auftrag_id,
+            "monteur": default_pruefer,
             "bemerkungen": auftrag.get("titel", ""),
             "messungen": messungen,
         }
     else:
-        protokoll = {"datum": datum_heute, "messungen": [{} for _ in range(3)]}
+        protokoll = {
+            "datum": datum_heute,
+            "monteur": default_pruefer,
+            "messungen": [{"pruefer": default_pruefer} for _ in range(3)],
+        }
 
     return render_template(
         "protocols/edit.html",
@@ -154,7 +184,7 @@ def new_protocol():
         alle_anlagen=anlagen.list(),
         alle_messgeraete=messgeraete_fuer_user(current_user.username, current_user.is_admin),
         teile_der_anlage=anlagenteile_fuer_anlage(anlage_id) if anlage else [],
-        messpunkt_felder=MESSPUNKT_FELDER, io_optionen=IO_OPTIONEN, neu=True,
+        messpunkt_felder=MESSPUNKT_FELDER, select_optionen=SELECT_OPTIONEN, neu=True,
     )
 
 
@@ -223,7 +253,7 @@ def edit_protocol(protokoll_id: str):
         alle_anlagen=anlagen.list(),
         alle_messgeraete=messgeraete_fuer_user(current_user.username, current_user.is_admin),
         teile_der_anlage=anlagenteile_fuer_anlage(anlage["id"]) if anlage else [],
-        messpunkt_felder=MESSPUNKT_FELDER, io_optionen=IO_OPTIONEN, neu=False,
+        messpunkt_felder=MESSPUNKT_FELDER, select_optionen=SELECT_OPTIONEN, neu=False,
     )
 
 

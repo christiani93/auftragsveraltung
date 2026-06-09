@@ -131,12 +131,17 @@ MESSPUNKT_FELDER = [
     {"name": "ausloesezeit_ms","label": "Auslösezeit [ms]",       "input": "text", "gruppe": "Obligatorisch", "placeholder": "z.B. 45", "width": "90"},
     {"name": "r_iso_mohm",     "label": "R Iso [MΩ]",             "input": "text", "gruppe": "Fakultativ",   "placeholder": "z.B. 843", "width": "90"},
     {"name": "ik_ende_a",      "label": "Ik Ende L-PE/L-N [A]",   "input": "text", "gruppe": "Fakultativ",   "placeholder": "wenn FI: L-N", "width": "110"},
-    {"name": "drehrichtung",   "label": "Drehrichtung OK?",       "input": "io",   "gruppe": "Fakultativ",   "width": "100"},
+    {"name": "drehrichtung",   "label": "Drehfeld",               "input": "drehfeld", "gruppe": "Fakultativ", "width": "100"},
     {"name": "pruefer",        "label": "Prüfer",                 "input": "text", "gruppe": "Unterschrift", "placeholder": "Name", "width": "140"},
     {"name": "bemerkung",      "label": "Bemerkung",              "input": "text", "gruppe": "Unterschrift", "width": "150"},
 ]
 
 IO_OPTIONEN = ["", "i.O.", "n.i.O."]
+DREHFELD_OPTIONEN = ["", "Links", "Rechts"]
+
+# Auswahl-Optionen je Eingabe-Typ eines Messpunkt-Feldes (input == ...).
+# Felder ohne Eintrag hier sind Freitext.
+SELECT_OPTIONEN = {"io": IO_OPTIONEN, "drehfeld": DREHFELD_OPTIONEN}
 
 
 # ----- Hilfsfunktionen --------------------------------------------------------
