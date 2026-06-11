@@ -44,8 +44,16 @@
     <div class="col-md-6">
       <label class="form-label">Besitzer</label>
       {% if is_admin %}
-        <input type="text" name="owner" class="form-control" value="{{ geraet.owner or '' }}"
-               placeholder="Username — leer = ohne Besitzer (alle sehen es)">
+        {% set owner_usernames = alle_user|map(attribute='username')|list %}
+        <select name="owner" class="form-select">
+          <option value="" {% if not geraet.owner %}selected{% endif %}>— ohne Besitzer (alle sehen es) —</option>
+          {% for u in alle_user %}
+          <option value="{{ u.username }}" {% if geraet.owner == u.username %}selected{% endif %}>{{ u.name }} ({{ u.username }})</option>
+          {% endfor %}
+          {% if geraet.owner and geraet.owner not in owner_usernames %}
+          <option value="{{ geraet.owner }}" selected>{{ geraet.owner }} (unbekannt)</option>
+          {% endif %}
+        </select>
         <small class="text-muted">Nur Admin kann den Besitzer ändern.</small>
       {% else %}
         <input type="text" class="form-control" value="{{ geraet.owner or '— ohne Besitzer —' }}" readonly>

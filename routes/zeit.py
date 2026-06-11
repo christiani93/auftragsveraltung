@@ -50,6 +50,22 @@ def _parse_dt(value: str) -> datetime:
         return datetime.now()
 
 
+def _uhrzeit_auf_datum(zeit_str: str, basis: datetime) -> datetime | None:
+    """Parst 'HH:MM' und legt es auf das Datum von basis. None bei ungueltig/leer.
+
+    Wird fuer manuell angepasste Block-Startzeiten verwendet — exakt, ohne
+    Viertelstunden-Rundung, weil der User die echte Zeit kennt.
+    """
+    zeit_str = (zeit_str or "").strip()
+    if not zeit_str:
+        return None
+    try:
+        t = datetime.strptime(zeit_str, "%H:%M").time()
+    except ValueError:
+        return None
+    return basis.replace(hour=t.hour, minute=t.minute, second=0, microsecond=0)
+
+
 # Quantisierung der Stempel-Zeitpunkte auf Viertelstunden mit Toleranz-Filter:
 # - Einstempeln (Start): 5 Min vor und 10 Min nach Viertelstunden-Punkt T → T.
 #   D.h. :11..:14 rundet auf nächstes T, :00..:10 auf voriges T.
@@ -156,11 +172,17 @@ def stempel_start():
         flash(f"{ziel_name} ist bereits eingestempelt — nutze 'Auftrag wechseln' oder 'Ausstempeln'.", "warning")
         return redirect(url_for("zeit.heute"))
 
+    # Optionale manuelle Startzeit (z.B. nachtraegliches Einstempeln). Exakt,
+    # ohne Rundung; Zukunft wird auf 'jetzt gerundet' zurueckgesetzt.
+    jetzt = datetime.now()
+    manuell = _uhrzeit_auf_datum(request.form.get("start_zeit", ""), jetzt)
+    start_dt = manuell if (manuell and manuell <= jetzt) else _runde_einstempel(jetzt)
+
     stempelungen.create({
         "mitarbeiter": ziel_user,
         "mitarbeiter_name": ziel_name,
         "auftrag_id": auftrag_id,
-        "start": _runde_einstempel(datetime.now()).isoformat(timespec="seconds"),
+        "start": start_dt.isoformat(timespec="seconds"),
         "taetigkeit": request.form.get("taetigkeit", "").strip(),
     })
     wer = "Eingestempelt" if ziel_user == current_user.username else f"{ziel_name} eingestempelt"
@@ -251,6 +273,28 @@ def stempel_auftrag_zuordnen():
         return redirect(url_for("zeit.heute"))
     stempelungen.update(aktive["id"], {"auftrag_id": neuer_auftrag_id})
     flash("Auftrag fuer laufenden Block zugeordnet.", "success")
+    return redirect(url_for("zeit.heute"))
+
+
+@bp.route("/stempel/start-anpassen", methods=["POST"])
+@login_required
+def stempel_start_anpassen():
+    """Korrigiert die Startzeit des laufenden Blocks (ohne Buchung zu erzeugen)."""
+    ziel_user, _ = _ziel_mitarbeiter()
+    aktive = aktive_stempelung_von(ziel_user)
+    if not aktive:
+        flash("Keine laufende Stempelung.", "warning")
+        return redirect(url_for("zeit.heute"))
+    alt_start = _parse_dt(aktive.get("start", ""))
+    neu_start = _uhrzeit_auf_datum(request.form.get("start_zeit", ""), alt_start)
+    if not neu_start:
+        flash("Ungültige Uhrzeit.", "warning")
+        return redirect(url_for("zeit.heute"))
+    if neu_start > datetime.now():
+        flash("Startzeit darf nicht in der Zukunft liegen.", "warning")
+        return redirect(url_for("zeit.heute"))
+    stempelungen.update(aktive["id"], {"start": neu_start.isoformat(timespec="seconds")})
+    flash(f"Startzeit angepasst auf {neu_start.strftime('%H:%M')}.", "success")
     return redirect(url_for("zeit.heute"))
 
 
