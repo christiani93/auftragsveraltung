@@ -166,6 +166,7 @@ def edit_revision(revision_id: str):
         "revisionen/edit.html",
         revision=rev, neu=False, kunde=kunde,
         status_optionen=REVISION_STATUS, status_label=REVISION_STATUS_LABEL,
+        alle_user=list_users(),
     )
 
 
