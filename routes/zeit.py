@@ -17,6 +17,7 @@ from flask_login import current_user, login_required
 from models.repos import (
     aktive_stempelung_von,
     alle_aktiven_stempelungen,
+    auftrag_bei_zeitbuchung_aktualisieren,
     auftraege,
     ist_mitarbeiter_in_revision,
     kunden,
@@ -153,6 +154,10 @@ def _stempelung_abschliessen(aktive: dict, ende_dt: datetime, taetigkeit_overrid
         "notizen": notizen.strip(),
         "via_stempelung": True,
     })
+    auftrag_bei_zeitbuchung_aktualisieren(
+        aktive.get("auftrag_id") or "",
+        aktive.get("mitarbeiter") or current_user.username,
+    )
     stempelungen.delete(aktive["id"])
     return dauer_h
 

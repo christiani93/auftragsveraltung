@@ -21,6 +21,7 @@ from models.repos import (
     anlagen_ids_im_auftrag,
     anlagenteile,
     anlagenteile_fuer_anlage,
+    auftrag_bei_zeitbuchung_aktualisieren,
     auftraege,
     dauer_aus_zeitspanne,
     ist_mitarbeiter_in_revision,
@@ -347,6 +348,7 @@ def add_zeitbuchung(auftrag_id: str):
         "taetigkeit": request.form.get("taetigkeit", "").strip(),
         "notizen": request.form.get("notizen", "").strip(),
     })
+    auftrag_bei_zeitbuchung_aktualisieren(auftrag_id, mitarbeiter)
     flash(f"{dauer} h erfasst.", "success")
     return redirect(url_for("auftraege.detail", auftrag_id=auftrag_id))
 

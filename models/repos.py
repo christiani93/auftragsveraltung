@@ -253,6 +253,29 @@ def zeitsumme_h(eintraege: List[Dict[str, Any]]) -> float:
     return round(total, 2)
 
 
+def auftrag_bei_zeitbuchung_aktualisieren(auftrag_id: str, mitarbeiter: str) -> None:
+    """Auto-Hook nach einer Zeitbuchung: Auftrag in Arbeit setzen + zuteilen.
+
+    Sobald Zeit auf einen Auftrag gebucht wird, soll der Auftrag laufen:
+    - Status 'offen' -> 'in_arbeit' (bereits erledigte/abgerechnete bleiben unberuehrt)
+    - ist noch niemand zugeteilt, wird der buchende Mitarbeiter eingetragen
+      (eine bestehende Zuteilung wird NICHT ueberschrieben)
+    Leere auftrag_id (z.B. Stempelung ohne Auftrag) wird ignoriert.
+    """
+    if not auftrag_id:
+        return
+    auftrag = auftraege.get(auftrag_id)
+    if not auftrag:
+        return
+    update: Dict[str, Any] = {}
+    if auftrag.get("status") == "offen":
+        update["status"] = "in_arbeit"
+    if mitarbeiter and not (auftrag.get("zugewiesen_an") or "").strip():
+        update["zugewiesen_an"] = mitarbeiter
+    if update:
+        auftraege.update(auftrag_id, update)
+
+
 # ----- Stempelung (laufende Zeit-Erfassung) ----------------------------------
 
 def aktive_stempelung_von(username: str) -> Optional[Dict[str, Any]]:
