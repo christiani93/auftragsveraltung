@@ -52,7 +52,7 @@ def auftraege_pro_kunde(kunde_id: str):
         rows.append({
             "auftrag": a,
             "zeitbuchungen": eintraege,
-            "zeitsumme": zeitsumme_h(a["id"]),
+            "zeitsumme": zeitsumme_h(eintraege),
             "anzahl_teile": len(a.get("anlagenteil_ids") or []),
         })
 
