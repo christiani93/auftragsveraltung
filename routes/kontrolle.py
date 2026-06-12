@@ -1,4 +1,4 @@
-"""Übersicht: Stammkunden-Kontrollbedarf + aktive Revisionen + Eckdaten."""
+"""Übersicht: offene Kontrollen nach Kunden + aktive Revisionen + Eckdaten."""
 from __future__ import annotations
 
 from flask import Blueprint, abort, render_template
@@ -42,6 +42,7 @@ def dashboard():
         "kontrolle/dashboard.html",
         revision_rows=rev_rows,
         revision_status_label=REVISION_STATUS_LABEL,
+        kontroll_status_label=KONTROLL_STATUS_LABEL,
         **data,
     )
 

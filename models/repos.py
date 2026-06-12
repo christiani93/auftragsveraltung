@@ -464,20 +464,37 @@ def kontroll_uebersicht_fuer_kunde(kunde_id: str) -> Dict[str, Any]:
 
 
 def dashboard_data() -> Dict[str, Any]:
-    """Übersicht über alle Stammkunden mit offenen Kontrollen."""
-    stammkunden = [k for k in kunden.list() if k.get("ist_stammkunde")]
+    """Übersicht der offenen Kontrollen (offen + Mängel), nach Kunden gruppiert.
+
+    Nicht mehr auf Stammkunden beschränkt — gelistet wird jeder Kunde, bei dem
+    tatsächlich noch etwas zu prüfen ist (mindestens ein Anlagenteil offen oder
+    mit Mängel). Pro Kunde werden die konkreten Anlagenteile mitgeliefert, damit
+    die Übersicht die offenen Punkte direkt gruppiert anzeigen kann.
+    """
     rows: List[Dict[str, Any]] = []
-    for kunde in stammkunden:
+    summe_offen = 0
+    summe_maengel = 0
+    for kunde in kunden.list():
         uebersicht = kontroll_uebersicht_fuer_kunde(kunde["id"])
+        offen = uebersicht.get("offen", [])
+        maengel = uebersicht.get("maengel", [])
+        if not offen and not maengel:
+            continue
+        summe_offen += len(offen)
+        summe_maengel += len(maengel)
         rows.append({
             "kunde": kunde,
-            "anzahl_offen": uebersicht.get("anzahl_offen", 0),
-            "anzahl_maengel": uebersicht.get("anzahl_maengel", 0),
+            "offen": offen,
+            "maengel": maengel,
+            "anzahl_offen": len(offen),
+            "anzahl_maengel": len(maengel),
             "anzahl_total": uebersicht.get("anzahl_total", 0),
         })
     rows.sort(key=lambda r: (-r["anzahl_maengel"], -r["anzahl_offen"], r["kunde"]["name"].lower()))
     return {
-        "stammkunden_rows": rows,
+        "offene_rows": rows,
+        "summe_offen": summe_offen,
+        "summe_maengel": summe_maengel,
         "anzahl_kunden": len(kunden.list()),
         "anzahl_anlagen": len(anlagen.list()),
         "anzahl_messprotokolle": len(messprotokolle.list()),
