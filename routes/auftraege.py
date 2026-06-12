@@ -182,8 +182,8 @@ def new_auftrag():
 
     if request.method == "POST":
         data = _form_to_auftrag(request.form)
-        if not data["kunde_id"] or not data["titel"]:
-            flash("Kunde und Titel sind erforderlich.", "warning")
+        if not data["titel"]:
+            flash("Titel ist erforderlich.", "warning")
             kunde = kunden.get(data["kunde_id"]) if data["kunde_id"] else None
             return render_template(
                 "auftraege/edit.html",
@@ -265,8 +265,8 @@ def edit_auftrag(auftrag_id: str):
         abort(403)
     if request.method == "POST":
         data = _form_to_auftrag(request.form)
-        if not data["kunde_id"] or not data["titel"]:
-            flash("Kunde und Titel sind erforderlich.", "warning")
+        if not data["titel"]:
+            flash("Titel ist erforderlich.", "warning")
             return render_template(
                 "auftraege/edit.html",
                 auftrag={**auftrag, **data}, neu=False,

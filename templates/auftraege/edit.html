@@ -7,9 +7,9 @@
   <div class="card card-body mb-3">
     <div class="row g-3">
       <div class="col-md-6">
-        <label class="form-label">Kunde *</label>
-        <select name="kunde_id" class="form-select" required onchange="this.form.action='?kunde_id='+this.value; this.form.method='GET'; this.form.submit();">
-          <option value="">— wählen —</option>
+        <label class="form-label">Kunde</label>
+        <select name="kunde_id" class="form-select" onchange="this.form.action='?kunde_id='+this.value; this.form.method='GET'; this.form.submit();">
+          <option value="">— ohne Kunde (Einzelauftrag) —</option>
           {% for k in alle_kunden %}
           <option value="{{ k.id }}" {% if auftrag.kunde_id == k.id %}selected{% endif %}>{{ k.name }}</option>
           {% endfor %}
