@@ -12,9 +12,10 @@
     <table class="table table-kompakt table-hover m-0">
       <thead class="table-light">
         <tr>
-          <th>Datum</th>
+          <th>Verteilung</th>
           <th>Kunde</th>
           <th>Anlage</th>
+          <th>Datum</th>
           <th>Messpunkte</th>
           <th>Monteur</th>
           <th></th>
@@ -23,9 +24,13 @@
       <tbody>
         {% for r in rows %}
         <tr>
-          <td>{{ r.protokoll.datum }}</td>
+          <td class="fw-semibold">
+            {% if r.anlagenteil %}{{ r.anlagenteil.bezeichnung }}{% else %}<span class="text-muted">Gesamte Anlage</span>{% endif %}
+            {% if r.protokoll.geprueft %}<span class="badge bg-success">✓</span>{% endif %}
+          </td>
           <td>{% if r.kunde %}{{ r.kunde.name }}{% else %}—{% endif %}</td>
           <td>{% if r.anlage %}{{ r.anlage.bezeichnung }}{% else %}—{% endif %}</td>
+          <td>{{ r.protokoll.datum }}</td>
           <td>{{ r.protokoll.messungen|length }}</td>
           <td>{{ r.protokoll.monteur or '—' }}</td>
           <td class="text-end">
@@ -43,12 +48,14 @@
   <a class="mobile-list-item" href="{{ url_for('protocols.detail', protokoll_id=r.protokoll.id) }}">
     <div class="mobile-list-row">
       <div class="mobile-list-title flex-grow-1">
-        {% if r.anlage %}{{ r.anlage.bezeichnung }}{% else %}— Anlage —{% endif %}
+        {% if r.anlagenteil %}{{ r.anlagenteil.bezeichnung }}{% else %}Gesamte Anlage{% endif %}
+        {% if r.protokoll.geprueft %}<span class="badge bg-success">✓</span>{% endif %}
       </div>
       <span class="badge bg-secondary">{{ r.protokoll.messungen|length }} Pkt.</span>
     </div>
     <div class="mobile-list-meta">
       {{ r.protokoll.datum }}
+      {% if r.anlage %}· {{ r.anlage.bezeichnung }}{% endif %}
       {% if r.kunde %}· {{ r.kunde.name }}{% endif %}
       {% if r.protokoll.monteur %}· {{ r.protokoll.monteur }}{% endif %}
     </div>

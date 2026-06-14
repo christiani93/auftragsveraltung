@@ -213,13 +213,13 @@ def _teile_als_geprueft_markieren(p: dict) -> int:
 def _markiere_kontrollpflichtig(data: dict) -> None:
     """Nach Messprotokoll-Erstellung: betroffene Anlagenteile von 'geprueft'
     auf 'offen' setzen — nur fuer Installationen, fuer die ein Messprotokoll
-    erstellt wurde, muss der Kontrolleur ran. Betroffen = explizit gewaehltes
-    Teil + die Anlagenteile des verknuepften Auftrags (gleiche Anlage). Bereits
+    erstellt wurde, muss der Kontrolleur ran. Betroffen = die Anlagenteile des
+    verknuepften Auftrags (gleiche Anlage). Das Anlagenteil, AUF DEM das
+    Protokoll eroeffnet wurde (die Verteilung), wird bewusst NICHT angefasst —
+    es ist der Erfassungspunkt, nicht die gemessene Installation. Bereits
     'maengel'/'offen'-Teile bleiben unveraendert."""
     anlage_id = data.get("anlage_id")
     betroffen: set[str] = set()
-    if data.get("anlagenteil_id"):
-        betroffen.add(data["anlagenteil_id"])
     if data.get("auftrag_id"):
         auftrag = auftraege.get(data["auftrag_id"])
         if auftrag:
@@ -268,7 +268,8 @@ def list_protocols():
     for p in alle:
         a = anlagen_index.get(p.get("anlage_id"))
         k = kunden_index.get(a.get("kunde_id")) if a else None
-        rows.append({"protokoll": p, "anlage": a, "kunde": k})
+        teil = anlagenteile.get(p.get("anlagenteil_id")) if p.get("anlagenteil_id") else None
+        rows.append({"protokoll": p, "anlage": a, "kunde": k, "anlagenteil": teil})
     return render_template("protocols/list.html", rows=rows)
 
 
