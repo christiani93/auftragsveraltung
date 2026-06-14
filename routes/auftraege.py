@@ -23,6 +23,7 @@ from models.repos import (
     anlagenteile_fuer_anlage,
     auftrag_bei_zeitbuchung_aktualisieren,
     auftraege,
+    auftraege_fuer_kunde,
     dauer_aus_zeitspanne,
     ist_mitarbeiter_in_revision,
     kunden,
@@ -138,6 +139,25 @@ def _teile_strukturiert(kunde_id: str):
         )
         result.append({"anlage": a, "teile": teile})
     return result
+
+
+@bp.route("/kunde/<kunde_id>/liste")
+def kunde_liste(kunde_id: str):
+    """Browser-Ansicht der Auftragsliste eines Kunden (drucken / als PDF speichern).
+    Ohne Stunden/Zeitbuchungen und ohne Unterschriftsfeld."""
+    kunde = kunden.get(kunde_id)
+    if not kunde:
+        abort(404)
+    auftraege_liste = sorted(
+        auftraege_fuer_kunde(kunde_id),
+        key=lambda a: a.get("erteilungsdatum", ""),
+        reverse=True,
+    )
+    return render_template(
+        "auftraege/kunde_liste.html",
+        kunde=kunde, auftraege=auftraege_liste,
+        status_label=AUFTRAG_STATUS_LABEL,
+    )
 
 
 @bp.route("/")

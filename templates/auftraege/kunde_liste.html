@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Auftragsliste – {{ kunde.name }}{% endblock %}
+{% block content %}
+{% set status_farbe = {'offen': 'bg-secondary', 'in_arbeit': 'bg-warning text-dark', 'erledigt': 'bg-success', 'abgerechnet': 'bg-dark'} %}
+
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2 no-print">
+  <div>
+    <div class="text-muted small">
+      <a href="{{ url_for('customers.detail', kunde_id=kunde.id) }}">{{ kunde.name }}</a> › Auftragsliste
+    </div>
+    <h1 class="h3 m-0">Auftragsliste</h1>
+  </div>
+  <button class="btn btn-primary" onclick="window.print()">🖨 Drucken / als PDF speichern</button>
+</div>
+
+<div class="print-header d-none d-print-block mb-2">
+  <h2>Auftragsliste</h2>
+  <div>
+    <strong>{{ kunde.name }}</strong>
+    {% if kunde.adresse %}· {{ kunde.adresse }}{% endif %}
+    {% if kunde.plz or kunde.ort %}· {{ kunde.plz }} {{ kunde.ort }}{% endif %}
+  </div>
+</div>
+
+<p class="text-muted small mb-2"><span class="label">Anzahl Aufträge:</span> {{ auftraege|length }}</p>
+
+{% if auftraege %}
+<div class="table-responsive">
+  <table class="table table-sm table-bordered protokoll-tabelle m-0">
+    <thead class="table-light">
+      <tr>
+        <th style="width: 110px;">Datum</th>
+        <th>Titel / Beschreibung</th>
+        <th style="width: 140px;">Erteilt von</th>
+        <th style="width: 110px;">Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for a in auftraege %}
+      <tr>
+        <td>
+          {{ a.erteilungsdatum }}
+          {% if a.erledigt_am %}<div class="text-muted small">erl. {{ a.erledigt_am }}</div>{% endif %}
+        </td>
+        <td>
+          <strong>{{ a.titel }}</strong>
+          {% if a.beschreibung %}<div class="text-muted small">{{ a.beschreibung }}</div>{% endif %}
+          {% if a.anlagenteil_ids %}<div class="text-muted small">{{ a.anlagenteil_ids|length }} Anlagenteil(e) betroffen</div>{% endif %}
+        </td>
+        <td>{{ a.erteilt_von or '—' }}</td>
+        <td><span class="badge {{ status_farbe.get(a.status, 'bg-secondary') }}">{{ status_label.get(a.status, a.status) }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="alert alert-info">Keine Aufträge erfasst.</div>
+{% endif %}
+
+{% endblock %}
