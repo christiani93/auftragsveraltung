@@ -15,7 +15,7 @@
     <a class="btn btn-outline-primary" href="{{ url_for('kontrolle.kunde_uebersicht', kunde_id=kunde.id) }}">Kontroll-Übersicht</a>
     {% endif %}
     <a class="btn btn-outline-dark" href="{{ url_for('pdf.auftraege_pro_kunde', kunde_id=kunde.id) }}" target="_blank">📄 Auftragsliste PDF</a>
-    <a class="btn btn-outline-dark" href="{{ url_for('pdf.messpunkte_pro_kunde', kunde_id=kunde.id) }}" target="_blank">📄 Messpunkte PDF</a>
+    <a class="btn btn-outline-dark" href="{{ url_for('protocols.messpunkte_kunde_ansicht', kunde_id=kunde.id) }}" target="_blank">📄 Messpunkte (Druck/PDF)</a>
   </div>
 </div>
 

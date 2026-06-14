@@ -10,12 +10,12 @@ from models.repos import (
     MESSPUNKT_FELDER,
     anlagen,
     anlagen_fuer_kunde,
-    anlagenteile,
     auftraege,
     auftraege_fuer_kunde,
     kunden,
     messgeraete,
     messprotokolle,
+    messpunkte_gruppiert_fuer_kunde,
     zeitbuchungen_fuer_auftrag,
     zeitsumme_h,
 )
@@ -79,28 +79,7 @@ def messpunkte_pro_kunde(kunde_id: str):
     kunde = kunden.get(kunde_id)
     if not kunde:
         abort(404)
-    anlage_idx = {a["id"]: a for a in anlagen_fuer_kunde(kunde_id)}
-    protokolle = [p for p in messprotokolle.list() if p.get("anlage_id") in anlage_idx]
-
-    gruppen: dict = {}
-    for p in protokolle:
-        teil = anlagenteile.get(p.get("anlagenteil_id")) if p.get("anlagenteil_id") else None
-        anlage = anlage_idx.get(p.get("anlage_id"))
-        key = ("teil", p["anlagenteil_id"]) if teil else ("anlage", p.get("anlage_id"))
-        g = gruppen.setdefault(key, {"teil": teil, "anlage": anlage, "messungen": []})
-        for m in p.get("messungen", []):
-            g["messungen"].append(m)
-
-    def _sort_key(item):
-        g = item[1]
-        a = g["anlage"] or {}
-        t = g["teil"] or {}
-        return (a.get("bezeichnung", "").lower(), t.get("typ", ""), t.get("bezeichnung", "").lower())
-
-    gruppen_list = [g for _, g in sorted(gruppen.items(), key=_sort_key)]
-    for g in gruppen_list:
-        g["messungen"].sort(key=lambda m: m.get("datum", ""))
-    gesamt = sum(len(g["messungen"]) for g in gruppen_list)
+    gruppen_list, gesamt = messpunkte_gruppiert_fuer_kunde(kunde_id)
 
     html = render_template(
         "pdf/messpunkte_kunde.html",

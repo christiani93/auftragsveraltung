@@ -14,6 +14,7 @@ from models.repos import (
     anlagenteile,
     anlagenteile_fuer_anlage,
     anlagenteile_mit_anhang,
+    messpunkte_gruppiert_fuer_kunde,
     auftraege,
     kunden,
     messgeraete,
@@ -271,6 +272,22 @@ def list_protocols():
         teil = anlagenteile.get(p.get("anlagenteil_id")) if p.get("anlagenteil_id") else None
         rows.append({"protokoll": p, "anlage": a, "kunde": k, "anlagenteil": teil})
     return render_template("protocols/list.html", rows=rows)
+
+
+@bp.route("/uebersicht/kunde/<kunde_id>")
+def messpunkte_kunde_ansicht(kunde_id: str):
+    """Browser-Ansicht aller Messpunkte eines Kunden, gruppiert nach Anlagenteil.
+    Im Browser drucken/als PDF speichern (Querformat via Druck-CSS) — fuer breite
+    Tabellen zuverlaessiger als der direkte PDF-Download."""
+    kunde = kunden.get(kunde_id)
+    if not kunde:
+        abort(404)
+    gruppen, gesamt = messpunkte_gruppiert_fuer_kunde(kunde_id)
+    return render_template(
+        "protocols/messpunkte_kunde.html",
+        kunde=kunde, gruppen=gruppen, gesamt=gesamt,
+        messpunkt_felder=MESSPUNKT_FELDER,
+    )
 
 
 @bp.route("/neu", methods=["GET", "POST"])

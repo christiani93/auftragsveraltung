@@ -185,6 +185,37 @@ def anlagenteile_fuer_anlage(anlage_id: str) -> List[Dict[str, Any]]:
     return anlagenteile.filter(anlage_id=anlage_id)
 
 
+def messpunkte_gruppiert_fuer_kunde(kunde_id: str) -> tuple:
+    """Alle Messpunkte eines Kunden, gruppiert nach Anlagenteil (Verteilung).
+
+    Protokolle werden auf der Verteilung/dem Verteilstromkreis erfasst — diese
+    bildet die Gruppe. Sortiert nach Anlage/Teil, Messpunkte je Gruppe nach
+    Datum. Liefert (gruppen_list, gesamtzahl).
+    """
+    anlage_idx = {a["id"]: a for a in anlagen_fuer_kunde(kunde_id)}
+    protokolle = [p for p in messprotokolle.list() if p.get("anlage_id") in anlage_idx]
+    gruppen: Dict[Any, Dict[str, Any]] = {}
+    for p in protokolle:
+        teil = anlagenteile.get(p.get("anlagenteil_id")) if p.get("anlagenteil_id") else None
+        anlage = anlage_idx.get(p.get("anlage_id"))
+        key = ("teil", p["anlagenteil_id"]) if teil else ("anlage", p.get("anlage_id"))
+        g = gruppen.setdefault(key, {"teil": teil, "anlage": anlage, "messungen": []})
+        for m in p.get("messungen", []):
+            g["messungen"].append(m)
+
+    def _sort_key(item):
+        g = item[1]
+        a = g["anlage"] or {}
+        t = g["teil"] or {}
+        return (a.get("bezeichnung", "").lower(), t.get("typ", ""), t.get("bezeichnung", "").lower())
+
+    gruppen_list = [g for _, g in sorted(gruppen.items(), key=_sort_key)]
+    for g in gruppen_list:
+        g["messungen"].sort(key=lambda m: m.get("datum", ""))
+    gesamt = sum(len(g["messungen"]) for g in gruppen_list)
+    return gruppen_list, gesamt
+
+
 def anlagenteile_mit_anhang(anlage_id: str) -> List[Dict[str, Any]]:
     """Anlagenteile einer Anlage mit Datei-Anhaengen (Foto/Legende/Schema)."""
     teile = [t for t in anlagenteile_fuer_anlage(anlage_id) if t.get("anhang")]
