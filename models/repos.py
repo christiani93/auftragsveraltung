@@ -69,6 +69,16 @@ ANLAGENTEIL_TYP_KANN_PARENT = {
     "Anlagenstromkreis",
 }
 
+# Nur diese Typen zählen mit ihrer eigenen Eingabe als echte Last in der
+# "Summe nachgelagert". Verteilungen/Verteilstromkreise sind reine Verteil-
+# punkte (ihre eigene Eingabe ist nur eine Bemessung, keine Last) und
+# Erzeugerstromkreise speisen ein — sie werden NICHT als Last gezählt.
+ANLAGENTEIL_TYP_IST_LAST = {
+    "Anlagenstromkreis",
+    "Endstromkreis mit Steckdosen",
+    "Endstromkreis ohne Steckdosen",
+}
+
 
 def fi_erforderlich(typ: Optional[str]) -> Optional[bool]:
     """Ist für diesen Anlagenteil-Typ nach NIN ein FI (RCD) vorgeschrieben?
@@ -411,14 +421,20 @@ def baue_aufbau_baum(anlage_id: str) -> List[Dict[str, Any]]:
             roots.append(knoten[t["id"]])
 
     def _summe_nachgelagert(node: Dict[str, Any]) -> Optional[float]:
-        """Summe der Lasten ALLER Nachfahren in kW — ohne diesen Knoten selbst."""
+        """Summe der Lasten ALLER Nachfahren in kW — ohne diesen Knoten selbst.
+
+        Nur Anlagen- und Endstromkreise zählen mit ihrer eigenen Eingabe als
+        Last; Verteilungen/Verteilstromkreise (und Erzeugerstromkreise) werden
+        durchlaufen, aber ihre eigene Eingabe nicht aufsummiert.
+        """
         total_kw = 0.0
         any_value = False
         for child in node["children"]:
-            eigene = teil_last_kw(child["teil"])
-            if eigene is not None:
-                total_kw += eigene
-                any_value = True
+            if child["teil"].get("typ") in ANLAGENTEIL_TYP_IST_LAST:
+                eigene = teil_last_kw(child["teil"])
+                if eigene is not None:
+                    total_kw += eigene
+                    any_value = True
             sub = _summe_nachgelagert(child)
             if sub is not None:
                 total_kw += sub

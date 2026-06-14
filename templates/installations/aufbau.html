@@ -18,6 +18,8 @@
   <ul class="mb-0">
     <li><strong>Eigene Last</strong>: Was du an diesem Knoten erfasst hast — exakt so wie eingegeben (kW oder A).</li>
     <li><strong>Summe nachgelagert</strong>: Summe aller Lasten der Anlagenteile DAHINTER (Kinder &amp; Enkel), in kW.
+        Als Last zählen nur <strong>Anlagen- und Endstromkreise</strong> — Verteilungen/Verteilstromkreise (und Erzeugerstromkreise)
+        werden durchlaufen, aber ihre eigene Eingabe nicht mitgezählt.
         Eingaben in A werden anhand der Spannung des jeweiligen Teils auf kW umgerechnet (cos φ = 1).
         Der eigene Wert dieses Knotens wird <em>nicht</em> dazugezählt.</li>
     <li><strong>IKmax</strong>: Eigener gemessener Kurzschlussstrom, oder geerbt von der nächsten gemessenen Verteilung weiter oben.</li>
