@@ -79,6 +79,13 @@ ANLAGENTEIL_TYP_IST_LAST = {
     "Endstromkreis ohne Steckdosen",
 }
 
+# Verteiler-Knoten: nie ein "Endpunkt" — sie verteilen weiter und zeigen daher
+# immer die nachgelagerte Summe (auch wenn noch nichts darunter erfasst ist).
+ANLAGENTEIL_TYP_VERTEILER = {
+    "Verteilung",
+    "Verteilstromkreis",
+}
+
 
 def fi_erforderlich(typ: Optional[str]) -> Optional[bool]:
     """Ist für diesen Anlagenteil-Typ nach NIN ein FI (RCD) vorgeschrieben?
@@ -442,6 +449,9 @@ def baue_aufbau_baum(anlage_id: str) -> List[Dict[str, Any]]:
                 any_value = True
         result = total_kw if any_value else None
         node["summe_nachgelagert_kw"] = result
+        # Gleichzeitigkeitsfaktor = eigene Last / Summe nachgelagert (beide in kW)
+        eigen_kw = node["anzeige"]["kw"]
+        node["gleichzeitigkeit"] = (eigen_kw / result) if (eigen_kw and result) else None
         return result
 
     def _ikmax(node: Dict[str, Any], geerbt: Optional[Dict[str, Any]]) -> None:

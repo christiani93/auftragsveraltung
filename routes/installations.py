@@ -11,6 +11,7 @@ from werkzeug.utils import secure_filename
 import config
 from models.repos import (
     ANLAGENTEIL_TYPEN,
+    ANLAGENTEIL_TYP_VERTEILER,
     KONTROLL_STATUS,
     KONTROLL_STATUS_LABEL,
     SPANNUNG_LABEL,
@@ -195,6 +196,7 @@ def aufbau(anlage_id: str):
         "installations/aufbau.html",
         anlage=anlage, kunde=kunde, roots=roots,
         spannung_label=SPANNUNG_LABEL,
+        verteiler_typen=ANLAGENTEIL_TYP_VERTEILER,
     )
 
 

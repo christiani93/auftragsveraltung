@@ -22,6 +22,7 @@
         werden durchlaufen, aber ihre eigene Eingabe nicht mitgezählt.
         Eingaben in A werden anhand der Spannung des jeweiligen Teils auf kW umgerechnet (cos φ = 1).
         Der eigene Wert dieses Knotens wird <em>nicht</em> dazugezählt.</li>
+    <li><strong>Gleichzeitigkeit</strong>: Eigene Last ÷ Summe nachgelagert — Verhältnis der erfassten eigenen Last (z.B. Vorsicherung) zur Summe der nachgelagerten Lasten. Nur wenn beide Werte vorhanden.</li>
     <li><strong>IKmax</strong>: Eigener gemessener Kurzschlussstrom, oder geerbt von der nächsten gemessenen Verteilung weiter oben.</li>
   </ul>
 </div>
@@ -76,7 +77,7 @@
     <td>{% if teil.spannung %}<span class="badge bg-light text-dark border">{{ teil.spannung }}</span>{% else %}<span class="text-muted">—</span>{% endif %}</td>
     <td class="text-end">{{ fmt_eigene(node) }}</td>
     <td class="text-end fw-semibold">
-      {% if node.children %}
+      {% if node.children or teil.typ in verteiler_typen %}
         {% if node.summe_nachgelagert_kw is not none %}
           {{ '%.2f'|format(node.summe_nachgelagert_kw) }} kW
         {% else %}
@@ -84,6 +85,13 @@
         {% endif %}
       {% else %}
         <span class="text-muted">— (Endpunkt)</span>
+      {% endif %}
+    </td>
+    <td class="text-end">
+      {% if node.gleichzeitigkeit is not none %}
+        {{ '%.2f'|format(node.gleichzeitigkeit) }}
+      {% else %}
+        <span class="text-muted">—</span>
       {% endif %}
     </td>
     <td class="text-end">
@@ -117,6 +125,7 @@
           <th>Spannung</th>
           <th class="text-end">Eigene Last</th>
           <th class="text-end">Summe nachgelagert</th>
+          <th class="text-end" title="Eigene Last ÷ Summe nachgelagert">Gleichzeitigkeit</th>
           <th class="text-end">IKmax</th>
           <th></th>
         </tr>
