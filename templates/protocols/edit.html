@@ -98,6 +98,16 @@
         <label class="form-label">Bemerkungen (gesamt)</label>
         <textarea name="bemerkungen" class="form-control" rows="2">{{ protokoll.bemerkungen or '' }}</textarea>
       </div>
+      <div class="col-12">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="aufbau_sync" id="aufbau_sync" value="1" {% if neu %}checked{% endif %}>
+          <label class="form-check-label" for="aufbau_sync">
+            <strong>Anlagenaufbau aktualisieren</strong> — fehlende Anlagenteile aus den Messpunkten anlegen
+            (UV/Verteilung bzw. Endstromkreis je nach „Installation / Ort") und technische Daten ergänzen.
+            Bestehende Teile werden nur in leeren Feldern ergänzt, nie überschrieben.
+          </label>
+        </div>
+      </div>
     </div>
   </div>
 

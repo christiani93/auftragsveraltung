@@ -76,6 +76,78 @@ def _messpunkt_aus_teil(teil: dict, datum: str, pruefer: str = "") -> dict:
     }
 
 
+_UV_HINWEISE = ("uv", "verteil", "unterverteil", "hauptverteil", "tableau", "sak", "schaltgerät", "hv ")
+
+
+def _typ_aus_installation(name: str) -> str:
+    """Heuristik: UV/Verteilung erkennen am 'Installation / Ort'-Text, sonst
+    Endstromkreis. Der Anwender kann den Typ nachträglich korrigieren."""
+    low = name.lower()
+    if any(h in low for h in _UV_HINWEISE):
+        return "Verteilung"
+    return "Endstromkreis mit Steckdosen"
+
+
+def _aufbau_aus_messpunkten(anlage_id: str, messungen: list[dict], parent_id: str | None) -> tuple[int, int]:
+    """Ergänzt den Anlagenaufbau aus den Messpunkten.
+
+    - Bestehende Anlagenteile werden per Name gematcht (Bezeichnung, oder
+      'Bezeichnung – Beschreibung' wie in der Vorbefüllung) und nur in LEEREN
+      technischen Feldern ergänzt — nie überschrieben.
+    - Fehlende Anlagenteile werden angelegt; Typ aus 'Installation / Ort'
+      (UV/Verteilung vs. Endstromkreis). Neue Teile hängen unter parent_id
+      (das im Protokoll gewählte Anlagenteil), falls gesetzt.
+    Liefert (angelegt, aktualisiert). Idempotent — erneutes Speichern legt
+    nichts doppelt an.
+    """
+    by_name: dict[str, dict] = {}
+    for t in anlagenteile_fuer_anlage(anlage_id):
+        bez = (t.get("bezeichnung") or "").strip()
+        if not bez:
+            continue
+        by_name.setdefault(bez.lower(), t)
+        if t.get("beschreibung"):
+            by_name.setdefault(f"{bez} – {t['beschreibung']}".strip().lower(), t)
+
+    angelegt = aktualisiert = 0
+    for m in messungen:
+        name = (m.get("installation") or "").strip()
+        if not name or name.lower() == "installation / ort":
+            continue
+        tech = {
+            "kabel": (m.get("kabel") or "").strip(),
+            "sicherungsnr": (m.get("sicherungsnr") or "").strip(),
+            "sicherungstyp": (m.get("sicherungstyp") or "").strip(),
+            "fi_typ_ma": (m.get("fi_typ_ma") or "").strip(),
+            "sicherung_a": (m.get("sicherung_a") or "").strip(),
+        }
+        key = name.lower()
+        bestehend = by_name.get(key)
+        if bestehend:
+            updates = {k: v for k, v in tech.items() if v and not (bestehend.get(k) or "").strip()}
+            if updates:
+                anlagenteile.update(bestehend["id"], updates)
+                aktualisiert += 1
+        else:
+            neu = {
+                "anlage_id": anlage_id,
+                "parent_id": parent_id or None,
+                "typ": _typ_aus_installation(name),
+                "bezeichnung": name,
+                "beschreibung": "",
+                "spannung": None,
+                "leistung_kw": None,
+                "stromstaerke_a": None,
+                "kontroll_status": "geprueft",
+                "letzte_kontrolle": m.get("datum") or "",
+                **tech,
+            }
+            created = anlagenteile.create(neu)
+            by_name[key] = created
+            angelegt += 1
+    return angelegt, aktualisiert
+
+
 def _markiere_kontrollpflichtig(data: dict) -> None:
     """Nach Messprotokoll-Erstellung: betroffene Anlagenteile von 'geprueft'
     auf 'offen' setzen — nur fuer Installationen, fuer die ein Messprotokoll
@@ -181,6 +253,10 @@ def new_protocol():
         record = messprotokolle.create(data)
         _markiere_kontrollpflichtig(data)
         flash("Messprotokoll gespeichert.", "success")
+        if request.form.get("aufbau_sync"):
+            angelegt, aktualisiert = _aufbau_aus_messpunkten(anlage_id, messungen, data["anlagenteil_id"])
+            if angelegt or aktualisiert:
+                flash(f"Anlagenaufbau: {angelegt} Teil(e) angelegt, {aktualisiert} ergänzt.", "info")
         return redirect(url_for("protocols.detail", protokoll_id=record["id"]))
 
     # Vorausfüllen: wenn Auftrag mitgegeben, eine Zeile pro betroffenem Teil
@@ -289,6 +365,10 @@ def edit_protocol(protokoll_id: str):
         data["messgeraet_id"] = None
         messprotokolle.update(protokoll_id, data)
         flash("Messprotokoll aktualisiert.", "success")
+        if request.form.get("aufbau_sync"):
+            angelegt, aktualisiert = _aufbau_aus_messpunkten(data["anlage_id"], messungen, data["anlagenteil_id"])
+            if angelegt or aktualisiert:
+                flash(f"Anlagenaufbau: {angelegt} Teil(e) angelegt, {aktualisiert} ergänzt.", "info")
         return redirect(url_for("protocols.detail", protokoll_id=protokoll_id))
 
     # Vorausgewaehlt: bisher gewaehlte Messgeraete (auch aus altem messgeraet_id-Feld)
