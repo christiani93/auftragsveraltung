@@ -59,6 +59,7 @@ ANLAGENTEIL_TYPEN = [
     "Anlagenstromkreis",
     "Endstromkreis mit Steckdosen",
     "Endstromkreis ohne Steckdosen",
+    "Erzeugerstromkreis",
 ]
 
 # Diese Typen können andere Anlagenteile als Kinder haben (sind also Pfad-Elemente).
