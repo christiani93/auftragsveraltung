@@ -20,6 +20,7 @@ from models.repos import (
     messgeraete_fuer_user,
     messprotokolle,
 )
+from models.users import list_monteure
 
 
 def _messgeraet_ids_of(protokoll: dict) -> list[str]:
@@ -149,7 +150,7 @@ def new_protocol():
                 alle_anlagen=anlagen.list(),
                 alle_messgeraete=messgeraete_fuer_user(current_user.username, current_user.is_admin),
                 teile_der_anlage=anlagenteile_fuer_anlage(anlage_id) if anlage else [],
-                messpunkt_felder=MESSPUNKT_FELDER, select_optionen=SELECT_OPTIONEN, neu=True,
+                alle_monteure=list_monteure(), messpunkt_felder=MESSPUNKT_FELDER, select_optionen=SELECT_OPTIONEN, neu=True,
             )
         record = messprotokolle.create(data)
         _markiere_kontrollpflichtig(data)
@@ -198,7 +199,7 @@ def new_protocol():
         alle_anlagen=anlagen.list(),
         alle_messgeraete=messgeraete_fuer_user(current_user.username, current_user.is_admin),
         teile_der_anlage=anlagenteile_fuer_anlage(anlage_id) if anlage else [],
-        messpunkt_felder=MESSPUNKT_FELDER, select_optionen=SELECT_OPTIONEN, neu=True,
+        alle_monteure=list_monteure(), messpunkt_felder=MESSPUNKT_FELDER, select_optionen=SELECT_OPTIONEN, neu=True,
     )
 
 
@@ -271,7 +272,7 @@ def edit_protocol(protokoll_id: str):
         alle_anlagen=anlagen.list(),
         alle_messgeraete=messgeraete_fuer_user(current_user.username, current_user.is_admin),
         teile_der_anlage=anlagenteile_fuer_anlage(anlage["id"]) if anlage else [],
-        messpunkt_felder=MESSPUNKT_FELDER, select_optionen=SELECT_OPTIONEN, neu=False,
+        alle_monteure=list_monteure(), messpunkt_felder=MESSPUNKT_FELDER, select_optionen=SELECT_OPTIONEN, neu=False,
     )
 
 

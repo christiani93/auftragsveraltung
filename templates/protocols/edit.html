@@ -48,7 +48,15 @@
       </div>
       <div class="col-md-3">
         <label class="form-label">Monteur (Default für Prüfer-Spalte)</label>
-        <input type="text" name="monteur" class="form-control" value="{{ protokoll.monteur or '' }}">
+        <select name="monteur" class="form-select">
+          <option value="">— wählen —</option>
+          {% for u in alle_monteure %}
+          <option value="{{ u.name }}" {% if protokoll.monteur == u.name %}selected{% endif %}>{{ u.name }}</option>
+          {% endfor %}
+          {% if protokoll.monteur and protokoll.monteur not in alle_monteure|map(attribute='name')|list %}
+          <option value="{{ protokoll.monteur }}" selected>{{ protokoll.monteur }} (manuell)</option>
+          {% endif %}
+        </select>
       </div>
       <div class="col-12">
         <label class="form-label">Verwendete Messgeräte <span class="text-muted small">(Mehrfachauswahl — Bezeichnung + Seriennr. erscheinen auf dem Protokoll)</span></label>
