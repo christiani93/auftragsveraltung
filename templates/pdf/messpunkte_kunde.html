@@ -1,0 +1,41 @@
+{% extends "pdf/_pdf_base.html" %}
+{% block title %}Messpunkte-Übersicht {{ kunde.name }}{% endblock %}
+{% block footer_left %}Messpunkte-Übersicht {{ kunde.name }}{% endblock %}
+{% block heading %}Messpunkte-Übersicht{% endblock %}
+{% block subheading %}
+  <strong>{{ kunde.name }}</strong>{% if kunde.plz or kunde.ort %} · {{ kunde.plz }} {{ kunde.ort }}{% endif %}
+  <br>{{ gesamt }} Messpunkt(e) · gruppiert nach Anlagenteil
+{% endblock %}
+
+{% block content %}
+{% if gruppen %}
+  {% for g in gruppen %}
+  <h3 style="page-break-after: avoid;">
+    {% if g.anlage %}{{ g.anlage.bezeichnung }}{% if g.anlage.standort %} ({{ g.anlage.standort }}){% endif %}{% else %}—{% endif %}
+    ›
+    {% if g.teil %}[{{ g.teil.typ }}] {{ g.teil.bezeichnung }}{% else %}(ohne Anlagenteil){% endif %}
+    <span class="small">— {{ g.messungen|length }} Punkt(e)</span>
+  </h3>
+  <table style="font-size: 8.5pt;">
+    <thead>
+      <tr>
+        {% for f in messpunkt_felder %}
+        <th style="font-size: 8pt;">{{ f.label }}</th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for m in g.messungen %}
+      <tr>
+        {% for f in messpunkt_felder %}
+        <td style="font-size: 8.5pt;">{{ m.get(f.name, '') or '' }}</td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endfor %}
+{% else %}
+  <p><em>Für diesen Kunden sind noch keine Messpunkte erfasst.</em></p>
+{% endif %}
+{% endblock %}

@@ -138,7 +138,9 @@ def _aufbau_aus_messpunkten(anlage_id: str, messungen: list[dict], parent_id: st
                 "spannung": None,
                 "leistung_kw": None,
                 "stromstaerke_a": None,
-                "kontroll_status": "geprueft",
+                # Aus einem Messprotokoll angelegt = frisch gemessen, also
+                # kontrollpflichtig (nicht geprueft) — der Kontrolleur muss ran.
+                "kontroll_status": "offen",
                 "letzte_kontrolle": m.get("datum") or "",
                 **tech,
             }

@@ -10,6 +10,7 @@ from models.repos import (
     MESSPUNKT_FELDER,
     anlagen,
     anlagen_fuer_kunde,
+    anlagenteile,
     auftraege,
     auftraege_fuer_kunde,
     kunden,
@@ -65,6 +66,50 @@ def auftraege_pro_kunde(kunde_id: str):
     )
     safe_name = kunde["name"].replace(" ", "_").replace("/", "_")
     return _render_pdf(html, f"Auftragsliste_{safe_name}_{date.today().isoformat()}.pdf")
+
+
+@bp.route("/messpunkte/kunde/<kunde_id>")
+def messpunkte_pro_kunde(kunde_id: str):
+    """Alle Messpunkte eines Kunden als PDF, gruppiert nach Anlagenteil.
+
+    Protokolle werden auf der Verteilung/dem Verteilstromkreis erfasst — daher
+    bildet das jeweilige Anlagenteil die Gruppe; Messpunkte mehrerer Protokolle
+    auf demselben Teil werden zusammengefasst und nach Datum sortiert.
+    """
+    kunde = kunden.get(kunde_id)
+    if not kunde:
+        abort(404)
+    anlage_idx = {a["id"]: a for a in anlagen_fuer_kunde(kunde_id)}
+    protokolle = [p for p in messprotokolle.list() if p.get("anlage_id") in anlage_idx]
+
+    gruppen: dict = {}
+    for p in protokolle:
+        teil = anlagenteile.get(p.get("anlagenteil_id")) if p.get("anlagenteil_id") else None
+        anlage = anlage_idx.get(p.get("anlage_id"))
+        key = ("teil", p["anlagenteil_id"]) if teil else ("anlage", p.get("anlage_id"))
+        g = gruppen.setdefault(key, {"teil": teil, "anlage": anlage, "messungen": []})
+        for m in p.get("messungen", []):
+            g["messungen"].append(m)
+
+    def _sort_key(item):
+        g = item[1]
+        a = g["anlage"] or {}
+        t = g["teil"] or {}
+        return (a.get("bezeichnung", "").lower(), t.get("typ", ""), t.get("bezeichnung", "").lower())
+
+    gruppen_list = [g for _, g in sorted(gruppen.items(), key=_sort_key)]
+    for g in gruppen_list:
+        g["messungen"].sort(key=lambda m: m.get("datum", ""))
+    gesamt = sum(len(g["messungen"]) for g in gruppen_list)
+
+    html = render_template(
+        "pdf/messpunkte_kunde.html",
+        kunde=kunde, gruppen=gruppen_list, gesamt=gesamt,
+        messpunkt_felder=MESSPUNKT_FELDER,
+        erstellt_am=date.today().isoformat(),
+    )
+    safe_name = kunde["name"].replace(" ", "_").replace("/", "_")
+    return _render_pdf(html, f"Messpunkte_{safe_name}_{date.today().isoformat()}.pdf")
 
 
 @bp.route("/messprotokoll/<protokoll_id>")
