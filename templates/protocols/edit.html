@@ -11,6 +11,13 @@
 </div>
 {% endif %}
 
+{% if vorausgewaehlter_teil %}
+<div class="alert alert-info">
+  Messprotokoll für Anlagenteil <strong>[{{ vorausgewaehlter_teil.typ }}] {{ vorausgewaehlter_teil.bezeichnung }}</strong>
+  — eine Messpunkt-Zeile wurde daraus vorausgefüllt.
+</div>
+{% endif %}
+
 <form method="post">
   {% if protokoll.auftrag_id %}<input type="hidden" name="auftrag_id" value="{{ protokoll.auftrag_id }}">{% endif %}
   <div class="card card-body mb-3">
@@ -23,6 +30,15 @@
           <option value="{{ a.id }}" {% if (anlage and anlage.id == a.id) or protokoll.anlage_id == a.id %}selected{% endif %}>
             {{ a.bezeichnung }}{% if a.standort %} – {{ a.standort }}{% endif %}
           </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Anlagenteil <span class="text-muted small">(optional — wofür gilt das Protokoll?)</span></label>
+        <select name="anlagenteil_id" class="form-select">
+          <option value="">— ganze Anlage / nicht zugeordnet —</option>
+          {% for t in teile_der_anlage %}
+          <option value="{{ t.id }}" {% if protokoll.anlagenteil_id == t.id %}selected{% endif %}>[{{ t.typ }}] {{ t.bezeichnung }}</option>
           {% endfor %}
         </select>
       </div>

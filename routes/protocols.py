@@ -116,8 +116,13 @@ def list_protocols():
 def new_protocol():
     anlage_id = request.values.get("anlage_id", "")
     auftrag_id = request.values.get("auftrag_id", "")
+    anlagenteil_id = request.values.get("anlagenteil_id", "")
     anlage = anlagen.get(anlage_id) if anlage_id else None
     auftrag = auftraege.get(auftrag_id) if auftrag_id else None
+    teil = anlagenteile.get(anlagenteil_id) if anlagenteil_id else None
+    if teil and not anlage:
+        anlage = anlagen.get(teil.get("anlage_id"))
+        anlage_id = anlage["id"] if anlage else anlage_id
 
     if request.method == "POST":
         anlage_id = request.form.get("anlage_id", "")
@@ -171,6 +176,14 @@ def new_protocol():
             "bemerkungen": auftrag.get("titel", ""),
             "messungen": messungen,
         }
+    elif teil and anlage:
+        protokoll = {
+            "datum": datum_heute,
+            "anlagenteil_id": anlagenteil_id,
+            "monteur": default_pruefer,
+            "bemerkungen": "",
+            "messungen": [_messpunkt_aus_teil(teil, datum_heute, default_pruefer)],
+        }
     else:
         protokoll = {
             "datum": datum_heute,
@@ -181,7 +194,7 @@ def new_protocol():
     return render_template(
         "protocols/edit.html",
         protokoll=protokoll,
-        anlage=anlage, auftrag=auftrag,
+        anlage=anlage, auftrag=auftrag, vorausgewaehlter_teil=teil,
         alle_anlagen=anlagen.list(),
         alle_messgeraete=messgeraete_fuer_user(current_user.username, current_user.is_admin),
         teile_der_anlage=anlagenteile_fuer_anlage(anlage_id) if anlage else [],
@@ -200,10 +213,12 @@ def detail(protokoll_id: str):
     geraete = [messgeraete.get(gid) for gid in ids]
     geraete = [g for g in geraete if g]
     auftrag = auftraege.get(p.get("auftrag_id")) if p.get("auftrag_id") else None
+    anlagenteil = anlagenteile.get(p.get("anlagenteil_id")) if p.get("anlagenteil_id") else None
     dokumentierte_teile = anlagenteile_mit_anhang(anlage["id"]) if anlage else []
     return render_template(
         "protocols/detail.html",
         protokoll=p, anlage=anlage, kunde=kunde, geraete=geraete, auftrag=auftrag,
+        anlagenteil=anlagenteil,
         messpunkt_felder=MESSPUNKT_FELDER,
         dokumentierte_teile=dokumentierte_teile,
     )

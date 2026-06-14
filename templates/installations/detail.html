@@ -78,6 +78,7 @@
               <input type="hidden" name="status" value="maengel">
               <button type="submit" class="btn btn-sm btn-outline-danger" title="Mängel">⚠</button>
             </form>
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('protocols.new_protocol', anlagenteil_id=t.id) }}" title="Messprotokoll für diesen Anlagenteil">+ MP</a>
           </td>
         </tr>
         {% endfor %}

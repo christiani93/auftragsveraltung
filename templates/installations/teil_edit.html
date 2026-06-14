@@ -139,6 +139,11 @@
 
 {% if not neu %}
 <form id="delete-form" method="post" action="{{ url_for('installations.delete_teil', teil_id=teil.id) }}" class="d-none"></form>
+<div class="mt-3">
+  <a class="btn btn-outline-primary" href="{{ url_for('protocols.new_protocol', anlagenteil_id=teil.id) }}">
+    + Messprotokoll für diesen Anlagenteil
+  </a>
+</div>
 {% endif %}
 
 {% if not neu and teil.typ == "Verteilung" %}
