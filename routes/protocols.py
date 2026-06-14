@@ -99,6 +99,14 @@ def _markiere_kontrollpflichtig(data: dict) -> None:
             anlagenteile.update(tid, {"kontroll_status": "offen"})
 
 
+def _protokoll_datum(messungen: list[dict]) -> str:
+    """Protokoll-Datum = frühestes Messpunkt-Datum. Ein Protokoll kann über
+    mehrere Tage geführt werden; relevant ist der erste Tag. ISO-Daten sortieren
+    chronologisch. Fallback heute, falls keine Zeile ein Datum hat."""
+    daten = [m.get("datum") for m in messungen if m.get("datum")]
+    return min(daten) if daten else date.today().isoformat()
+
+
 def _parse_messpunkte(form) -> list[dict]:
     """Liest die Messpunkt-Zeilen aus dem Formular.
 
@@ -149,15 +157,16 @@ def new_protocol():
             flash("Bitte eine Anlage wählen.", "warning")
             return redirect(url_for("protocols.new_protocol"))
 
+        messungen = _parse_messpunkte(request.form)
         data = {
             "anlage_id": anlage_id,
             "auftrag_id": request.form.get("auftrag_id", "").strip() or None,
             "anlagenteil_id": request.form.get("anlagenteil_id", "").strip() or None,
-            "datum": request.form.get("datum", "").strip() or date.today().isoformat(),
+            "datum": _protokoll_datum(messungen),
             "monteur": request.form.get("monteur", "").strip(),
             "messgeraet_ids": request.form.getlist("messgeraet_ids"),
             "bemerkungen": request.form.get("bemerkungen", "").strip(),
-            "messungen": _parse_messpunkte(request.form),
+            "messungen": messungen,
         }
         if not data["messungen"]:
             flash("Mindestens ein Messpunkt muss erfasst werden.", "warning")
@@ -186,7 +195,7 @@ def new_protocol():
         ]
         messungen = [_messpunkt_aus_teil(t, datum_heute, default_pruefer) for t in relevante_teile]
         if not messungen:
-            messungen = [{"pruefer": default_pruefer} for _ in range(3)]
+            messungen = [{"pruefer": default_pruefer, "datum": datum_heute} for _ in range(3)]
         protokoll = {
             "datum": datum_heute,
             "auftrag_id": auftrag_id,
@@ -266,14 +275,15 @@ def edit_protocol(protokoll_id: str):
     anlage = anlagen.get(p.get("anlage_id"))
 
     if request.method == "POST":
+        messungen = _parse_messpunkte(request.form)
         data = {
             "anlage_id": request.form.get("anlage_id", p["anlage_id"]),
             "anlagenteil_id": request.form.get("anlagenteil_id", "").strip() or None,
-            "datum": request.form.get("datum", "").strip() or p.get("datum"),
+            "datum": _protokoll_datum(messungen) if messungen else p.get("datum"),
             "monteur": request.form.get("monteur", "").strip(),
             "messgeraet_ids": request.form.getlist("messgeraet_ids"),
             "bemerkungen": request.form.get("bemerkungen", "").strip(),
-            "messungen": _parse_messpunkte(request.form),
+            "messungen": messungen,
         }
         # Altes Single-Field beim Edit aufraeumen
         data["messgeraet_id"] = None

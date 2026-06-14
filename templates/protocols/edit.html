@@ -56,10 +56,6 @@
         </select>
       </div>
       <div class="col-md-3">
-        <label class="form-label">Protokoll-Datum</label>
-        <input type="date" name="datum" class="form-control" value="{{ protokoll.datum or '' }}">
-      </div>
-      <div class="col-md-3">
         <label class="form-label">Monteur (Default für Prüfer-Spalte)</label>
         <select name="monteur" class="form-select">
           <option value="">— wählen —</option>
@@ -105,10 +101,11 @@
     </div>
   </div>
 
-  <div class="d-flex justify-content-between align-items-center mb-2">
+  <div class="d-flex justify-content-between align-items-center mb-1">
     <h2 class="h5 m-0">Messpunkte</h2>
     <button type="button" class="btn btn-sm btn-outline-primary" onclick="addRow()">+ Zeile</button>
   </div>
+  <p class="text-muted small mb-2">Jede Zeile hat ein eigenes Datum — ein Protokoll kann über mehrere Tage laufen. Das Protokoll-Datum entspricht dem frühesten Zeilendatum.</p>
 
   <div class="card">
     <div class="table-responsive">
@@ -132,7 +129,9 @@
           <tr>
             {% for f in messpunkt_felder %}
             <td>
-              {% if f.name == 'pruefer' %}
+              {% if f.name == 'datum' %}
+                <input type="date" name="messpunkt_datum" class="form-control form-control-sm" value="{{ m.get('datum', '') }}">
+              {% elif f.name == 'pruefer' %}
                 {{ pruefer_select(m.get('pruefer') or protokoll.monteur, alle_monteure) }}
               {% elif f.input in select_optionen %}
                 <select name="messpunkt_{{ f.name }}" class="form-select form-select-sm">
@@ -164,7 +163,9 @@
   <tr>
     {% for f in messpunkt_felder %}
     <td>
-      {% if f.name == 'pruefer' %}
+      {% if f.name == 'datum' %}
+        <input type="date" name="messpunkt_datum" class="form-control form-control-sm" value="{{ protokoll.datum or '' }}">
+      {% elif f.name == 'pruefer' %}
         {{ pruefer_select(protokoll.monteur, alle_monteure) }}
       {% elif f.input in select_optionen %}
         <select name="messpunkt_{{ f.name }}" class="form-select form-select-sm">
