@@ -50,6 +50,7 @@
           <td>
             <a href="{{ url_for('installations.edit_teil', teil_id=t.id) }}" class="text-decoration-none fw-semibold">{{ t.bezeichnung }}</a>
             {% if fi_erforderlich(t.typ) == True %}<span class="badge bg-danger ms-1" title="FI/RCD nach NIN erforderlich">FI</span>{% endif %}
+            {% if t.typ == 'Verteilung' and t.anhang %}<span class="badge bg-info text-dark ms-1" title="Foto / Legende / Schema">📎 {{ t.anhang|length }}</span>{% endif %}
             {% if t.beschreibung %}<div class="text-muted small">{{ t.beschreibung }}</div>{% endif %}
           </td>
           <td>

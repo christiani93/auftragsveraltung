@@ -141,6 +141,49 @@
 <form id="delete-form" method="post" action="{{ url_for('installations.delete_teil', teil_id=teil.id) }}" class="d-none"></form>
 {% endif %}
 
+{% if not neu and teil.typ == "Verteilung" %}
+<div class="card card-body mt-3">
+  <h2 class="h5 mb-1">Dokumentation der Verteilung</h2>
+  <p class="text-muted small mb-3">Foto, Legende und Schema — Bilder (werden auf 1920 px verkleinert) oder PDF.</p>
+  <div class="row g-3">
+    {% for key, label in teil_datei_kategorien.items() %}
+    {% set dateien = (teil.anhang or [])|selectattr('kategorie', 'equalto', key)|list %}
+    <div class="col-md-4">
+      <div class="border rounded p-2 h-100 d-flex flex-column">
+        <div class="fw-semibold mb-2">
+          {{ label }}{% if dateien %} <span class="badge bg-secondary">{{ dateien|length }}</span>{% endif %}
+        </div>
+        {% for d in dateien %}
+        <div class="mb-2">
+          {% if d.mime == 'application/pdf' %}
+          <a href="{{ url_for('installations.show_teil_datei', teil_id=teil.id, datei_id=d.id) }}" target="_blank" class="d-block small text-truncate">📄 {{ d.original_name }}</a>
+          {% else %}
+          <a href="{{ url_for('installations.show_teil_datei', teil_id=teil.id, datei_id=d.id) }}" target="_blank">
+            <img src="{{ url_for('installations.show_teil_datei', teil_id=teil.id, datei_id=d.id) }}"
+                 alt="{{ label }}" loading="lazy" class="img-fluid rounded border"
+                 style="max-height: 140px; width: 100%; object-fit: cover;">
+          </a>
+          {% endif %}
+          <form method="post" action="{{ url_for('installations.delete_teil_datei', teil_id=teil.id, datei_id=d.id) }}"
+                onsubmit="return confirm('Datei löschen?');">
+            <button type="submit" class="btn btn-sm btn-outline-danger w-100 mt-1" style="font-size:0.75rem;">Löschen</button>
+          </form>
+        </div>
+        {% endfor %}
+        <form method="post" action="{{ url_for('installations.upload_teil_datei', teil_id=teil.id, kategorie=key) }}"
+              enctype="multipart/form-data" class="mt-auto pt-1">
+          <input type="file" name="dateien" class="form-control form-control-sm mb-1" accept="image/*,application/pdf" multiple required>
+          <button type="submit" class="btn btn-sm btn-primary w-100">+ {{ label }} hochladen</button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% elif neu %}
+<p class="text-muted small mt-2">Foto, Legende und Schema lassen sich nach dem Speichern hinzufügen (nur bei Verteilungen).</p>
+{% endif %}
+
 <script>
   // FI-Hinweis live aktualisieren wenn Typ geändert wird
   document.getElementById("typ-select").addEventListener("change", (e) => {
