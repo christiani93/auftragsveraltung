@@ -88,27 +88,51 @@ def _typ_aus_installation(name: str) -> str:
     return "Endstromkreis mit Steckdosen"
 
 
+def _teil_indizes(anlage_id: str) -> tuple[dict, dict]:
+    """Indizes der Anlagenteile fuer das Matching von Messpunkten.
+
+    by_sicherung: {(parent_id, sicherungsnr): teil} — primaeres, eindeutiges
+        Kriterium (Sicherungsnummer im Kontext der jeweiligen Verteilung).
+    by_name: {bezeichnung|'bezeichnung – beschreibung': teil} — Fallback.
+    """
+    by_sicherung: dict = {}
+    by_name: dict = {}
+    for t in anlagenteile_fuer_anlage(anlage_id):
+        snr = (t.get("sicherungsnr") or "").strip().lower()
+        if snr:
+            by_sicherung.setdefault((t.get("parent_id"), snr), t)
+        bez = (t.get("bezeichnung") or "").strip()
+        if bez:
+            by_name.setdefault(bez.lower(), t)
+            if t.get("beschreibung"):
+                by_name.setdefault(f"{bez} – {t['beschreibung']}".strip().lower(), t)
+    return by_sicherung, by_name
+
+
+def _finde_teil_fuer_messpunkt(m: dict, parent_id: str | None, by_sicherung: dict, by_name: dict) -> dict | None:
+    """Ordnet einen Messpunkt einem bestehenden Anlagenteil zu — primaer ueber
+    die Sicherungsnummer (im Kontext der Verteilung), sonst ueber den Namen."""
+    snr = (m.get("sicherungsnr") or "").strip().lower()
+    if snr:
+        t = by_sicherung.get((parent_id, snr))
+        if t:
+            return t
+    name = (m.get("installation") or "").strip().lower()
+    return by_name.get(name) if name else None
+
+
 def _aufbau_aus_messpunkten(anlage_id: str, messungen: list[dict], parent_id: str | None) -> tuple[int, int]:
     """Ergänzt den Anlagenaufbau aus den Messpunkten.
 
-    - Bestehende Anlagenteile werden per Name gematcht (Bezeichnung, oder
-      'Bezeichnung – Beschreibung' wie in der Vorbefüllung) und nur in LEEREN
-      technischen Feldern ergänzt — nie überschrieben.
+    - Bestehende Anlagenteile werden zuerst über die Sicherungsnummer (im
+      Kontext der Verteilung) gematcht, sonst über den Namen — und nur in
+      LEEREN technischen Feldern ergänzt, nie überschrieben.
     - Fehlende Anlagenteile werden angelegt; Typ aus 'Installation / Ort'
-      (UV/Verteilung vs. Endstromkreis). Neue Teile hängen unter parent_id
-      (das im Protokoll gewählte Anlagenteil), falls gesetzt.
-    Liefert (angelegt, aktualisiert). Idempotent — erneutes Speichern legt
-    nichts doppelt an.
+      (UV/Verteilung vs. Endstromkreis). Neue Teile hängen unter parent_id.
+      Die Stromstärke (Schutzorgan-Nennstrom) wird als stromstaerke_a übernommen.
+    Liefert (angelegt, aktualisiert). Idempotent.
     """
-    by_name: dict[str, dict] = {}
-    for t in anlagenteile_fuer_anlage(anlage_id):
-        bez = (t.get("bezeichnung") or "").strip()
-        if not bez:
-            continue
-        by_name.setdefault(bez.lower(), t)
-        if t.get("beschreibung"):
-            by_name.setdefault(f"{bez} – {t['beschreibung']}".strip().lower(), t)
-
+    by_sicherung, by_name = _teil_indizes(anlage_id)
     angelegt = aktualisiert = 0
     for m in messungen:
         name = (m.get("installation") or "").strip()
@@ -119,12 +143,12 @@ def _aufbau_aus_messpunkten(anlage_id: str, messungen: list[dict], parent_id: st
             "sicherungsnr": (m.get("sicherungsnr") or "").strip(),
             "sicherungstyp": (m.get("sicherungstyp") or "").strip(),
             "fi_typ_ma": (m.get("fi_typ_ma") or "").strip(),
-            "sicherung_a": (m.get("sicherung_a") or "").strip(),
+            # Schutzorgan-Nennstrom als Stromstärke des Teils übernehmen
+            "stromstaerke_a": (m.get("sicherung_a") or "").strip(),
         }
-        key = name.lower()
-        bestehend = by_name.get(key)
+        bestehend = _finde_teil_fuer_messpunkt(m, parent_id, by_sicherung, by_name)
         if bestehend:
-            updates = {k: v for k, v in tech.items() if v and not (bestehend.get(k) or "").strip()}
+            updates = {k: v for k, v in tech.items() if v and not str(bestehend.get(k) or "").strip()}
             if updates:
                 anlagenteile.update(bestehend["id"], updates)
                 aktualisiert += 1
@@ -137,7 +161,6 @@ def _aufbau_aus_messpunkten(anlage_id: str, messungen: list[dict], parent_id: st
                 "beschreibung": "",
                 "spannung": None,
                 "leistung_kw": None,
-                "stromstaerke_a": None,
                 # Aus einem Messprotokoll angelegt = frisch gemessen, also
                 # kontrollpflichtig (nicht geprueft) — der Kontrolleur muss ran.
                 "kontroll_status": "offen",
@@ -145,9 +168,46 @@ def _aufbau_aus_messpunkten(anlage_id: str, messungen: list[dict], parent_id: st
                 **tech,
             }
             created = anlagenteile.create(neu)
-            by_name[key] = created
+            snr = (created.get("sicherungsnr") or "").strip().lower()
+            if snr:
+                by_sicherung[(created.get("parent_id"), snr)] = created
+            by_name[name.lower()] = created
             angelegt += 1
     return angelegt, aktualisiert
+
+
+def _teile_als_geprueft_markieren(p: dict) -> int:
+    """Setzt alle im Protokoll aufgeführten Anlagenteile (inkl. der Verteilung,
+    auf der das Protokoll erfasst wurde) auf 'geprueft'. Zuordnung via
+    Sicherungsnummer bzw. Name. Liefert die Anzahl gesetzter Teile."""
+    anlage_id = p.get("anlage_id")
+    if not anlage_id:
+        return 0
+    by_sicherung, by_name = _teil_indizes(anlage_id)
+    parent_id = p.get("anlagenteil_id")
+    datum = p.get("datum") or date.today().isoformat()
+    kontrolleur = p.get("monteur") or ""
+    gesehen: set = set()
+
+    def _setze(teil_id: str) -> None:
+        anlagenteile.update(teil_id, {
+            "kontroll_status": "geprueft",
+            "letzte_kontrolle": datum,
+            "kontrolleur": kontrolleur,
+        })
+
+    for m in p.get("messungen", []):
+        teil = _finde_teil_fuer_messpunkt(m, parent_id, by_sicherung, by_name)
+        if teil and teil["id"] not in gesehen:
+            gesehen.add(teil["id"])
+            _setze(teil["id"])
+    # Die Verteilung selbst (auf der erfasst wurde) ebenfalls als geprueft.
+    if parent_id and parent_id not in gesehen:
+        verteilung = anlagenteile.get(parent_id)
+        if verteilung:
+            gesehen.add(parent_id)
+            _setze(parent_id)
+    return len(gesehen)
 
 
 def _markiere_kontrollpflichtig(data: dict) -> None:
@@ -327,6 +387,29 @@ def detail(protokoll_id: str):
         messpunkt_felder=MESSPUNKT_FELDER,
         dokumentierte_teile=dokumentierte_teile,
     )
+
+
+@bp.route("/<protokoll_id>/geprueft", methods=["POST"])
+def set_geprueft(protokoll_id: str):
+    """Protokoll als geprüft markieren (oder Markierung entfernen). Beim Setzen
+    werden die im Protokoll aufgeführten Anlagenteile auf 'geprueft' gesetzt."""
+    p = messprotokolle.get(protokoll_id)
+    if not p:
+        abort(404)
+    geprueft = request.form.get("geprueft") == "1"
+    update = {"geprueft": geprueft}
+    if geprueft:
+        update["geprueft_am"] = date.today().isoformat()
+        update["geprueft_von"] = current_user.name
+        messprotokolle.update(protokoll_id, update)
+        anzahl = _teile_als_geprueft_markieren(p)
+        flash(f"Protokoll als geprüft markiert — {anzahl} Anlagenteil(e) auf 'geprüft' gesetzt.", "success")
+    else:
+        update["geprueft_am"] = None
+        update["geprueft_von"] = None
+        messprotokolle.update(protokoll_id, update)
+        flash("Prüf-Markierung entfernt (Anlagenteile bleiben unverändert).", "info")
+    return redirect(url_for("protocols.detail", protokoll_id=protokoll_id))
 
 
 def _gruppen_spans():

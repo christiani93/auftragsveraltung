@@ -9,14 +9,32 @@
       {% if anlage %}<a href="{{ url_for('installations.detail', anlage_id=anlage.id) }}">{{ anlage.bezeichnung }}</a> ›{% endif %}
       Messprotokoll
     </div>
-    <h1 class="h3 m-0">Messprotokoll vom {{ protokoll.datum }}</h1>
+    <h1 class="h3 m-0">
+      Messprotokoll vom {{ protokoll.datum }}
+      {% if protokoll.geprueft %}<span class="badge bg-success align-middle">✓ Geprüft</span>{% endif %}
+    </h1>
   </div>
   <div class="d-flex gap-2 flex-wrap">
+    {% if protokoll.geprueft %}
+    <form method="post" action="{{ url_for('protocols.set_geprueft', protokoll_id=protokoll.id) }}">
+      <input type="hidden" name="geprueft" value="0">
+      <button type="submit" class="btn btn-outline-secondary">Prüf-Markierung entfernen</button>
+    </form>
+    {% else %}
+    <form method="post" action="{{ url_for('protocols.set_geprueft', protokoll_id=protokoll.id) }}"
+          onsubmit="return confirm('Protokoll als geprüft markieren? Die aufgeführten Anlagenteile werden auf geprüft gesetzt.');">
+      <input type="hidden" name="geprueft" value="1">
+      <button type="submit" class="btn btn-success">✓ Als geprüft markieren</button>
+    </form>
+    {% endif %}
     <a class="btn btn-outline-secondary" href="{{ url_for('protocols.edit_protocol', protokoll_id=protokoll.id) }}">Bearbeiten</a>
     <a class="btn btn-outline-dark" href="{{ url_for('pdf.messprotokoll_einzeln', protokoll_id=protokoll.id) }}" target="_blank">📄 PDF</a>
     <button class="btn btn-outline-primary" onclick="window.print()">Drucken (Browser)</button>
   </div>
 </div>
+{% if protokoll.geprueft and protokoll.geprueft_am %}
+<div class="alert alert-success py-2 no-print">Geprüft am {{ protokoll.geprueft_am }}{% if protokoll.geprueft_von %} von {{ protokoll.geprueft_von }}{% endif %}.</div>
+{% endif %}
 
 <div class="print-header d-none d-print-block mb-3">
   <h2>Messprotokoll</h2>
