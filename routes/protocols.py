@@ -36,6 +36,23 @@ def _messgeraet_ids_of(protokoll: dict) -> list[str]:
 bp = Blueprint("protocols", __name__)
 
 
+def _kunden_index() -> dict:
+    return {k["id"]: k for k in kunden.list()}
+
+
+def _anlagen_sortiert() -> list:
+    """Anlagen sortiert nach Kundenname, dann Bezeichnung — fuer die Auswahl,
+    damit gleichnamige Anlagen verschiedener Kunden unterscheidbar bleiben."""
+    idx = _kunden_index()
+    return sorted(
+        anlagen.list(),
+        key=lambda a: (
+            (idx.get(a.get("kunde_id")) or {}).get("name", "").lower(),
+            a.get("bezeichnung", "").lower(),
+        ),
+    )
+
+
 def _messpunkt_aus_teil(teil: dict, datum: str, pruefer: str = "") -> dict:
     """Erzeugt eine vorausgefüllte Messpunkt-Zeile aus einem Anlagenteil."""
     installation = teil.get("bezeichnung", "")
@@ -147,7 +164,7 @@ def new_protocol():
             return render_template(
                 "protocols/edit.html",
                 protokoll=data, anlage=anlage, auftrag=auftrag,
-                alle_anlagen=anlagen.list(),
+                alle_anlagen=_anlagen_sortiert(), kunden_index=_kunden_index(),
                 alle_messgeraete=messgeraete_fuer_user(current_user.username, current_user.is_admin),
                 teile_der_anlage=anlagenteile_fuer_anlage(anlage_id) if anlage else [],
                 alle_monteure=list_monteure(), messpunkt_felder=MESSPUNKT_FELDER, select_optionen=SELECT_OPTIONEN, neu=True,
@@ -196,7 +213,7 @@ def new_protocol():
         "protocols/edit.html",
         protokoll=protokoll,
         anlage=anlage, auftrag=auftrag, vorausgewaehlter_teil=teil,
-        alle_anlagen=anlagen.list(),
+        alle_anlagen=_anlagen_sortiert(), kunden_index=_kunden_index(),
         alle_messgeraete=messgeraete_fuer_user(current_user.username, current_user.is_admin),
         teile_der_anlage=anlagenteile_fuer_anlage(anlage_id) if anlage else [],
         alle_monteure=list_monteure(), messpunkt_felder=MESSPUNKT_FELDER, select_optionen=SELECT_OPTIONEN, neu=True,
@@ -269,7 +286,7 @@ def edit_protocol(protokoll_id: str):
     return render_template(
         "protocols/edit.html",
         protokoll=p, anlage=anlage,
-        alle_anlagen=anlagen.list(),
+        alle_anlagen=_anlagen_sortiert(), kunden_index=_kunden_index(),
         alle_messgeraete=messgeraete_fuer_user(current_user.username, current_user.is_admin),
         teile_der_anlage=anlagenteile_fuer_anlage(anlage["id"]) if anlage else [],
         alle_monteure=list_monteure(), messpunkt_felder=MESSPUNKT_FELDER, select_optionen=SELECT_OPTIONEN, neu=False,

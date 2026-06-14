@@ -39,8 +39,9 @@
         <select name="anlage_id" class="form-select" required>
           <option value="">— wählen —</option>
           {% for a in alle_anlagen %}
+          {% set k = kunden_index.get(a.kunde_id) %}
           <option value="{{ a.id }}" {% if (anlage and anlage.id == a.id) or protokoll.anlage_id == a.id %}selected{% endif %}>
-            {{ a.bezeichnung }}{% if a.standort %} – {{ a.standort }}{% endif %}
+            {% if k %}{{ k.name }} – {% endif %}{{ a.bezeichnung }}{% if a.standort %} ({{ a.standort }}){% endif %}
           </option>
           {% endfor %}
         </select>
