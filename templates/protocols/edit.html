@@ -18,6 +18,18 @@
 </div>
 {% endif %}
 
+{% macro pruefer_select(selected, monteure) %}
+<select name="messpunkt_pruefer" class="form-select form-select-sm">
+  <option value="">— Prüfer —</option>
+  {% for u in monteure %}
+  <option value="{{ u.name }}" {% if selected == u.name %}selected{% endif %}>{{ u.name }}</option>
+  {% endfor %}
+  {% if selected and selected not in monteure|map(attribute='name')|list %}
+  <option value="{{ selected }}" selected>{{ selected }}</option>
+  {% endif %}
+</select>
+{% endmacro %}
+
 <form method="post">
   {% if protokoll.auftrag_id %}<input type="hidden" name="auftrag_id" value="{{ protokoll.auftrag_id }}">{% endif %}
   <div class="card card-body mb-3">
@@ -119,7 +131,9 @@
           <tr>
             {% for f in messpunkt_felder %}
             <td>
-              {% if f.input in select_optionen %}
+              {% if f.name == 'pruefer' %}
+                {{ pruefer_select(m.get('pruefer') or protokoll.monteur, alle_monteure) }}
+              {% elif f.input in select_optionen %}
                 <select name="messpunkt_{{ f.name }}" class="form-select form-select-sm">
                   {% for opt in select_optionen[f.input] %}
                   <option value="{{ opt }}" {% if (m.get(f.name) or '') == opt %}selected{% endif %}>{{ opt or '—' }}</option>
@@ -149,7 +163,9 @@
   <tr>
     {% for f in messpunkt_felder %}
     <td>
-      {% if f.input in select_optionen %}
+      {% if f.name == 'pruefer' %}
+        {{ pruefer_select(protokoll.monteur, alle_monteure) }}
+      {% elif f.input in select_optionen %}
         <select name="messpunkt_{{ f.name }}" class="form-select form-select-sm">
           {% for opt in select_optionen[f.input] %}
           <option value="{{ opt }}">{{ opt or '—' }}</option>
