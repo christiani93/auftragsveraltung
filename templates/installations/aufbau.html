@@ -25,12 +25,35 @@
 </div>
 
 {% macro fmt_eigene(node) %}
-  {% if node.eingabe_kw is not none %}
-    {{ '%.2f'|format(node.eingabe_kw) }} kW
-  {% elif node.eingabe_a is not none %}
-    {{ '%.1f'|format(node.eingabe_a) }} A
+  {% set z = node.anzeige %}
+  {% if z.kw is not none or z.a is not none %}
+    {% if z.kw is not none %}
+      <div>{{ '%.2f'|format(z.kw) }} kW{% if z.kw_berechnet %} <span class="text-muted" title="berechnet aus Strom × Spannung (cos φ = 1)">≈</span>{% endif %}</div>
+    {% endif %}
+    {% if z.a is not none %}
+      <div>{{ '%.1f'|format(z.a) }} A{% if z.a_berechnet %} <span class="text-muted" title="berechnet aus Leistung ÷ Spannung (cos φ = 1)">≈</span>{% endif %}</div>
+    {% endif %}
   {% else %}
     <span class="text-muted">—</span>
+  {% endif %}
+{% endmacro %}
+
+{% macro anhang_galerie(teil) %}
+  {% if teil.anhang %}
+  <div class="d-flex flex-wrap gap-1 mt-1">
+    {% for d in teil.anhang %}
+      {% if d.mime == 'application/pdf' %}
+      <a href="{{ url_for('installations.show_teil_datei', teil_id=teil.id, datei_id=d.id) }}" target="_blank"
+         class="badge bg-light text-dark border text-decoration-none" title="{{ d.kategorie }}">📄 {{ d.kategorie }}</a>
+      {% else %}
+      <a href="{{ url_for('installations.show_teil_datei', teil_id=teil.id, datei_id=d.id) }}" target="_blank" title="{{ d.kategorie }}">
+        <img src="{{ url_for('installations.show_teil_datei', teil_id=teil.id, datei_id=d.id) }}"
+             alt="{{ d.kategorie }}" loading="lazy" class="rounded border"
+             style="height: 48px; width: 48px; object-fit: cover;">
+      </a>
+      {% endif %}
+    {% endfor %}
+  </div>
   {% endif %}
 {% endmacro %}
 
@@ -45,6 +68,7 @@
         {% if fi == True %}<span class="badge bg-danger me-1" title="FI/RCD nach NIN erforderlich">FI</span>{% endif %}
         <a href="{{ url_for('installations.edit_teil', teil_id=teil.id) }}" class="fw-semibold text-decoration-none">{{ teil.bezeichnung }}</a>
         {% if teil.beschreibung %}<span class="text-muted small">– {{ teil.beschreibung }}</span>{% endif %}
+        {{ anhang_galerie(teil) }}
       </div>
     </td>
     <td>{% if teil.spannung %}<span class="badge bg-light text-dark border">{{ teil.spannung }}</span>{% else %}<span class="text-muted">—</span>{% endif %}</td>

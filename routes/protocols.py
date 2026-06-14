@@ -13,6 +13,7 @@ from models.repos import (
     anlagen,
     anlagenteile,
     anlagenteile_fuer_anlage,
+    anlagenteile_mit_anhang,
     auftraege,
     kunden,
     messgeraete,
@@ -199,10 +200,12 @@ def detail(protokoll_id: str):
     geraete = [messgeraete.get(gid) for gid in ids]
     geraete = [g for g in geraete if g]
     auftrag = auftraege.get(p.get("auftrag_id")) if p.get("auftrag_id") else None
+    dokumentierte_teile = anlagenteile_mit_anhang(anlage["id"]) if anlage else []
     return render_template(
         "protocols/detail.html",
         protokoll=p, anlage=anlage, kunde=kunde, geraete=geraete, auftrag=auftrag,
         messpunkt_felder=MESSPUNKT_FELDER,
+        dokumentierte_teile=dokumentierte_teile,
     )
 
 

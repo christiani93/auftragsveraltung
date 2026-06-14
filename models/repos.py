@@ -167,6 +167,13 @@ def anlagenteile_fuer_anlage(anlage_id: str) -> List[Dict[str, Any]]:
     return anlagenteile.filter(anlage_id=anlage_id)
 
 
+def anlagenteile_mit_anhang(anlage_id: str) -> List[Dict[str, Any]]:
+    """Anlagenteile einer Anlage mit Datei-Anhaengen (Foto/Legende/Schema)."""
+    teile = [t for t in anlagenteile_fuer_anlage(anlage_id) if t.get("anhang")]
+    teile.sort(key=lambda t: (t.get("typ", ""), t.get("bezeichnung", "")))
+    return teile
+
+
 def messprotokolle_fuer_anlage(anlage_id: str) -> List[Dict[str, Any]]:
     return [m for m in messprotokolle.list() if m.get("anlage_id") == anlage_id]
 
@@ -333,6 +340,28 @@ def leistung_aus_strom(strom_a: Optional[float], spannung: Optional[str]) -> Opt
     return None
 
 
+def anzeige_last(teil: Dict[str, Any]) -> Dict[str, Any]:
+    """Anzeige-Werte fuer Leistung (kW) und Strom (A) eines Anlagenteils.
+
+    Zeigt beide Groessen. Fehlt eine, wird sie aus der anderen mit der
+    angegebenen Spannung berechnet (cos φ = 1) und als 'berechnet' markiert.
+    Ohne Spannung bleibt die fehlende Groesse None.
+    """
+    kw_in = _to_float(teil.get("leistung_kw"))
+    a_in = _to_float(teil.get("stromstaerke_a"))
+    spannung = teil.get("spannung")
+    kw, a = kw_in, a_in
+    kw_berechnet = False
+    a_berechnet = False
+    if kw_in is None and a_in is not None:
+        kw = leistung_aus_strom(a_in, spannung)
+        kw_berechnet = kw is not None
+    if a_in is None and kw_in is not None:
+        a = strom_aus_leistung(kw_in, spannung)
+        a_berechnet = a is not None
+    return {"kw": kw, "a": a, "kw_berechnet": kw_berechnet, "a_berechnet": a_berechnet}
+
+
 def teil_last_kw(teil: Dict[str, Any]) -> Optional[float]:
     """Last eines Anlagenteils in kW — direkt erfasste Leistung,
     oder aus Stromstärke + Spannung umgerechnet. Nur wenn nötig.
@@ -369,6 +398,7 @@ def baue_aufbau_baum(anlage_id: str) -> List[Dict[str, Any]]:
             "children": [],
             "eingabe_kw": _to_float(t.get("leistung_kw")),
             "eingabe_a": _to_float(t.get("stromstaerke_a")),
+            "anzeige": anzeige_last(t),
         }
         for t in teile
     }
