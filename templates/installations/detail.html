@@ -27,15 +27,53 @@
   <a class="btn btn-sm btn-primary" href="{{ url_for('installations.new_teil', anlage_id=anlage.id) }}">+ Anlagenteil</a>
 </div>
 
+{% macro render_teil(node, depth) %}
+  {% set t = node.teil %}
+  <tr>
+    <td><span class="badge bg-secondary">{{ t.typ }}</span></td>
+    <td>
+      <div style="padding-left: {{ depth * 22 }}px;">
+        {% if depth > 0 %}<span class="text-muted">└─ </span>{% endif %}
+        <a href="{{ url_for('installations.edit_teil', teil_id=t.id) }}" class="text-decoration-none fw-semibold">{{ t.bezeichnung }}</a>
+        {% if fi_erforderlich(t.typ) == True %}<span class="badge bg-danger ms-1" title="FI/RCD nach NIN erforderlich">FI</span>{% endif %}
+        {% if t.typ == 'Verteilung' and t.anhang %}<span class="badge bg-info text-dark ms-1" title="Foto / Legende / Schema">📎 {{ t.anhang|length }}</span>{% endif %}
+        {% if t.beschreibung %}<div class="text-muted small">{{ t.beschreibung }}</div>{% endif %}
+      </div>
+    </td>
+    <td>{% if t.spannung %}<span class="badge bg-light text-dark border">{{ t.spannung }}</span>{% else %}<span class="text-muted">—</span>{% endif %}</td>
+    <td class="text-end small">
+      {% if t.leistung_kw %}{{ t.leistung_kw }} kW{% endif %}
+      {% if t.leistung_kw and t.stromstaerke_a %} · {% endif %}
+      {% if t.stromstaerke_a %}{{ t.stromstaerke_a }} A{% endif %}
+      {% if not t.leistung_kw and not t.stromstaerke_a %}<span class="text-muted">—</span>{% endif %}
+    </td>
+    <td><span class="badge badge-status-{{ t.kontroll_status }}">{{ kontroll_status_label[t.kontroll_status] }}</span></td>
+    <td>{{ t.letzte_kontrolle or '—' }}</td>
+    <td class="text-end">
+      <form method="post" action="{{ url_for('installations.set_teil_status', teil_id=t.id) }}" class="d-inline">
+        <input type="hidden" name="status" value="geprueft">
+        <button type="submit" class="btn btn-sm btn-outline-success" title="Als geprüft markieren (heute)">✓</button>
+      </form>
+      <form method="post" action="{{ url_for('installations.set_teil_status', teil_id=t.id) }}" class="d-inline">
+        <input type="hidden" name="status" value="maengel">
+        <button type="submit" class="btn btn-sm btn-outline-danger" title="Mängel">⚠</button>
+      </form>
+      <a class="btn btn-sm btn-outline-primary" href="{{ url_for('protocols.new_protocol', anlagenteil_id=t.id) }}" title="Messprotokoll für diesen Anlagenteil">+ MP</a>
+    </td>
+  </tr>
+  {% for child in node.children|sort(attribute='teil.bezeichnung') %}
+    {{ render_teil(child, depth + 1) }}
+  {% endfor %}
+{% endmacro %}
+
 {% if teile %}
 <div class="card">
   <div class="table-responsive">
-    <table class="table table-kompakt table-hover m-0">
+    <table class="table table-kompakt table-hover m-0 align-middle">
       <thead class="table-light">
         <tr>
           <th>Typ</th>
           <th>Bezeichnung</th>
-          <th>Ab Verteilung</th>
           <th>Spannung</th>
           <th class="text-end">Leistung / Strom</th>
           <th>Status</th>
@@ -44,43 +82,8 @@
         </tr>
       </thead>
       <tbody>
-        {% for t in teile %}
-        <tr>
-          <td><span class="badge bg-secondary">{{ t.typ }}</span></td>
-          <td>
-            <a href="{{ url_for('installations.edit_teil', teil_id=t.id) }}" class="text-decoration-none fw-semibold">{{ t.bezeichnung }}</a>
-            {% if fi_erforderlich(t.typ) == True %}<span class="badge bg-danger ms-1" title="FI/RCD nach NIN erforderlich">FI</span>{% endif %}
-            {% if t.typ == 'Verteilung' and t.anhang %}<span class="badge bg-info text-dark ms-1" title="Foto / Legende / Schema">📎 {{ t.anhang|length }}</span>{% endif %}
-            {% if t.beschreibung %}<div class="text-muted small">{{ t.beschreibung }}</div>{% endif %}
-          </td>
-          <td>
-            {% if t.parent_id and teile_by_id.get(t.parent_id) %}
-              <span class="small">{{ teile_by_id[t.parent_id].bezeichnung }}</span>
-            {% else %}
-              <span class="text-muted small">—</span>
-            {% endif %}
-          </td>
-          <td>{% if t.spannung %}<span class="badge bg-light text-dark border">{{ t.spannung }}</span>{% else %}<span class="text-muted">—</span>{% endif %}</td>
-          <td class="text-end small">
-            {% if t.leistung_kw %}{{ t.leistung_kw }} kW{% endif %}
-            {% if t.leistung_kw and t.stromstaerke_a %} · {% endif %}
-            {% if t.stromstaerke_a %}{{ t.stromstaerke_a }} A{% endif %}
-            {% if not t.leistung_kw and not t.stromstaerke_a %}<span class="text-muted">—</span>{% endif %}
-          </td>
-          <td><span class="badge badge-status-{{ t.kontroll_status }}">{{ kontroll_status_label[t.kontroll_status] }}</span></td>
-          <td>{{ t.letzte_kontrolle or '—' }}</td>
-          <td class="text-end">
-            <form method="post" action="{{ url_for('installations.set_teil_status', teil_id=t.id) }}" class="d-inline">
-              <input type="hidden" name="status" value="geprueft">
-              <button type="submit" class="btn btn-sm btn-outline-success" title="Als geprüft markieren (heute)">✓</button>
-            </form>
-            <form method="post" action="{{ url_for('installations.set_teil_status', teil_id=t.id) }}" class="d-inline">
-              <input type="hidden" name="status" value="maengel">
-              <button type="submit" class="btn btn-sm btn-outline-danger" title="Mängel">⚠</button>
-            </form>
-            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('protocols.new_protocol', anlagenteil_id=t.id) }}" title="Messprotokoll für diesen Anlagenteil">+ MP</a>
-          </td>
-        </tr>
+        {% for root in roots|sort(attribute='teil.bezeichnung') %}
+          {{ render_teil(root, 0) }}
         {% endfor %}
       </tbody>
     </table>

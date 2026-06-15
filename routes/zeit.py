@@ -421,11 +421,25 @@ def heute():
             "dauer_h_live": dauer_h,
         })
 
-    # Auftragsliste fuer die Dropdowns (sichtbare, ohne 'erledigt' und 'abgerechnet')
+    # Aktueller Kunde = Kunde der laufenden Stempelung (falls vorhanden) — dessen
+    # Auftraege erscheinen in der Auswahl zuoberst.
+    aktueller_kunde_id = None
+    if aktive_fuer_karte:
+        a_akt = auftraege_idx.get(aktive_fuer_karte.get("auftrag_id") or "")
+        if a_akt:
+            aktueller_kunde_id = a_akt.get("kunde_id")
+
+    def _auftrag_sort_key(a):
+        k = kunden_idx.get(a.get("kunde_id"))
+        ist_aktueller = 0 if (aktueller_kunde_id and a.get("kunde_id") == aktueller_kunde_id) else 1
+        return (ist_aktueller, (k["name"].lower() if k else "￿"), (a.get("titel") or "").lower())
+
+    # Auftragsliste fuer die Dropdowns (sichtbare, ohne 'erledigt' und 'abgerechnet'):
+    # aktueller Kunde zuoberst, dann nach Kunde, dann nach Auftragstitel.
     sichtbare_auftraege = sorted(
         [a for a in auftraege.list()
          if _darf_auftrag_sehen(a) and a.get("status") not in ("erledigt", "abgerechnet")],
-        key=lambda a: (a.get("status") != "in_arbeit", a.get("status") != "offen", a.get("titel", "").lower()),
+        key=_auftrag_sort_key,
     )
     auftrag_optionen = []
     for a in sichtbare_auftraege:

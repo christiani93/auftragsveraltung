@@ -174,11 +174,12 @@ def detail(anlage_id: str):
     teile = anlagenteile_fuer_anlage(anlage_id)
     teile_by_id = {t["id"]: t for t in teile}
     teile.sort(key=lambda t: (t.get("typ", ""), t.get("bezeichnung", "")))
+    roots = baue_aufbau_baum(anlage_id)
     protokolle = messprotokolle_fuer_anlage(anlage_id)
     protokolle.sort(key=lambda p: p.get("datum", ""), reverse=True)
     return render_template(
         "installations/detail.html",
-        anlage=anlage, kunde=kunde, teile=teile, teile_by_id=teile_by_id,
+        anlage=anlage, kunde=kunde, teile=teile, teile_by_id=teile_by_id, roots=roots,
         protokolle=protokolle,
         kontroll_status_label=KONTROLL_STATUS_LABEL,
         spannung_label=SPANNUNG_LABEL,
