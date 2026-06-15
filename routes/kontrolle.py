@@ -8,7 +8,6 @@ from flask import Blueprint, abort, render_template
 from models.repos import (
     KONTROLL_STATUS_LABEL,
     REVISION_STATUS_LABEL,
-    anlagenteile,
     auftraege_in_revision,
     dashboard_data,
     kontroll_uebersicht_fuer_kunde,
@@ -43,31 +42,43 @@ def dashboard():
         row["r"].get("von") or "9999-12-31",
     ))
 
-    # Leistungsschalter-Wartungen, die dieses Jahr anstehen (inkl. überfälliger
-    # aus Vorjahren — die müssen ebenfalls noch erledigt werden).
+    # Leistungsschalter-Wartungen pro Kunde zusammengefasst — dieses und
+    # nächstes Jahr (inkl. überfälliger aus Vorjahren, die noch offen sind).
     jahr = date.today().year
-    teile_idx = {t["id"]: t for t in anlagenteile.list()}
-    wartung_rows = []
+    naechstes_jahr = jahr + 1
+    kunden_wartung: dict = {}
     for ls in leistungsschalter.list():
         st = wartung_status(ls)
         if not st["naechste"]:
             continue
-        if date.fromisoformat(st["naechste"]).year <= jahr:
-            wartung_rows.append({
-                "ls": ls,
-                "kunde": kunden_idx.get(ls.get("kunde_id")),
-                "anlagenteil": teile_idx.get(ls.get("anlagenteil_id")),
-                **st,
-            })
-    wartung_rows.sort(key=lambda r: r["naechste"])
+        y = date.fromisoformat(st["naechste"]).year
+        if y > naechstes_jahr:
+            continue
+        kid = ls.get("kunde_id")
+        g = kunden_wartung.setdefault(kid, {
+            "kunde": kunden_idx.get(kid),
+            "ueberfaellig": 0, "dieses": 0, "naechstes": 0, "total": 0,
+        })
+        if st["status"] == "ueberfaellig":
+            g["ueberfaellig"] += 1
+        elif y == jahr:
+            g["dieses"] += 1
+        elif y == naechstes_jahr:
+            g["naechstes"] += 1
+        g["total"] += 1
+    wartung_kunden = sorted(
+        kunden_wartung.values(),
+        key=lambda g: (-g["ueberfaellig"], -g["dieses"], (g["kunde"]["name"].lower() if g["kunde"] else "￿")),
+    )
 
     return render_template(
         "kontrolle/dashboard.html",
         revision_rows=rev_rows,
         revision_status_label=REVISION_STATUS_LABEL,
         kontroll_status_label=KONTROLL_STATUS_LABEL,
-        wartung_rows=wartung_rows,
+        wartung_kunden=wartung_kunden,
         wartung_jahr=jahr,
+        wartung_naechstes_jahr=naechstes_jahr,
         **data,
     )
 

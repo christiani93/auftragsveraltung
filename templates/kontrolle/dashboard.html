@@ -107,39 +107,28 @@
 </div>
 {% endif %}
 
-{% set wartung_badge = {'ueberfaellig': 'bg-danger', 'bald': 'bg-warning text-dark', 'ok': 'bg-success', 'unbekannt': 'bg-secondary'} %}
-{% set wartung_text = {'ueberfaellig': 'Überfällig', 'bald': 'Bald fällig', 'ok': 'Dieses Jahr', 'unbekannt': '—'} %}
-<h2 class="h5 mb-2 mt-4">Leistungsschalter-Wartungen {{ wartung_jahr }}</h2>
-{% if wartung_rows %}
+<h2 class="h5 mb-2 mt-4">Leistungsschalter-Wartungen {{ wartung_jahr }} / {{ wartung_naechstes_jahr }} — pro Kunde</h2>
+{% if wartung_kunden %}
 <div class="card mb-4">
   <div class="table-responsive">
-    <table class="table table-kompakt table-hover m-0">
+    <table class="table table-kompakt table-hover m-0 align-middle">
       <thead class="table-light">
         <tr>
-          <th>Status</th>
-          <th>Leistungsschalter</th>
-          <th>Kunde / Anlagenteil</th>
-          <th>Nächste Wartung</th>
+          <th>Kunde</th>
+          <th class="text-center">Überfällig</th>
+          <th class="text-center">{{ wartung_jahr }}</th>
+          <th class="text-center">{{ wartung_naechstes_jahr }}</th>
           <th></th>
         </tr>
       </thead>
       <tbody>
-        {% for w in wartung_rows %}
+        {% for g in wartung_kunden %}
         <tr>
-          <td><span class="badge {{ wartung_badge[w.status] }}">{{ wartung_text[w.status] }}</span></td>
-          <td class="fw-semibold"><a href="{{ url_for('leistungsschalter.edit_schalter', schalter_id=w.ls.id) }}" class="text-decoration-none">{{ w.ls.bezeichnung }}</a></td>
-          <td class="small">
-            {% if w.kunde %}{{ w.kunde.name }}{% endif %}
-            {% if w.anlagenteil %}<div class="text-muted">[{{ w.anlagenteil.typ }}] {{ w.anlagenteil.bezeichnung }}</div>{% endif %}
-            {% if not w.kunde and not w.anlagenteil %}<span class="text-muted">—</span>{% endif %}
-          </td>
-          <td>{{ w.naechste }}{% if w.tage is not none and w.tage < 0 %} <span class="text-danger small">({{ -w.tage }} T. überfällig)</span>{% endif %}</td>
-          <td class="text-end">
-            <form method="post" action="{{ url_for('leistungsschalter.wartung_erfassen', schalter_id=w.ls.id) }}" class="d-inline"
-                  onsubmit="return confirm('Wartung heute erfassen?');">
-              <button type="submit" class="btn btn-sm btn-outline-success" title="Wartung heute erfassen">✓ Gewartet</button>
-            </form>
-          </td>
+          <td class="fw-semibold">{% if g.kunde %}{{ g.kunde.name }}{% else %}<span class="text-muted">Ohne Kunde</span>{% endif %}</td>
+          <td class="text-center">{% if g.ueberfaellig %}<span class="badge bg-danger">{{ g.ueberfaellig }}</span>{% else %}—{% endif %}</td>
+          <td class="text-center">{% if g.dieses %}<span class="badge bg-warning text-dark">{{ g.dieses }}</span>{% else %}—{% endif %}</td>
+          <td class="text-center">{% if g.naechstes %}<span class="badge bg-secondary">{{ g.naechstes }}</span>{% else %}—{% endif %}</td>
+          <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="{{ url_for('leistungsschalter.list_schalter') }}">Anzeigen</a></td>
         </tr>
         {% endfor %}
       </tbody>
@@ -147,6 +136,6 @@
   </div>
 </div>
 {% else %}
-<div class="alert alert-success">Keine Leistungsschalter-Wartungen fällig in {{ wartung_jahr }}. ✓</div>
+<div class="alert alert-success">Keine Leistungsschalter-Wartungen fällig in {{ wartung_jahr }} / {{ wartung_naechstes_jahr }}. ✓</div>
 {% endif %}
 {% endblock %}
