@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}{{ "Neuer Leistungsschalter" if neu else "Leistungsschalter bearbeiten" }}{% endblock %}
+{% block content %}
+<h1 class="h3 mb-3">{{ "Neuer Leistungsschalter" if neu else "Leistungsschalter bearbeiten" }}</h1>
+
+<form method="post" class="card card-body">
+  <div class="row g-3">
+    <div class="col-md-8">
+      <label class="form-label">Bezeichnung *</label>
+      <input type="text" name="bezeichnung" class="form-control" value="{{ schalter.bezeichnung or '' }}" required autofocus
+             placeholder="z.B. Hauptschalter UV 41 / 250A">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Typ</label>
+      <input type="text" name="typ" class="form-control" value="{{ schalter.typ or '' }}" placeholder="z.B. NSX250">
+    </div>
+
+    <div class="col-md-6">
+      <label class="form-label">Kunde</label>
+      <select name="kunde_id" class="form-select">
+        <option value="">— keiner —</option>
+        {% for k in alle_kunden %}
+        <option value="{{ k.id }}" {% if schalter.kunde_id == k.id %}selected{% endif %}>{{ k.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">Anlage</label>
+      <select name="anlage_id" class="form-select">
+        <option value="">— keine —</option>
+        {% for a in alle_anlagen %}
+        <option value="{{ a.id }}" {% if schalter.anlage_id == a.id %}selected{% endif %}>{{ a.bezeichnung }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="col-md-6">
+      <label class="form-label">Einbauort</label>
+      <input type="text" name="einbauort" class="form-control" value="{{ schalter.einbauort or '' }}" placeholder="z.B. Verteilung UV 41, Feld 2">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Hersteller</label>
+      <input type="text" name="hersteller" class="form-control" value="{{ schalter.hersteller or '' }}">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Seriennummer</label>
+      <input type="text" name="seriennr" class="form-control" value="{{ schalter.seriennr or '' }}">
+    </div>
+
+    <div class="col-md-4">
+      <label class="form-label">Letzte Wartung</label>
+      <input type="date" name="letzte_wartung" class="form-control" value="{{ schalter.letzte_wartung or '' }}">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Wartungsintervall (Jahre)</label>
+      <input type="number" name="intervall_jahre" class="form-control" min="1" step="1"
+             value="{{ schalter.intervall_jahre or default_intervall }}">
+      <small class="text-muted">Standard: {{ default_intervall }} Jahre.</small>
+    </div>
+
+    <div class="col-12">
+      <label class="form-label">Notizen</label>
+      <textarea name="notizen" class="form-control" rows="3">{{ schalter.notizen or '' }}</textarea>
+    </div>
+  </div>
+
+  <div class="mt-4 d-flex gap-2 justify-content-between">
+    <div class="d-flex gap-2">
+      <button type="submit" class="btn btn-primary">Speichern</button>
+      <a class="btn btn-outline-secondary" href="{{ url_for('leistungsschalter.list_schalter') }}">Abbrechen</a>
+    </div>
+    {% if not neu %}
+    <button type="button" class="btn btn-outline-danger"
+            onclick="if(confirm('Leistungsschalter löschen?')) document.getElementById('delete-form').submit();">Löschen</button>
+    {% endif %}
+  </div>
+</form>
+
+{% if not neu %}
+<form id="delete-form" method="post" action="{{ url_for('leistungsschalter.delete_schalter', schalter_id=schalter.id) }}" class="d-none"></form>
+{% endif %}
+{% endblock %}

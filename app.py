@@ -21,6 +21,7 @@ from routes.auth import bp as auth_bp
 from routes.customers import bp as customers_bp
 from routes.installations import bp as installations_bp
 from routes.kontrolle import bp as kontrolle_bp
+from routes.leistungsschalter import bp as leistungsschalter_bp
 from routes.messgeraete import bp as messgeraete_bp
 from routes.pdf_export import bp as pdf_bp
 from routes.protocols import bp as protocols_bp
@@ -106,6 +107,7 @@ def create_app() -> Flask:
     app.register_blueprint(protocols_bp, url_prefix="/messprotokolle")
     app.register_blueprint(kontrolle_bp, url_prefix="/kontrolle")
     app.register_blueprint(messgeraete_bp, url_prefix="/messgeraete")
+    app.register_blueprint(leistungsschalter_bp, url_prefix="/leistungsschalter")
     app.register_blueprint(auftraege_bp, url_prefix="/auftraege")
     app.register_blueprint(zeit_bp, url_prefix="/zeit")
     app.register_blueprint(revisionen_bp, url_prefix="/revisionen")

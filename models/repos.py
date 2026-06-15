@@ -49,6 +49,7 @@ auftraege = JsonStore("auftraege.json")
 zeitbuchungen = JsonStore("zeitbuchungen.json")
 stempelungen = JsonStore("stempelung.json")
 revisionen = JsonStore("revisionen.json")
+leistungsschalter = JsonStore("leistungsschalter.json")
 
 
 # ----- Konstanten -------------------------------------------------------------
@@ -179,6 +180,48 @@ def format_date_ch(value: Optional[str]) -> str:
 
 def anlagen_fuer_kunde(kunde_id: str) -> List[Dict[str, Any]]:
     return anlagen.filter(kunde_id=kunde_id)
+
+
+# ----- Leistungsschalter-Wartung (Intervall, Default 5 Jahre) -----------------
+
+WARTUNG_INTERVALL_JAHRE_DEFAULT = 5
+
+
+def _plus_jahre(d: date, jahre: int) -> date:
+    try:
+        return d.replace(year=d.year + jahre)
+    except ValueError:  # 29. Februar -> 28.
+        return d.replace(year=d.year + jahre, day=28)
+
+
+def naechste_wartung(ls: Dict[str, Any]) -> Optional[str]:
+    """Fälligkeitsdatum der nächsten Wartung (ISO) aus letzter Wartung +
+    Intervall (Jahre). None, wenn keine letzte Wartung erfasst ist."""
+    letzte = parse_iso_date(ls.get("letzte_wartung"))
+    if not letzte:
+        return None
+    try:
+        jahre = int(ls.get("intervall_jahre") or WARTUNG_INTERVALL_JAHRE_DEFAULT)
+    except (TypeError, ValueError):
+        jahre = WARTUNG_INTERVALL_JAHRE_DEFAULT
+    return _plus_jahre(letzte, jahre).isoformat()
+
+
+def wartung_status(ls: Dict[str, Any]) -> Dict[str, Any]:
+    """Wartungsstatus eines Leistungsschalters:
+    status = 'ueberfaellig' | 'bald' (<= 90 Tage) | 'ok' | 'unbekannt'."""
+    nd = naechste_wartung(ls)
+    if not nd:
+        return {"status": "unbekannt", "naechste": None, "tage": None}
+    naechste = date.fromisoformat(nd)
+    tage = (naechste - date.today()).days
+    if tage < 0:
+        status = "ueberfaellig"
+    elif tage <= 90:
+        status = "bald"
+    else:
+        status = "ok"
+    return {"status": status, "naechste": nd, "tage": tage}
 
 
 def anlagenteile_fuer_anlage(anlage_id: str) -> List[Dict[str, Any]]:

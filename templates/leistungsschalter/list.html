@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Leistungsschalter{% endblock %}
+{% block content %}
+{% set status_badge = {'ueberfaellig': 'bg-danger', 'bald': 'bg-warning text-dark', 'ok': 'bg-success', 'unbekannt': 'bg-secondary'} %}
+{% set status_text = {'ueberfaellig': 'Überfällig', 'bald': 'Bald fällig', 'ok': 'OK', 'unbekannt': 'Keine Wartung erfasst'} %}
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div>
+    <h1 class="h3 m-0">Leistungsschalter</h1>
+    <div class="text-muted small">Wartung alle 5 Jahre{% if anzahl_faellig %} · <span class="text-danger fw-semibold">{{ anzahl_faellig }} fällig/überfällig</span>{% endif %}</div>
+  </div>
+  <a class="btn btn-primary" href="{{ url_for('leistungsschalter.new_schalter') }}">+ Neuer Leistungsschalter</a>
+</div>
+
+{% if rows %}
+<div class="card desktop-table-only">
+  <div class="table-responsive">
+    <table class="table table-kompakt table-hover m-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Status</th>
+          <th>Bezeichnung</th>
+          <th>Kunde / Anlage</th>
+          <th>Einbauort</th>
+          <th>Letzte Wartung</th>
+          <th>Nächste Wartung</th>
+          <th class="text-end">Aktion</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td>
+            <span class="badge {{ status_badge[r.status] }}">{{ status_text[r.status] }}</span>
+            {% if r.tage is not none and r.status in ('ueberfaellig','bald') %}
+              <div class="text-muted small">{% if r.tage < 0 %}{{ -r.tage }} Tage überfällig{% else %}in {{ r.tage }} Tagen{% endif %}</div>
+            {% endif %}
+          </td>
+          <td class="fw-semibold">
+            <a href="{{ url_for('leistungsschalter.edit_schalter', schalter_id=r.ls.id) }}" class="text-decoration-none">{{ r.ls.bezeichnung }}</a>
+            {% if r.ls.typ or r.ls.hersteller %}<div class="text-muted small">{{ r.ls.hersteller }}{% if r.ls.hersteller and r.ls.typ %} · {% endif %}{{ r.ls.typ }}</div>{% endif %}
+          </td>
+          <td class="small">
+            {% if r.kunde %}{{ r.kunde.name }}{% endif %}
+            {% if r.anlage %}<div class="text-muted">{{ r.anlage.bezeichnung }}</div>{% endif %}
+            {% if not r.kunde and not r.anlage %}<span class="text-muted">—</span>{% endif %}
+          </td>
+          <td class="small">{{ r.ls.einbauort or '—' }}</td>
+          <td>{{ r.ls.letzte_wartung or '—' }}</td>
+          <td>{{ r.naechste or '—' }}</td>
+          <td class="text-end">
+            <form method="post" action="{{ url_for('leistungsschalter.wartung_erfassen', schalter_id=r.ls.id) }}" class="d-inline"
+                  onsubmit="return confirm('Wartung heute ({{ heute }}) erfassen?');">
+              <button type="submit" class="btn btn-sm btn-outline-success" title="Wartung heute erfassen">✓ Gewartet</button>
+            </form>
+            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('leistungsschalter.edit_schalter', schalter_id=r.ls.id) }}">Bearbeiten</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card mobile-list">
+  {% for r in rows %}
+  <div class="mobile-list-item">
+    <div class="mobile-list-row">
+      <a class="mobile-list-title flex-grow-1 text-decoration-none" href="{{ url_for('leistungsschalter.edit_schalter', schalter_id=r.ls.id) }}">{{ r.ls.bezeichnung }}</a>
+      <span class="badge {{ status_badge[r.status] }}">{{ status_text[r.status] }}</span>
+    </div>
+    <div class="mobile-list-meta">
+      {% if r.kunde %}{{ r.kunde.name }} · {% endif %}Nächste: {{ r.naechste or '—' }}
+    </div>
+    <form method="post" action="{{ url_for('leistungsschalter.wartung_erfassen', schalter_id=r.ls.id) }}" class="mt-1"
+          onsubmit="return confirm('Wartung heute ({{ heute }}) erfassen?');">
+      <button type="submit" class="btn btn-sm btn-outline-success w-100">✓ Wartung heute erfassen</button>
+    </form>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="alert alert-info">
+  Noch keine Leistungsschalter erfasst. <a href="{{ url_for('leistungsschalter.new_schalter') }}">Ersten anlegen →</a>
+</div>
+{% endif %}
+{% endblock %}
