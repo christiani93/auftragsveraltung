@@ -398,12 +398,12 @@
   </div>
 </form>
 
-{% if current_user.is_admin %}
+{% if current_user.darf_auftrag_loeschen %}
 <form method="post" action="{{ url_for('auftraege.delete_auftrag', auftrag_id=auftrag.id) }}"
       class="mt-5 mb-3"
       onsubmit="return confirm('Auftrag „{{ (auftrag.titel or '')|e }}“ wirklich löschen?\n\n{{ zeitbuchungen|length }} Zeitbuchung(en) und {{ (auftrag.bilder or [])|length }} Bild(er) werden mitgelöscht. Diese Aktion kann nicht rückgängig gemacht werden.');">
   <button type="submit" class="btn btn-outline-danger">
-    Auftrag löschen <span class="badge bg-danger ms-1">Admin</span>
+    Auftrag löschen
   </button>
   <span class="text-muted small ms-2">Löscht auch Zeitbuchungen und Bilder.</span>
 </form>

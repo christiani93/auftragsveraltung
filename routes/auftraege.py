@@ -581,9 +581,9 @@ def delete_zeitbuchung(zeitbuchung_id: str):
 
 @bp.route("/<auftrag_id>/loeschen", methods=["POST"])
 def delete_auftrag(auftrag_id: str):
-    # Nur Admins duerfen Auftraege loeschen — verhindert versehentlichen Datenverlust
-    if not getattr(current_user, "is_admin", False):
-        flash("Nur Admins dürfen Aufträge löschen.", "danger")
+    # Admin + Projektleiter duerfen Auftraege loeschen — verhindert versehentlichen Datenverlust durch Monteure
+    if not getattr(current_user, "darf_auftrag_loeschen", False):
+        flash("Nur Admin oder Projektleiter dürfen Aufträge löschen.", "danger")
         return redirect(url_for("auftraege.detail", auftrag_id=auftrag_id))
     auftrag = auftraege.get(auftrag_id)
     if not auftrag:

@@ -84,6 +84,11 @@ class User(UserMixin):
         return self.role in ("admin", "projektleiter")
 
     @property
+    def darf_auftrag_loeschen(self) -> bool:
+        """Admin + Projektleiter duerfen Auftraege loeschen."""
+        return self.role in ("admin", "projektleiter")
+
+    @property
     def passwort_aendern_pflicht(self) -> bool:
         """True wenn der User sein Passwort beim naechsten Login zwingend aendern muss
         (z.B. weil Admin ihm ein Ersatz-Passwort vergeben hat)."""
