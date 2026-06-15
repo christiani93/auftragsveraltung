@@ -32,6 +32,16 @@
         <option value="{{ a.id }}" {% if schalter.anlage_id == a.id %}selected{% endif %}>{{ a.bezeichnung }}</option>
         {% endfor %}
       </select>
+      <small class="text-muted">Wird aus dem Anlagenteil abgeleitet, falls eines gewählt ist.</small>
+    </div>
+    <div class="col-12">
+      <label class="form-label">Anlagenteil <span class="text-muted small">(setzt Kunde + Anlage automatisch)</span></label>
+      <select name="anlagenteil_id" class="form-select">
+        <option value="">— keiner (nur Anlage/Kunde) —</option>
+        {% for t in teile_optionen %}
+        <option value="{{ t.id }}" {% if schalter.anlagenteil_id == t.id %}selected{% endif %}>{{ t.label }}</option>
+        {% endfor %}
+      </select>
     </div>
 
     <div class="col-md-6">

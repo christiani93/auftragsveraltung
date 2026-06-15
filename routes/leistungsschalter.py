@@ -14,6 +14,7 @@ from flask_login import login_required
 from models.repos import (
     WARTUNG_INTERVALL_JAHRE_DEFAULT,
     anlagen,
+    anlagenteile,
     kunden,
     leistungsschalter,
     wartung_status,
@@ -27,6 +28,7 @@ def _form_to_schalter(form) -> dict:
         "bezeichnung": form.get("bezeichnung", "").strip(),
         "kunde_id": form.get("kunde_id", "").strip() or None,
         "anlage_id": form.get("anlage_id", "").strip() or None,
+        "anlagenteil_id": form.get("anlagenteil_id", "").strip() or None,
         "einbauort": form.get("einbauort", "").strip(),
         "hersteller": form.get("hersteller", "").strip(),
         "typ": form.get("typ", "").strip(),
@@ -37,11 +39,41 @@ def _form_to_schalter(form) -> dict:
     }
 
 
+def _mit_hierarchie(data: dict) -> dict:
+    """Ist ein Anlagenteil gewaehlt, werden Anlage und Kunde daraus abgeleitet —
+    so ist der Leistungsschalter eindeutig auf Kunde + Anlagenteil heruntergebrochen."""
+    if data.get("anlagenteil_id"):
+        teil = anlagenteile.get(data["anlagenteil_id"])
+        if teil:
+            anlage = anlagen.get(teil.get("anlage_id")) if teil.get("anlage_id") else None
+            if anlage:
+                data["anlage_id"] = anlage["id"]
+                if anlage.get("kunde_id"):
+                    data["kunde_id"] = anlage["kunde_id"]
+    return data
+
+
+def _teile_optionen() -> list:
+    """Alle Anlagenteile, voll qualifiziert (Kunde · Anlage › [Typ] Bezeichnung)."""
+    kidx = {k["id"]: k for k in kunden.list()}
+    aidx = {a["id"]: a for a in anlagen.list()}
+    opts = []
+    for t in anlagenteile.list():
+        a = aidx.get(t.get("anlage_id"))
+        k = kidx.get(a.get("kunde_id")) if a else None
+        label = (f"{k['name'] if k else '—'} · {a['bezeichnung'] if a else '—'} "
+                 f"› [{t.get('typ', '')}] {t.get('bezeichnung', '')}")
+        opts.append({"id": t["id"], "label": label})
+    opts.sort(key=lambda o: o["label"].lower())
+    return opts
+
+
 def _edit_context(schalter: dict, neu: bool, **extra) -> dict:
     return dict(
         schalter=schalter, neu=neu,
         alle_kunden=sorted(kunden.list(), key=lambda k: k.get("name", "").lower()),
         alle_anlagen=sorted(anlagen.list(), key=lambda a: a.get("bezeichnung", "").lower()),
+        teile_optionen=_teile_optionen(),
         default_intervall=WARTUNG_INTERVALL_JAHRE_DEFAULT,
         **extra,
     )
@@ -52,26 +84,41 @@ def _edit_context(schalter: dict, neu: bool, **extra) -> dict:
 def list_schalter():
     kunden_idx = {k["id"]: k for k in kunden.list()}
     anlagen_idx = {a["id"]: a for a in anlagen.list()}
-    rows = []
+    teile_idx = {t["id"]: t for t in anlagenteile.list()}
+    order = {"ueberfaellig": 0, "bald": 1, "ok": 2, "unbekannt": 3}
+
+    # Nach Kunde gruppieren, innerhalb nach Dringlichkeit
+    gruppen: dict = {}
     for ls in leistungsschalter.list():
         st = wartung_status(ls)
-        rows.append({
+        kunde = kunden_idx.get(ls.get("kunde_id"))
+        row = {
             "ls": ls,
-            "kunde": kunden_idx.get(ls.get("kunde_id")),
+            "kunde": kunde,
             "anlage": anlagen_idx.get(ls.get("anlage_id")),
+            "anlagenteil": teile_idx.get(ls.get("anlagenteil_id")),
             **st,
+        }
+        key = kunde["name"] if kunde else "Ohne Kunde"
+        gruppen.setdefault(key, []).append(row)
+
+    gruppen_list = []
+    for name in sorted(gruppen, key=lambda n: (n == "Ohne Kunde", n.lower())):
+        rows = sorted(gruppen[name], key=lambda r: (order.get(r["status"], 9), r["naechste"] or "9999-12-31", r["ls"].get("bezeichnung", "").lower()))
+        gruppen_list.append({
+            "kunde": name,
+            "rows": rows,
+            "faellig": sum(1 for r in rows if r["status"] in ("ueberfaellig", "bald")),
         })
-    order = {"ueberfaellig": 0, "bald": 1, "ok": 2, "unbekannt": 3}
-    rows.sort(key=lambda r: (order.get(r["status"], 9), r["naechste"] or "9999-12-31", r["ls"].get("bezeichnung", "").lower()))
-    anzahl_faellig = sum(1 for r in rows if r["status"] in ("ueberfaellig", "bald"))
-    return render_template("leistungsschalter/list.html", rows=rows, anzahl_faellig=anzahl_faellig, heute=date.today().isoformat())
+    anzahl_faellig = sum(g["faellig"] for g in gruppen_list)
+    return render_template("leistungsschalter/list.html", gruppen=gruppen_list, anzahl_faellig=anzahl_faellig, heute=date.today().isoformat())
 
 
 @bp.route("/neu", methods=["GET", "POST"])
 @login_required
 def new_schalter():
     if request.method == "POST":
-        data = _form_to_schalter(request.form)
+        data = _mit_hierarchie(_form_to_schalter(request.form))
         if not data["bezeichnung"]:
             flash("Bezeichnung ist erforderlich.", "warning")
             return render_template("leistungsschalter/edit.html", **_edit_context(data, neu=True))
@@ -88,7 +135,7 @@ def edit_schalter(schalter_id: str):
     if not schalter:
         abort(404)
     if request.method == "POST":
-        data = _form_to_schalter(request.form)
+        data = _mit_hierarchie(_form_to_schalter(request.form))
         if not data["bezeichnung"]:
             flash("Bezeichnung ist erforderlich.", "warning")
             return render_template("leistungsschalter/edit.html", **_edit_context({**schalter, **data}, neu=False))
