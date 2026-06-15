@@ -63,7 +63,11 @@ def _teile_optionen() -> list:
         k = kidx.get(a.get("kunde_id")) if a else None
         label = (f"{k['name'] if k else '—'} · {a['bezeichnung'] if a else '—'} "
                  f"› [{t.get('typ', '')}] {t.get('bezeichnung', '')}")
-        opts.append({"id": t["id"], "label": label})
+        opts.append({
+            "id": t["id"], "label": label,
+            "anlage_id": t.get("anlage_id") or "",
+            "kunde_id": (a.get("kunde_id") if a else "") or "",
+        })
     opts.sort(key=lambda o: o["label"].lower())
     return opts
 

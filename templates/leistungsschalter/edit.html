@@ -17,7 +17,7 @@
 
     <div class="col-md-6">
       <label class="form-label">Kunde</label>
-      <select name="kunde_id" class="form-select">
+      <select name="kunde_id" id="ls-kunde" class="form-select">
         <option value="">— keiner —</option>
         {% for k in alle_kunden %}
         <option value="{{ k.id }}" {% if schalter.kunde_id == k.id %}selected{% endif %}>{{ k.name }}</option>
@@ -26,20 +26,20 @@
     </div>
     <div class="col-md-6">
       <label class="form-label">Anlage</label>
-      <select name="anlage_id" class="form-select">
+      <select name="anlage_id" id="ls-anlage" class="form-select">
         <option value="">— keine —</option>
         {% for a in alle_anlagen %}
-        <option value="{{ a.id }}" {% if schalter.anlage_id == a.id %}selected{% endif %}>{{ a.bezeichnung }}</option>
+        <option value="{{ a.id }}" data-kunde="{{ a.kunde_id or '' }}" {% if schalter.anlage_id == a.id %}selected{% endif %}>{{ a.bezeichnung }}</option>
         {% endfor %}
       </select>
-      <small class="text-muted">Wird aus dem Anlagenteil abgeleitet, falls eines gewählt ist.</small>
+      <small class="text-muted">Nach Kunde gefiltert. Wird aus dem Anlagenteil abgeleitet, falls eines gewählt ist.</small>
     </div>
     <div class="col-12">
-      <label class="form-label">Anlagenteil <span class="text-muted small">(setzt Kunde + Anlage automatisch)</span></label>
-      <select name="anlagenteil_id" class="form-select">
+      <label class="form-label">Anlagenteil <span class="text-muted small">(nach Anlage gefiltert — setzt Kunde + Anlage automatisch)</span></label>
+      <select name="anlagenteil_id" id="ls-teil" class="form-select">
         <option value="">— keiner (nur Anlage/Kunde) —</option>
         {% for t in teile_optionen %}
-        <option value="{{ t.id }}" {% if schalter.anlagenteil_id == t.id %}selected{% endif %}>{{ t.label }}</option>
+        <option value="{{ t.id }}" data-anlage="{{ t.anlage_id }}" data-kunde="{{ t.kunde_id }}" {% if schalter.anlagenteil_id == t.id %}selected{% endif %}>{{ t.label }}</option>
         {% endfor %}
       </select>
     </div>
@@ -89,4 +89,40 @@
 {% if not neu %}
 <form id="delete-form" method="post" action="{{ url_for('leistungsschalter.delete_schalter', schalter_id=schalter.id) }}" class="d-none"></form>
 {% endif %}
+
+<script>
+(function () {
+  const kunde = document.getElementById("ls-kunde");
+  const anlage = document.getElementById("ls-anlage");
+  const teil = document.getElementById("ls-teil");
+
+  function applyFilter(select, matchFn) {
+    let aktiveVersteckt = false;
+    for (const opt of select.options) {
+      if (!opt.value) continue; // Leer-Option immer sichtbar
+      const ok = matchFn(opt);
+      opt.hidden = !ok;
+      opt.disabled = !ok;
+      if (!ok && opt.selected) aktiveVersteckt = true;
+    }
+    if (aktiveVersteckt) select.value = "";
+  }
+
+  function filterAnlagen() {
+    const k = kunde.value;
+    applyFilter(anlage, (opt) => !k || opt.dataset.kunde === k);
+  }
+  function filterTeile() {
+    const k = kunde.value, a = anlage.value;
+    applyFilter(teil, (opt) =>
+      (!a || opt.dataset.anlage === a) && (!k || opt.dataset.kunde === k));
+  }
+
+  kunde.addEventListener("change", () => { filterAnlagen(); filterTeile(); });
+  anlage.addEventListener("change", filterTeile);
+  // Initial anwenden (konsistenter Zustand beim Bearbeiten)
+  filterAnlagen();
+  filterTeile();
+})();
+</script>
 {% endblock %}
