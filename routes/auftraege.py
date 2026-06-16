@@ -403,19 +403,36 @@ def edit_zeitbuchung(zeitbuchung_id: str):
         abort(403)
 
     if request.method == "POST":
-        # Pflichtfelder: Datum, plus entweder Von+Bis oder Dauer direkt
+        # Pflichtfelder: Datum. Dauer-Quelle wird explizit gewaehlt:
+        # 'vonbis' = aus den Stempelzeiten berechnen, 'manuell' = Stunden-Feld.
         datum = request.form.get("datum", "").strip() or date.today().isoformat()
         von = request.form.get("von_zeit", "").strip() or None
         bis = request.form.get("bis_zeit", "").strip() or None
+        # Modus-Default rueckwaertskompatibel: ohne explizite Wahl wie bisher
+        # (manuelle Dauer bevorzugt, sonst Von/Bis).
+        dauer_modus = request.form.get("dauer_modus", "")
         dauer_str = request.form.get("dauer_h", "").strip()
         dauer = None
-        if dauer_str:
-            try:
-                dauer = round(float(dauer_str.replace(",", ".")), 2)
-            except ValueError:
-                dauer = None
-        if dauer is None and von and bis:
+        if dauer_modus == "vonbis":
+            if not (von and bis):
+                flash("Für 'aus Von/Bis' bitte Von und Bis angeben.", "warning")
+                return redirect(url_for("auftraege.edit_zeitbuchung", zeitbuchung_id=zeitbuchung_id))
             dauer = dauer_aus_zeitspanne(von, bis)
+        elif dauer_modus == "manuell":
+            if dauer_str:
+                try:
+                    dauer = round(float(dauer_str.replace(",", ".")), 2)
+                except ValueError:
+                    dauer = None
+        else:
+            # Kein Modus uebergeben (Alt-Form): manuell bevorzugt, sonst Von/Bis
+            if dauer_str:
+                try:
+                    dauer = round(float(dauer_str.replace(",", ".")), 2)
+                except ValueError:
+                    dauer = None
+            if dauer is None and von and bis:
+                dauer = dauer_aus_zeitspanne(von, bis)
         if not dauer or dauer <= 0:
             flash("Bitte Stunden oder gueltige Von/Bis-Zeiten angeben.", "warning")
             return redirect(url_for("auftraege.edit_zeitbuchung", zeitbuchung_id=zeitbuchung_id))

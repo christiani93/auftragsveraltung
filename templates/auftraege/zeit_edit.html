@@ -39,6 +39,18 @@
     </div>
     {% endif %}
 
+    {% set hat_vonbis = z.von_zeit and z.bis_zeit %}
+    <div class="col-12">
+      <label class="form-label d-block">Dauer-Berechnung</label>
+      <div class="btn-group" role="group">
+        <input type="radio" class="btn-check" name="dauer_modus" id="modus-vonbis" value="vonbis" {% if hat_vonbis %}checked{% endif %}>
+        <label class="btn btn-outline-primary" for="modus-vonbis">Aus Von/Bis berechnen</label>
+        <input type="radio" class="btn-check" name="dauer_modus" id="modus-manuell" value="manuell" {% if not hat_vonbis %}checked{% endif %}>
+        <label class="btn btn-outline-primary" for="modus-manuell">Manuelle Dauer</label>
+      </div>
+      <small class="text-muted d-block">Bestimmt, ob die Zeit zwischen Von/Bis (Stempelzeiten) oder die manuell eingegebenen Stunden gilt.</small>
+    </div>
+
     <div class="col-md-2">
       <label class="form-label">Von</label>
       <input type="time" name="von_zeit" class="form-control" value="{{ z.von_zeit or '' }}">
@@ -48,11 +60,11 @@
       <input type="time" name="bis_zeit" class="form-control" value="{{ z.bis_zeit or '' }}">
     </div>
     <div class="col-md-2">
-      <label class="form-label">Stunden</label>
+      <label class="form-label">Stunden (manuell)</label>
       <input type="text" inputmode="decimal" name="dauer_h" class="form-control"
              value="{{ '%.2f'|format(z.get('brutto_h')) if z.get('brutto_h') is not none else '%.2f'|format(z.get('dauer_h')) if z.get('dauer_h') is not none else '' }}"
-             placeholder="oder leer">
-      <small class="text-muted">Direkt eingeben oder aus Von/Bis ableiten lassen. Bei Pause = Brutto.</small>
+             placeholder="z.B. 1.5">
+      <small class="text-muted">Nur bei „Manuelle Dauer". Bei Pause = Brutto.</small>
     </div>
 
     <div class="col-md-3">
