@@ -8,6 +8,16 @@
 
 <form method="post" class="card card-body">
   <div class="row g-3">
+    <div class="col-12">
+      <label class="form-label">Auftrag</label>
+      <select name="auftrag_id" class="form-select">
+        <option value="">— ohne Auftrag —</option>
+        {% for opt in auftrag_optionen %}
+        <option value="{{ opt.id }}" {% if z.auftrag_id == opt.id %}selected{% endif %}>{{ opt.label }}</option>
+        {% endfor %}
+      </select>
+      <small class="text-muted">Hier kannst du einen falsch oder nicht gewählten Auftrag korrigieren.</small>
+    </div>
     <div class="col-md-3">
       <label class="form-label">Datum *</label>
       <input type="date" name="datum" class="form-control" value="{{ z.datum or '' }}" required>

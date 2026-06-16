@@ -242,12 +242,19 @@
               {% set taetigkeiten = ab.eintraege|map(attribute='z.taetigkeit')|select|map('trim')|reject('eq', '')|list %}
               {% if taetigkeiten %}<div class="text-muted small">{{ taetigkeiten|join(' · ') }}</div>{% endif %}
             </div>
-            <span class="fw-semibold">{{ '%.2f'|format(ab.summe) }} h</span>
+            <div class="d-flex align-items-center gap-2">
+              <span class="fw-semibold">{{ '%.2f'|format(ab.summe) }} h</span>
+              {% if ab.eintraege|length == 1 %}
+              <a class="btn btn-sm btn-outline-secondary py-0 px-1" href="{{ url_for('auftraege.edit_zeitbuchung', zeitbuchung_id=ab.eintraege[0].z.id) }}" title="Buchung bearbeiten (Auftrag ändern)">✎</a>
+              {% endif %}
+            </div>
           </div>
           {% if ab.eintraege|length > 1 %}
           <div class="ms-3 small text-muted">
             {% for row in ab.eintraege %}
-            <div>{{ row.z.von_zeit or '—' }}–{{ row.z.bis_zeit or '—' }} · {{ '%.2f'|format(row.z.dauer_h) }} h{% if row.z.taetigkeit %} · {{ row.z.taetigkeit }}{% endif %}{% if row.z.via_stempelung %} ⏱{% endif %}</div>
+            <div>{{ row.z.von_zeit or '—' }}–{{ row.z.bis_zeit or '—' }} · {{ '%.2f'|format(row.z.dauer_h) }} h{% if row.z.taetigkeit %} · {{ row.z.taetigkeit }}{% endif %}{% if row.z.via_stempelung %} ⏱{% endif %}
+              <a href="{{ url_for('auftraege.edit_zeitbuchung', zeitbuchung_id=row.z.id) }}" title="Buchung bearbeiten">✎</a>
+            </div>
             {% endfor %}
           </div>
           {% endif %}

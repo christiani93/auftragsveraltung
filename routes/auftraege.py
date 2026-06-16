@@ -426,6 +426,14 @@ def edit_zeitbuchung(zeitbuchung_id: str):
         else:
             mitarbeiter = z.get("mitarbeiter") or ""
 
+        # Auftrag aendern/zuordnen (leer = ohne Auftrag). Validieren: muss sichtbar sein.
+        neuer_auftrag_id = request.form.get("auftrag_id", "").strip()
+        if neuer_auftrag_id:
+            neuer_auftrag = auftraege.get(neuer_auftrag_id)
+            if not neuer_auftrag or not _darf_auftrag_sehen(neuer_auftrag):
+                flash("Auftrag nicht gefunden oder keine Berechtigung.", "warning")
+                return redirect(url_for("auftraege.edit_zeitbuchung", zeitbuchung_id=zeitbuchung_id))
+
         # Pause: von/bis aus Form (beide leer = keine Pause)
         p_von = request.form.get("pause_von", "").strip()
         p_bis = request.form.get("pause_bis", "").strip()
@@ -467,15 +475,28 @@ def edit_zeitbuchung(zeitbuchung_id: str):
                 "taetigkeit": request.form.get("taetigkeit", "").strip(),
                 "notizen": request.form.get("notizen", "").strip(),
             }
+        updates["auftrag_id"] = neuer_auftrag_id or None
         zeitbuchungen.update(zeitbuchung_id, updates)
         flash("Zeitbuchung gespeichert.", "success")
-        return redirect(url_for("auftraege.detail", auftrag_id=z.get("auftrag_id")) if z.get("auftrag_id") else url_for("auftraege.list_auftraege"))
+        if neuer_auftrag_id:
+            return redirect(url_for("auftraege.detail", auftrag_id=neuer_auftrag_id))
+        return redirect(url_for("zeit.heute"))
 
     moegliche_mitarbeiter = list_users() if current_user.sieht_alle_auftraege else []
+    # Auswahl sichtbarer Auftraege (Kunde: Titel) zum Umzuordnen
+    kunden_idx = {k["id"]: k for k in kunden.list()}
+    auftrag_optionen = []
+    for a in auftraege.list():
+        if not _darf_auftrag_sehen(a):
+            continue
+        k = kunden_idx.get(a.get("kunde_id"))
+        auftrag_optionen.append({"id": a["id"], "label": (f"{k['name']}: " if k else "") + (a.get("titel") or "—")})
+    auftrag_optionen.sort(key=lambda o: o["label"].lower())
     return render_template(
         "auftraege/zeit_edit.html",
         z=z, auftrag=auftrag,
         moegliche_mitarbeiter=moegliche_mitarbeiter,
+        auftrag_optionen=auftrag_optionen,
     )
 
 
