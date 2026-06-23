@@ -4,10 +4,13 @@ from __future__ import annotations
 from datetime import date
 
 from flask import Blueprint, abort, render_template
+from flask_login import current_user
 
 from models.repos import (
+    AUFTRAG_STATUS_LABEL,
     KONTROLL_STATUS_LABEL,
     REVISION_STATUS_LABEL,
+    auftraege,
     auftraege_in_revision,
     dashboard_data,
     kontroll_uebersicht_fuer_kunde,
@@ -41,6 +44,24 @@ def dashboard():
         {"laeuft": 0, "geplant": 1}.get(row["r"].get("status", "geplant"), 2),
         row["r"].get("von") or "9999-12-31",
     ))
+
+    # Mir zugewiesene, noch offene Aufträge — sortiert nach Termin, dann
+    # Fälligkeit (zu_erledigen_bis), dann Status (in Arbeit vor offen).
+    def _meine_sort(a):
+        termine = [d for d in (a.get("termin"), a.get("zu_erledigen_bis")) if d]
+        frueheste = min(termine) if termine else "9999-12-31"
+        status_prio = {"in_arbeit": 0, "offen": 1}.get(a.get("status"), 2)
+        return (frueheste, status_prio, (a.get("titel") or "").lower())
+
+    meine_auftraege = [
+        {"auftrag": a, "kunde": kunden_idx.get(a.get("kunde_id"))}
+        for a in sorted(
+            [a for a in auftraege.list()
+             if a.get("zugewiesen_an") == current_user.username
+             and a.get("status") not in ("erledigt", "abgerechnet")],
+            key=_meine_sort,
+        )
+    ]
 
     # Leistungsschalter-Wartungen pro Kunde zusammengefasst — dieses und
     # nächstes Jahr (inkl. überfälliger aus Vorjahren, die noch offen sind).
@@ -76,6 +97,8 @@ def dashboard():
         revision_rows=rev_rows,
         revision_status_label=REVISION_STATUS_LABEL,
         kontroll_status_label=KONTROLL_STATUS_LABEL,
+        auftrag_status_label=AUFTRAG_STATUS_LABEL,
+        meine_auftraege=meine_auftraege,
         wartung_kunden=wartung_kunden,
         wartung_jahr=jahr,
         wartung_naechstes_jahr=naechstes_jahr,

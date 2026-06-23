@@ -175,6 +175,16 @@ def list_auftraege():
         sichtbar = [a for a in sichtbar_alle if a.get("status") not in AUFTRAG_STATUS_ARCHIVIERT]
     anzahl_archiviert = sum(1 for a in sichtbar_alle if a.get("status") in AUFTRAG_STATUS_ARCHIVIERT)
     anzahl_in_revision = sum(1 for a in alle if a.get("revision_id") and _darf_auftrag_sehen(a))
+
+    # Filter nach zugewiesenem Mitarbeiter (nur fuer Admin/Projektleiter sinnvoll).
+    # '__none__' = nicht zugewiesene Auftraege.
+    zugewiesen_filter = request.args.get("zugewiesen", "").strip()
+    if zugewiesen_filter and current_user.sieht_alle_auftraege:
+        if zugewiesen_filter == "__none__":
+            sichtbar = [a for a in sichtbar if not (a.get("zugewiesen_an") or "").strip()]
+        else:
+            sichtbar = [a for a in sichtbar if a.get("zugewiesen_an") == zugewiesen_filter]
+
     kunden_idx = {k["id"]: k for k in kunden.list()}
     rev_idx = {r["id"]: r for r in revisionen.list()}
     rows = [{
@@ -193,6 +203,9 @@ def list_auftraege():
         archiv_anzeigen=archiv_anzeigen,
         anzahl_in_revision=anzahl_in_revision,
         revisionen_anzeigen=revisionen_anzeigen,
+        zeigt_zuweisung=current_user.sieht_alle_auftraege,
+        monteure=list_monteure() if current_user.sieht_alle_auftraege else [],
+        zugewiesen_filter=zugewiesen_filter,
     )
 
 

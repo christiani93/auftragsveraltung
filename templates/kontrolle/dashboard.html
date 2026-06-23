@@ -6,8 +6,8 @@
 <div class="row g-3 mb-4">
   <div class="col-6 col-md-3">
     <div class="card card-body text-center">
-      <div class="text-muted small">Kunden</div>
-      <div class="fs-3 fw-bold">{{ anzahl_kunden }}</div>
+      <div class="text-muted small">Aufträge</div>
+      <div class="fs-3 fw-bold">{{ anzahl_auftraege }}</div>
     </div>
   </div>
   <div class="col-6 col-md-3">
@@ -29,6 +29,41 @@
     </div>
   </div>
 </div>
+
+{% set auftrag_badge = {'offen': 'bg-secondary', 'in_arbeit': 'bg-warning text-dark', 'erledigt': 'bg-success', 'abgerechnet': 'bg-dark'} %}
+<h2 class="h5 mb-2">Meine Aufträge ({{ meine_auftraege|length }})</h2>
+{% if meine_auftraege %}
+<div class="card mb-4">
+  <div class="table-responsive">
+    <table class="table table-kompakt table-hover m-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Termin</th>
+          <th>Zu erledigen bis</th>
+          <th>Kunde</th>
+          <th>Titel</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in meine_auftraege %}
+        <tr>
+          <td>{{ r.auftrag.termin or '—' }}</td>
+          <td>{{ r.auftrag.zu_erledigen_bis or '—' }}</td>
+          <td class="small">{% if r.kunde %}{{ r.kunde.name }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+          <td class="fw-semibold"><a href="{{ url_for('auftraege.detail', auftrag_id=r.auftrag.id) }}" class="text-decoration-none">{{ r.auftrag.titel }}</a></td>
+          <td><span class="badge {{ auftrag_badge.get(r.auftrag.status, 'bg-secondary') }}">{{ auftrag_status_label.get(r.auftrag.status, r.auftrag.status) }}</span></td>
+          <td class="text-end"><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('auftraege.detail', auftrag_id=r.auftrag.id) }}">Öffnen</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="alert alert-light border mb-4">Dir sind aktuell keine offenen Aufträge zugewiesen.</div>
+{% endif %}
 
 <h2 class="h5 mb-2">Offene Kontrollen — nach Kunden</h2>
 {% if offene_rows %}

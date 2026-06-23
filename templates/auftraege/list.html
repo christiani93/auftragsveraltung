@@ -5,7 +5,20 @@
   <h1 class="h3 m-0">Aufträge
     {% if gefiltert %}<small class="text-muted fs-6 ms-2">(nur eigene + unzugewiesene · {{ anzahl_sichtbar }}/{{ anzahl_total }})</small>{% endif %}
   </h1>
-  <div class="d-flex gap-2 flex-wrap">
+  <div class="d-flex gap-2 flex-wrap align-items-center">
+    {% if zeigt_zuweisung %}
+    <form method="get" class="d-flex align-items-center">
+      {% if archiv_anzeigen %}<input type="hidden" name="archiv" value="1">{% endif %}
+      {% if revisionen_anzeigen %}<input type="hidden" name="revisionen" value="1">{% endif %}
+      <select name="zugewiesen" class="form-select" style="min-width: 190px;" onchange="this.form.submit()" title="Nach zugewiesenem Mitarbeiter filtern">
+        <option value="">Alle Mitarbeiter</option>
+        <option value="__none__" {% if zugewiesen_filter == '__none__' %}selected{% endif %}>— nicht zugewiesen —</option>
+        {% for m in monteure %}
+        <option value="{{ m.username }}" {% if zugewiesen_filter == m.username %}selected{% endif %}>{{ m.name }}</option>
+        {% endfor %}
+      </select>
+    </form>
+    {% endif %}
     {% if revisionen_anzeigen %}
       <a href="{{ url_for('auftraege.list_auftraege', archiv='1' if archiv_anzeigen else None) }}" class="btn btn-outline-secondary">Revisions-Aufträge ausblenden</a>
     {% else %}
@@ -34,6 +47,7 @@
           <th>Kunde</th>
           <th>Titel</th>
           <th>Erteilt von</th>
+          {% if zeigt_zuweisung %}<th>Zugewiesen an</th>{% endif %}
           <th>Teile</th>
           <th>Status</th>
           <th></th>
@@ -49,6 +63,7 @@
             {% if r.revision %}<a href="{{ url_for('revisionen.detail', revision_id=r.revision.id) }}" class="badge bg-info text-decoration-none ms-1" title="Teil der Revision">↻ {{ r.revision.titel }}</a>{% endif %}
           </td>
           <td>{{ r.auftrag.erteilt_von or '—' }}</td>
+          {% if zeigt_zuweisung %}<td class="small">{% if r.auftrag.zugewiesen_an %}{{ r.auftrag.zugewiesen_an|mitarbeiter_name }}{% else %}<span class="text-muted">—</span>{% endif %}</td>{% endif %}
           <td>{{ r.auftrag.anlagenteil_ids|length }}</td>
           <td>
             {% if r.auftrag.status == 'offen' %}<span class="badge bg-secondary">{{ status_label[r.auftrag.status] }}</span>

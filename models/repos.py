@@ -653,4 +653,5 @@ def dashboard_data() -> Dict[str, Any]:
         "anzahl_kunden": len(kunden.list()),
         "anzahl_anlagen": len(anlagen.list()),
         "anzahl_messprotokolle": len(messprotokolle.list()),
+        "anzahl_auftraege": len(auftraege.list()),
     }
