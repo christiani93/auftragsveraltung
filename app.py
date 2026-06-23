@@ -130,6 +130,20 @@ def create_app() -> Flask:
             g._mitarbeiter_name_cache = cache
         return cache.get(username, username)
 
+    @app.template_filter("datetime_ch")
+    def _datetime_ch(value):
+        """ISO-Datum/-Datetime -> Schweizer Format. '2026-06-23T09:30' ->
+        '23.06.2026 09:30', '2026-06-23' -> '23.06.2026'. Leer -> ''."""
+        if not value:
+            return ""
+        s = str(value).strip()
+        datum, _, zeit = s.partition("T")
+        teile = datum.split("-")
+        out = f"{teile[2]}.{teile[1]}.{teile[0]}" if len(teile) == 3 else datum
+        if zeit:
+            out += " " + zeit[:5]
+        return out
+
     @app.before_request
     def require_login():
         from flask import request
