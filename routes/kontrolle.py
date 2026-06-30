@@ -48,7 +48,7 @@ def dashboard():
     # Mir zugewiesene, noch offene Aufträge — sortiert nach Termin, dann
     # Fälligkeit (zu_erledigen_bis), dann Status (in Arbeit vor offen).
     def _meine_sort(a):
-        termine = [d for d in (a.get("termin"), a.get("zu_erledigen_bis")) if d]
+        termine = [d for d in (a.get("termin"), a.get("termin_datum"), a.get("zu_erledigen_bis")) if d]
         frueheste = min(termine) if termine else "9999-12-31"
         status_prio = {"in_arbeit": 0, "offen": 1}.get(a.get("status"), 2)
         return (frueheste, status_prio, (a.get("titel") or "").lower())

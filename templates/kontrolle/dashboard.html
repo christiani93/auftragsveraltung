@@ -49,7 +49,7 @@
       <tbody>
         {% for r in meine_auftraege %}
         <tr>
-          <td>{{ r.auftrag.termin|datetime_ch or '—' }}</td>
+          <td>{{ r.auftrag.termin|datetime_ch or r.auftrag.termin_datum|datetime_ch or '—' }}</td>
           <td>{{ r.auftrag.zu_erledigen_bis|datetime_ch or '—' }}</td>
           <td class="small">{% if r.kunde %}{{ r.kunde.name }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
           <td class="fw-semibold"><a href="{{ url_for('auftraege.detail', auftrag_id=r.auftrag.id) }}" class="text-decoration-none">{{ r.auftrag.titel }}</a></td>

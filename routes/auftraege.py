@@ -107,6 +107,7 @@ def _form_to_auftrag(form) -> dict:
         "erledigt_am": form.get("erledigt_am", "").strip() or None,
         "zu_erledigen_bis": form.get("zu_erledigen_bis", "").strip() or None,
         "termin": form.get("termin", "").strip() or None,
+        "termin_datum": form.get("termin_datum", "").strip() or None,
         "revision_id": form.get("revision_id", "").strip() or None,
         "notizen": form.get("notizen", "").strip(),
     }

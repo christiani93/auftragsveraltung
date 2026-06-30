@@ -91,6 +91,16 @@
     </div>
   </div>
   {% endif %}
+  {% if auftrag.termin_datum %}
+  <div class="col-md-3">
+    <div class="card card-body border-primary">
+      <div class="text-muted small">Termin (ohne Uhrzeit)</div>
+      <div class="fw-semibold text-primary">
+        📅 {{ auftrag.termin_datum|datetime_ch }}
+      </div>
+    </div>
+  </div>
+  {% endif %}
   <div class="col-md-3">
     <div class="card card-body">
       <div class="text-muted small">Schnellaktion</div>

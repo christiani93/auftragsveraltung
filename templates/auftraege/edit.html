@@ -139,6 +139,11 @@
         <input type="datetime-local" name="termin" class="form-control" value="{{ auftrag.termin or '' }}">
         <small class="text-muted">Konkreter Vor-Ort-Termin (Datum + Uhrzeit).</small>
       </div>
+      <div class="col-md-3">
+        <label class="form-label">Termin ohne Uhrzeit</label>
+        <input type="date" name="termin_datum" class="form-control" value="{{ auftrag.termin_datum or '' }}">
+        <small class="text-muted">Zeitunabhängiger Termin (nur Datum).</small>
+      </div>
 
       <div class="col-12">
         <label class="form-label">Beschreibung</label>
