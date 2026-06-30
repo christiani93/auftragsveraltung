@@ -5,22 +5,22 @@
 
 <div class="row g-3 mb-4">
   <div class="col-6 col-md-3">
-    <div class="card card-body text-center">
+    <a class="card card-body text-center text-decoration-none text-reset" href="{{ url_for('auftraege.list_auftraege', status='offen') }}">
       <div class="text-muted small">Aufträge offen</div>
-      <div class="fs-3 fw-bold">{{ anzahl_auftraege }}</div>
-    </div>
+      <div class="fs-3 fw-bold">{{ auftraege_offen }}</div>
+    </a>
   </div>
   <div class="col-6 col-md-3">
-    <div class="card card-body text-center">
-      <div class="text-muted small">Anlagen</div>
-      <div class="fs-3 fw-bold">{{ anzahl_anlagen }}</div>
-    </div>
+    <a class="card card-body text-center text-decoration-none text-reset" href="{{ url_for('auftraege.list_auftraege', status='in_arbeit') }}">
+      <div class="text-muted small">Aufträge in Arbeit</div>
+      <div class="fs-3 fw-bold">{{ auftraege_in_arbeit }}</div>
+    </a>
   </div>
   <div class="col-6 col-md-3">
-    <div class="card card-body text-center">
-      <div class="text-muted small">Messprotokolle</div>
-      <div class="fs-3 fw-bold">{{ anzahl_messprotokolle }}</div>
-    </div>
+    <a class="card card-body text-center text-decoration-none text-reset" href="{{ url_for('auftraege.list_auftraege', status='erledigt') }}">
+      <div class="text-muted small">Aufträge erledigt</div>
+      <div class="fs-3 fw-bold">{{ auftraege_erledigt }}</div>
+    </a>
   </div>
   <div class="col-6 col-md-3">
     <div class="card card-body text-center">
