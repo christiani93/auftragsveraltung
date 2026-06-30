@@ -169,7 +169,12 @@ def list_auftraege():
     # Default: in Revisionen gebuendelte Auftraege ausblenden (sind 'Grossauftrag' der Revision)
     if not revisionen_anzeigen:
         sichtbar_alle = [a for a in sichtbar_alle if not a.get("revision_id")]
-    if archiv_anzeigen:
+    # Status-Filter (offen/in_arbeit/erledigt/abgerechnet) — zeigt bei Auswahl
+    # genau diesen Status (auch archivierte wie 'abgerechnet').
+    status_filter = request.args.get("status", "").strip()
+    if status_filter and status_filter in AUFTRAG_STATUS:
+        sichtbar = [a for a in sichtbar_alle if a.get("status") == status_filter]
+    elif archiv_anzeigen:
         sichtbar = sichtbar_alle
     else:
         sichtbar = [a for a in sichtbar_alle if a.get("status") not in AUFTRAG_STATUS_ARCHIVIERT]
@@ -206,6 +211,8 @@ def list_auftraege():
         zeigt_zuweisung=current_user.sieht_alle_auftraege,
         monteure=list_monteure() if current_user.sieht_alle_auftraege else [],
         zugewiesen_filter=zugewiesen_filter,
+        status_optionen=AUFTRAG_STATUS,
+        status_filter=status_filter,
     )
 
 

@@ -6,10 +6,22 @@
     {% if gefiltert %}<small class="text-muted fs-6 ms-2">(nur eigene + unzugewiesene · {{ anzahl_sichtbar }}/{{ anzahl_total }})</small>{% endif %}
   </h1>
   <div class="d-flex gap-2 flex-wrap align-items-center">
+    <form method="get" class="d-flex align-items-center">
+      {% if archiv_anzeigen %}<input type="hidden" name="archiv" value="1">{% endif %}
+      {% if revisionen_anzeigen %}<input type="hidden" name="revisionen" value="1">{% endif %}
+      {% if zugewiesen_filter %}<input type="hidden" name="zugewiesen" value="{{ zugewiesen_filter }}">{% endif %}
+      <select name="status" class="form-select" style="min-width: 160px;" onchange="this.form.submit()" title="Nach Status filtern">
+        <option value="">Alle Status</option>
+        {% for s in status_optionen %}
+        <option value="{{ s }}" {% if status_filter == s %}selected{% endif %}>{{ status_label[s] }}</option>
+        {% endfor %}
+      </select>
+    </form>
     {% if zeigt_zuweisung %}
     <form method="get" class="d-flex align-items-center">
       {% if archiv_anzeigen %}<input type="hidden" name="archiv" value="1">{% endif %}
       {% if revisionen_anzeigen %}<input type="hidden" name="revisionen" value="1">{% endif %}
+      {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
       <select name="zugewiesen" class="form-select" style="min-width: 190px;" onchange="this.form.submit()" title="Nach zugewiesenem Mitarbeiter filtern">
         <option value="">Alle Mitarbeiter</option>
         <option value="__none__" {% if zugewiesen_filter == '__none__' %}selected{% endif %}>— nicht zugewiesen —</option>
