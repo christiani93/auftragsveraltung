@@ -653,5 +653,6 @@ def dashboard_data() -> Dict[str, Any]:
         "anzahl_kunden": len(kunden.list()),
         "anzahl_anlagen": len(anlagen.list()),
         "anzahl_messprotokolle": len(messprotokolle.list()),
-        "anzahl_auftraege": len(auftraege.list()),
+        # Nur nicht abgeschlossene Auftraege (ohne erledigt/abgerechnet)
+        "anzahl_auftraege": sum(1 for a in auftraege.list() if a.get("status") not in ("erledigt", "abgerechnet")),
     }
