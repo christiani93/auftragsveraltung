@@ -198,6 +198,21 @@ def stempel_start():
     return redirect(url_for("zeit.heute"))
 
 
+def _markiere_auftrag_erledigt(auftrag_id: str) -> bool:
+    """Setzt einen Auftrag auf 'erledigt' (erledigt_am = heute, falls leer).
+    Liefert True, wenn ein Auftrag geaendert wurde."""
+    if not auftrag_id:
+        return False
+    a = auftraege.get(auftrag_id)
+    if not a or a.get("status") == "erledigt":
+        return False
+    update = {"status": "erledigt"}
+    if not a.get("erledigt_am"):
+        update["erledigt_am"] = date.today().isoformat()
+    auftraege.update(auftrag_id, update)
+    return True
+
+
 @bp.route("/stempel/wechsel", methods=["POST"])
 @login_required
 def stempel_wechsel():
@@ -210,6 +225,7 @@ def stempel_wechsel():
     ziel_user, ziel_name = _ziel_mitarbeiter()
     aktive = aktive_stempelung_von(ziel_user)
     taetigkeit_neu = request.form.get("taetigkeit", "").strip()
+    alt_auftrag_id = aktive.get("auftrag_id") if aktive else None
 
     # Wechsel: EIN Zeitpunkt fuer Ende_alt und Start_neu — kein Gap/Ueberlappung.
     wechsel_zp = _runde_ausstempel(datetime.now())
@@ -218,6 +234,8 @@ def stempel_wechsel():
         dauer_h = _stempelung_abschliessen(aktive, wechsel_zp)
         praefix = "Umgestempelt" if ziel_user == current_user.username else f"{ziel_name} umgestempelt"
         flash(f"{praefix} — vorheriger Block: {dauer_h} h.", "info")
+        if request.form.get("auftrag_erledigt") and _markiere_auftrag_erledigt(alt_auftrag_id):
+            flash("Vorheriger Auftrag als erledigt markiert.", "info")
 
     stempelungen.create({
         "mitarbeiter": ziel_user,
@@ -239,6 +257,7 @@ def stempel_stop():
         flash(f"Keine laufende Stempelung fuer {ziel_name}.", "warning")
         return redirect(request.referrer or url_for("zeit.heute"))
 
+    alt_auftrag_id = aktive.get("auftrag_id")
     dauer_h = _stempelung_abschliessen(
         aktive,
         _runde_ausstempel(datetime.now()),
@@ -247,6 +266,8 @@ def stempel_stop():
     )
     praefix = "Ausgestempelt" if ziel_user == current_user.username else f"{ziel_name} ausgestempelt"
     flash(f"{praefix} — {dauer_h} h gebucht.", "success")
+    if request.form.get("auftrag_erledigt") and _markiere_auftrag_erledigt(alt_auftrag_id):
+        flash("Auftrag als erledigt markiert.", "info")
     return redirect(url_for("zeit.heute"))
 
 

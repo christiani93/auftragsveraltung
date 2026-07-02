@@ -92,6 +92,14 @@
         <div class="col-md-2">
           <button type="submit" class="btn btn-warning w-100">→ Umstempeln</button>
         </div>
+        {% if eigene_stempelung.auftrag %}
+        <div class="col-12">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="auftrag_erledigt" value="1" id="wechsel-erledigt">
+            <label class="form-check-label small" for="wechsel-erledigt">Bisherigen Auftrag „{{ eigene_stempelung.auftrag.titel }}" als erledigt markieren</label>
+          </div>
+        </div>
+        {% endif %}
       </form>
 
       {# Auftrag-Zuordnen ohne Buchung (wenn aktuell noch keiner zugeordnet) #}
@@ -113,9 +121,15 @@
       </form>
       {% endif %}
 
-      <div class="d-flex gap-2 mt-3">
+      <div class="d-flex gap-2 mt-3 align-items-end">
         <form method="post" action="{{ url_for('zeit.stempel_stop') }}" class="d-inline">
           <input type="hidden" name="fuer_mitarbeiter" value="{{ stempel_fuer }}">
+          {% if eigene_stempelung.auftrag %}
+          <div class="form-check mb-1">
+            <input class="form-check-input" type="checkbox" name="auftrag_erledigt" value="1" id="stop-erledigt">
+            <label class="form-check-label small" for="stop-erledigt">Auftrag „{{ eigene_stempelung.auftrag.titel }}" als erledigt markieren</label>
+          </div>
+          {% endif %}
           <button type="submit" class="btn btn-success">⏹ Ausstempeln (Tagesende)</button>
         </form>
         <form method="post" action="{{ url_for('zeit.stempel_abbrechen') }}" class="d-inline"
