@@ -73,6 +73,27 @@
         </div>
       </form>
 
+      {% if eigene_stempelung.auftrag %}
+      <div class="form-check mb-2">
+        <input class="form-check-input" type="checkbox" id="erledigt-check">
+        <label class="form-check-label" for="erledigt-check">
+          Auftrag „{{ eigene_stempelung.auftrag.titel }}" als <strong>erledigt</strong> markieren
+          <span class="text-muted small">(gilt fürs Umstempeln und Ausstempeln unten)</span>
+        </label>
+      </div>
+      <script>
+        (function () {
+          var cb = document.getElementById("erledigt-check");
+          if (!cb) return;
+          cb.addEventListener("change", function () {
+            document.querySelectorAll(".erledigt-flag").forEach(function (inp) {
+              inp.value = cb.checked ? "1" : "";
+            });
+          });
+        })();
+      </script>
+      {% endif %}
+
       {# Auftrag-Wechsel-Form #}
       <form method="post" action="{{ url_for('zeit.stempel_wechsel') }}" class="row g-2 align-items-end mb-2">
         <input type="hidden" name="fuer_mitarbeiter" value="{{ stempel_fuer }}">
@@ -92,14 +113,7 @@
         <div class="col-md-2">
           <button type="submit" class="btn btn-warning w-100">→ Umstempeln</button>
         </div>
-        {% if eigene_stempelung.auftrag %}
-        <div class="col-12">
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" name="auftrag_erledigt" value="1" id="wechsel-erledigt">
-            <label class="form-check-label small" for="wechsel-erledigt">Beim Umstempeln: bisherigen Auftrag „{{ eigene_stempelung.auftrag.titel }}" als erledigt markieren</label>
-          </div>
-        </div>
-        {% endif %}
+        <input type="hidden" name="auftrag_erledigt" value="" class="erledigt-flag">
       </form>
 
       {# Auftrag-Zuordnen ohne Buchung (wenn aktuell noch keiner zugeordnet) #}
@@ -124,12 +138,7 @@
       <div class="d-flex gap-2 mt-3 align-items-end">
         <form method="post" action="{{ url_for('zeit.stempel_stop') }}" class="d-inline">
           <input type="hidden" name="fuer_mitarbeiter" value="{{ stempel_fuer }}">
-          {% if eigene_stempelung.auftrag %}
-          <div class="form-check mb-1">
-            <input class="form-check-input" type="checkbox" name="auftrag_erledigt" value="1" id="stop-erledigt">
-            <label class="form-check-label small" for="stop-erledigt">Beim Ausstempeln: Auftrag „{{ eigene_stempelung.auftrag.titel }}" als erledigt markieren</label>
-          </div>
-          {% endif %}
+          <input type="hidden" name="auftrag_erledigt" value="" class="erledigt-flag">
           <button type="submit" class="btn btn-success">⏹ Ausstempeln (Tagesende)</button>
         </form>
         <form method="post" action="{{ url_for('zeit.stempel_abbrechen') }}" class="d-inline"
