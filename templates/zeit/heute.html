@@ -180,6 +180,45 @@
 </div>
 {% endif %}
 
+{# ============ Unproduktive Zeit erfassen ============ #}
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <strong>Unproduktive Zeit erfassen</strong>
+    <span class="text-muted small">ohne Auftrag — z.B. Büro, Werkstatt, Anfahrt</span>
+  </div>
+  <form method="post" action="{{ url_for('zeit.unproduktiv_neu') }}" class="card-body row g-2 align-items-end">
+    <input type="hidden" name="fuer_mitarbeiter" value="{{ stempel_fuer }}">
+    <div class="col-md-2">
+      <label class="form-label small mb-0">Datum</label>
+      <input type="date" name="datum" class="form-control form-control-sm" value="{{ datum }}">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label small mb-0">Kategorie</label>
+      <select name="kategorie" class="form-select form-select-sm">
+        {% for k in unproduktiv_kategorien %}<option value="{{ k }}">{{ k }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <label class="form-label small mb-0">Von</label>
+      <input type="time" name="von_zeit" class="form-control form-control-sm">
+    </div>
+    <div class="col-md-2">
+      <label class="form-label small mb-0">Bis</label>
+      <input type="time" name="bis_zeit" class="form-control form-control-sm">
+    </div>
+    <div class="col-md-1">
+      <label class="form-label small mb-0">Std.</label>
+      <input type="text" inputmode="decimal" name="dauer_h" class="form-control form-control-sm" placeholder="od.">
+    </div>
+    <div class="col-md-2">
+      <button type="submit" class="btn btn-outline-primary btn-sm w-100">+ Erfassen</button>
+    </div>
+    <div class="col-12">
+      <input type="text" name="notizen" class="form-control form-control-sm" placeholder="Notiz (optional)">
+    </div>
+  </form>
+</div>
+
 {# ============ Andere laufende Stempelungen (Admin/Projektleiter) ============ #}
 {% set anzahl_andere = laufend|selectattr('s.mitarbeiter', 'ne', stempel_fuer)|list|length %}
 {% if anzahl_andere > 0 %}
@@ -237,7 +276,10 @@
 <div class="card mb-3">
   <div class="card-header d-flex justify-content-between align-items-center">
     <strong>{{ (daten.username|mitarbeiter_name) or '— ohne Mitarbeiter —' }}</strong>
-    <span class="badge bg-primary fs-6">{{ '%.2f'|format(daten.summe) }} h</span>
+    <span>
+      {% if daten.unproduktiv %}<span class="badge bg-secondary me-1" title="davon unproduktiv">unprod. {{ '%.2f'|format(daten.unproduktiv) }} h</span>{% endif %}
+      <span class="badge bg-primary fs-6">{{ '%.2f'|format(daten.summe) }} h</span>
+    </span>
   </div>
   <ul class="list-group list-group-flush">
     {% for kb in daten.kunden %}
@@ -260,7 +302,14 @@
               <span class="text-muted small me-2">{{ ab.von or '—' }}–{{ ab.bis or '—' }}</span>
               {% if ab.auftrag %}
                 <a href="{{ url_for('auftraege.detail', auftrag_id=ab.auftrag.id) }}">{{ ab.auftrag.titel }}</a>
-              {% else %}<span class="text-muted">— ohne Auftrag —</span>{% endif %}
+              {% else %}
+                {% set ns = namespace(unprod=false, kats=[]) %}
+                {% for r in ab.eintraege %}
+                  {% if r.z.unproduktiv %}{% set ns.unprod = true %}{% if r.z.kategorie and r.z.kategorie not in ns.kats %}{% set ns.kats = ns.kats + [r.z.kategorie] %}{% endif %}{% endif %}
+                {% endfor %}
+                {% if ns.unprod %}<span class="badge bg-secondary">Unproduktiv</span>{% if ns.kats %} <span class="text-muted small">{{ ns.kats|join(' · ') }}</span>{% endif %}
+                {% else %}<span class="text-muted">— ohne Auftrag —</span>{% endif %}
+              {% endif %}
               {% if ab.eintraege|length > 1 %}<span class="badge bg-light text-muted ms-1">{{ ab.eintraege|length }} Buchungen</span>{% endif %}
               {% set taetigkeiten = ab.eintraege|map(attribute='z.taetigkeit')|select|map('trim')|reject('eq', '')|list %}
               {% if taetigkeiten %}<div class="text-muted small">{{ taetigkeiten|join(' · ') }}</div>{% endif %}

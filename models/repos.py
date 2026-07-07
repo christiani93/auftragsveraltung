@@ -115,6 +115,16 @@ SPANNUNG_TYPEN = [
 SPANNUNG_LABEL = {key: label for key, label in SPANNUNG_TYPEN}
 SPANNUNG_VOLT = {"230V": 230.0, "400V": 400.0}
 
+UNPRODUKTIV_KATEGORIEN = [
+    "Büro / Administration",
+    "Werkstatt / Lager",
+    "Anfahrt / Rückfahrt",
+    "Wartezeit",
+    "Reinigung / Aufräumen",
+    "Weiterbildung",
+    "Sonstiges",
+]
+
 AUFTRAG_STATUS = ["offen", "in_arbeit", "erledigt", "abgerechnet"]
 AUFTRAG_STATUS_LABEL = {
     "offen": "Offen",

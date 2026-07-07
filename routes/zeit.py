@@ -15,10 +15,12 @@ from flask import Blueprint, abort, flash, redirect, render_template, request, u
 from flask_login import current_user, login_required
 
 from models.repos import (
+    UNPRODUKTIV_KATEGORIEN,
     aktive_stempelung_von,
     alle_aktiven_stempelungen,
     auftrag_bei_zeitbuchung_aktualisieren,
     auftraege,
+    dauer_aus_zeitspanne,
     ist_mitarbeiter_in_revision,
     kunden,
     stempelungen,
@@ -324,6 +326,45 @@ def stempel_start_anpassen():
     return redirect(url_for("zeit.heute"))
 
 
+@bp.route("/unproduktiv/neu", methods=["POST"])
+@login_required
+def unproduktiv_neu():
+    """Erfasst unproduktive Zeit (ohne Auftrag) mit Kategorie — direkt als
+    Zeitbuchung. Dauer aus Von/Bis oder direkt in Stunden."""
+    ziel_user, ziel_name = _ziel_mitarbeiter()
+    datum = request.form.get("datum", "").strip() or date.today().isoformat()
+    von = request.form.get("von_zeit", "").strip() or None
+    bis = request.form.get("bis_zeit", "").strip() or None
+    dauer_str = request.form.get("dauer_h", "").strip()
+    dauer = None
+    if dauer_str:
+        try:
+            dauer = round(float(dauer_str.replace(",", ".")), 2)
+        except ValueError:
+            dauer = None
+    if dauer is None and von and bis:
+        dauer = dauer_aus_zeitspanne(von, bis)
+    if not dauer or dauer <= 0:
+        flash("Bitte Stunden direkt eintragen oder gültige Von/Bis-Zeiten angeben.", "warning")
+        return redirect(url_for("zeit.heute", datum=datum))
+
+    kategorie = request.form.get("kategorie", "").strip()
+    zeitbuchungen.create({
+        "auftrag_id": "",
+        "datum": datum,
+        "mitarbeiter": ziel_user,
+        "von_zeit": von,
+        "bis_zeit": bis,
+        "dauer_h": dauer,
+        "taetigkeit": kategorie or "Unproduktiv",
+        "notizen": request.form.get("notizen", "").strip(),
+        "unproduktiv": True,
+        "kategorie": kategorie,
+    })
+    flash(f"{dauer} h unproduktive Zeit erfasst{(' — ' + kategorie) if kategorie else ''}.", "success")
+    return redirect(url_for("zeit.heute", datum=datum))
+
+
 @bp.route("/")
 @bp.route("/heute")
 @login_required
@@ -371,12 +412,14 @@ def heute():
     for row in sichtbare:
         mit = row["z"].get("mitarbeiter") or ""
         if mit not in pro_mitarbeiter:
-            pro_mitarbeiter[mit] = {"username": mit, "summe": 0.0, "_kunden": {}}
+            pro_mitarbeiter[mit] = {"username": mit, "summe": 0.0, "unproduktiv": 0.0, "_kunden": {}}
         try:
             dauer = float(row["z"].get("dauer_h") or 0)
         except (TypeError, ValueError):
             dauer = 0.0
         pro_mitarbeiter[mit]["summe"] += dauer
+        if row["z"].get("unproduktiv"):
+            pro_mitarbeiter[mit]["unproduktiv"] += dauer
         kbuckets = pro_mitarbeiter[mit]["_kunden"]
         kunde_id = row["kunde"]["id"] if row["kunde"] else ""
         if kunde_id not in kbuckets:
@@ -398,6 +441,7 @@ def heute():
     # _kunden/_auftraege-Dicts zu sortierten Listen mit Von/Bis ausrechnen
     for daten in pro_mitarbeiter.values():
         daten["summe"] = round(daten["summe"], 2)
+        daten["unproduktiv"] = round(daten["unproduktiv"], 2)
         kunden_liste = []
         for kb in daten["_kunden"].values():
             alle_eintraege_k = [r for ab in kb["_auftraege"].values() for r in ab["eintraege"]]
@@ -507,4 +551,5 @@ def heute():
         prev_tag=prev_tag,
         next_tag=next_tag,
         heute_iso=date.today().isoformat(),
+        unproduktiv_kategorien=UNPRODUKTIV_KATEGORIEN,
     )
