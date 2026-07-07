@@ -143,7 +143,9 @@ def _stempelung_abschliessen(aktive: dict, ende_dt: datetime, taetigkeit_overrid
     dauer_min = (ende - start).total_seconds() / 60.0
     dauer_h = round(dauer_min / 60.0, 2)
 
-    taetigkeit = taetigkeit_override.strip() or aktive.get("taetigkeit", "")
+    unproduktiv = bool(aktive.get("unproduktiv"))
+    kategorie = aktive.get("kategorie", "") if unproduktiv else ""
+    taetigkeit = taetigkeit_override.strip() or aktive.get("taetigkeit", "") or (kategorie if unproduktiv else "")
 
     zeitbuchungen.create({
         "auftrag_id": aktive.get("auftrag_id") or "",
@@ -155,6 +157,8 @@ def _stempelung_abschliessen(aktive: dict, ende_dt: datetime, taetigkeit_overrid
         "taetigkeit": taetigkeit,
         "notizen": notizen.strip(),
         "via_stempelung": True,
+        "unproduktiv": unproduktiv,
+        "kategorie": kategorie,
     })
     auftrag_bei_zeitbuchung_aktualisieren(
         aktive.get("auftrag_id") or "",
@@ -185,16 +189,24 @@ def stempel_start():
     manuell = _uhrzeit_auf_datum(request.form.get("start_zeit", ""), jetzt)
     start_dt = manuell if (manuell and manuell <= jetzt) else _runde_einstempel(jetzt)
 
-    stempelungen.create({
+    # Ohne Auftrag kann direkt unproduktiv gestempelt werden (Kategorie waehlen).
+    kategorie = request.form.get("kategorie", "").strip() if not auftrag_id else ""
+    stempel = {
         "mitarbeiter": ziel_user,
         "mitarbeiter_name": ziel_name,
         "auftrag_id": auftrag_id,
         "start": start_dt.isoformat(timespec="seconds"),
         "taetigkeit": request.form.get("taetigkeit", "").strip(),
-    })
+    }
+    if kategorie:
+        stempel["unproduktiv"] = True
+        stempel["kategorie"] = kategorie
+    stempelungen.create(stempel)
     wer = "Eingestempelt" if ziel_user == current_user.username else f"{ziel_name} eingestempelt"
     if auftrag_id:
         flash(f"{wer}.", "success")
+    elif kategorie:
+        flash(f"{wer} — unproduktiv ({kategorie}).", "success")
     else:
         flash(f"{wer} — Auftrag kannst du nachtraeglich zuordnen.", "success")
     return redirect(url_for("zeit.heute"))
@@ -239,14 +251,19 @@ def stempel_wechsel():
         if request.form.get("auftrag_erledigt") and _markiere_auftrag_erledigt(alt_auftrag_id):
             flash("Vorheriger Auftrag als erledigt markiert.", "info")
 
-    stempelungen.create({
+    kategorie_neu = request.form.get("kategorie", "").strip() if not neuer_auftrag_id else ""
+    neuer_stempel = {
         "mitarbeiter": ziel_user,
         "mitarbeiter_name": ziel_name,
         "auftrag_id": neuer_auftrag_id,
         "start": wechsel_zp.isoformat(timespec="seconds"),
         "taetigkeit": taetigkeit_neu,
-    })
-    flash("Neuer Block laeuft.", "success")
+    }
+    if kategorie_neu:
+        neuer_stempel["unproduktiv"] = True
+        neuer_stempel["kategorie"] = kategorie_neu
+    stempelungen.create(neuer_stempel)
+    flash("Neuer Block laeuft." + (f" Unproduktiv ({kategorie_neu})." if kategorie_neu else ""), "success")
     return redirect(url_for("zeit.heute"))
 
 

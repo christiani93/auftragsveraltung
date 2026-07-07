@@ -51,6 +51,8 @@
             {% if eigene_stempelung.auftrag %}
               <a href="{{ url_for('auftraege.detail', auftrag_id=eigene_stempelung.auftrag.id) }}">{{ eigene_stempelung.auftrag.titel }}</a>
               {% if eigene_stempelung.kunde %}<div class="text-muted small">{{ eigene_stempelung.kunde.name }}</div>{% endif %}
+            {% elif eigene_stempelung.s.unproduktiv %}
+              <span class="badge bg-secondary">Unproduktiv</span>{% if eigene_stempelung.s.kategorie %} {{ eigene_stempelung.s.kategorie }}{% endif %}
             {% else %}
               <span class="text-warning">— noch nicht zugeordnet —</span>
             {% endif %}
@@ -97,16 +99,23 @@
       {# Auftrag-Wechsel-Form #}
       <form method="post" action="{{ url_for('zeit.stempel_wechsel') }}" class="row g-2 align-items-end mb-2">
         <input type="hidden" name="fuer_mitarbeiter" value="{{ stempel_fuer }}">
-        <div class="col-md-6">
+        <div class="col-md-4">
           <label class="form-label small mb-0">→ Auftrag wechseln auf</label>
-          <select name="auftrag_id" class="form-select form-select-sm" required>
+          <select name="auftrag_id" class="form-select form-select-sm">
             <option value="">— wählen —</option>
             {% for opt in auftrag_optionen %}
             <option value="{{ opt.id }}" {% if eigene_stempelung.auftrag and eigene_stempelung.auftrag.id == opt.id %}disabled{% endif %}>{{ opt.label }}</option>
             {% endfor %}
           </select>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
+          <label class="form-label small mb-0">oder Unproduktiv</label>
+          <select name="kategorie" class="form-select form-select-sm">
+            <option value="">— keine —</option>
+            {% for k in unproduktiv_kategorien %}<option value="{{ k }}">{{ k }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3">
           <label class="form-label small mb-0">Tätigkeit (optional)</label>
           <input type="text" name="taetigkeit" class="form-control form-control-sm" placeholder="z.B. Montage UV">
         </div>
@@ -154,7 +163,7 @@
       </p>
       <form method="post" action="{{ url_for('zeit.stempel_start') }}" class="row g-2 align-items-end">
         <input type="hidden" name="fuer_mitarbeiter" value="{{ stempel_fuer }}">
-        <div class="col-md-5">
+        <div class="col-md-4">
           <label class="form-label small mb-0">Auftrag (optional — kann später zugeordnet werden)</label>
           <select name="auftrag_id" class="form-select form-select-sm">
             <option value="">— noch keinen Auftrag —</option>
@@ -163,16 +172,22 @@
             {% endfor %}
           </select>
         </div>
+        <div class="col-md-3">
+          <label class="form-label small mb-0">oder Unproduktiv</label>
+          <select name="kategorie" class="form-select form-select-sm">
+            <option value="">— keine —</option>
+            {% for k in unproduktiv_kategorien %}<option value="{{ k }}">{{ k }}</option>{% endfor %}
+          </select>
+        </div>
         <div class="col-md-2">
           <label class="form-label small mb-0">Startzeit (optional)</label>
           <input type="time" name="start_zeit" class="form-control form-control-sm" placeholder="jetzt">
         </div>
         <div class="col-md-3">
-          <label class="form-label small mb-0">Tätigkeit (optional)</label>
-          <input type="text" name="taetigkeit" class="form-control form-control-sm" placeholder="z.B. Anfahrt">
-        </div>
-        <div class="col-md-2">
           <button type="submit" class="btn btn-primary w-100">▶ Einstempeln</button>
+        </div>
+        <div class="col-12">
+          <input type="text" name="taetigkeit" class="form-control form-control-sm" placeholder="Tätigkeit (optional) — z.B. Anfahrt">
         </div>
       </form>
     {% endif %}
