@@ -29,14 +29,24 @@
     <div class="collapse navbar-collapse" id="nav">
       <ul class="navbar-nav me-auto">
         <li class="nav-item"><a class="nav-link" href="{{ url_for('kontrolle.dashboard') }}">Übersicht</a></li>
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('customers.list_customers') }}">Kunden</a></li>
         <li class="nav-item"><a class="nav-link" href="{{ url_for('auftraege.list_auftraege') }}">Aufträge</a></li>
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('revisionen.list_revisionen') }}">Revisionen</a></li>
         <li class="nav-item"><a class="nav-link" href="{{ url_for('zeit.heute') }}">Zeiterfassung</a></li>
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('installations.list_installations') }}">Anlagen</a></li>
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('protocols.list_protocols') }}">Messprotokolle</a></li>
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('messgeraete.list_devices') }}">Messgeräte</a></li>
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('leistungsschalter.list_schalter') }}">Leistungsschalter</a></li>
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">Kunden</a>
+          <ul class="dropdown-menu">
+            <li><a class="dropdown-item" href="{{ url_for('customers.list_customers') }}">Kunden</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('revisionen.list_revisionen') }}">Revisionen</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('installations.list_installations') }}">Anlagen</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('leistungsschalter.list_schalter') }}">Leistungsschalter</a></li>
+          </ul>
+        </li>
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">Kontrolle</a>
+          <ul class="dropdown-menu">
+            <li><a class="dropdown-item" href="{{ url_for('protocols.list_protocols') }}">Messprotokolle</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('messgeraete.list_devices') }}">Messgeräte</a></li>
+          </ul>
+        </li>
       </ul>
       {% if current_user.is_authenticated %}
       <ul class="navbar-nav">
