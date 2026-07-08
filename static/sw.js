@@ -2,7 +2,7 @@
 // Cached die App-Shell + statische Assets (network-first für Datenrouten).
 // Achtung: Daten sind nicht offline editierbar — der PC-Server muss laufen.
 
-const CACHE_NAME = "auftragsverwaltung-v3";
+const CACHE_NAME = "auftragsverwaltung-v4";
 const APP_SHELL = [
   "/static/style.css",
   "/static/icon.svg",
@@ -50,5 +50,36 @@ self.addEventListener("fetch", (event) => {
         return response;
       })
       .catch(() => caches.match(event.request))
+  );
+});
+
+// ----- Web Push -----
+self.addEventListener("push", (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch (e) {
+    data = { title: "Auftragsverwaltung", body: event.data ? event.data.text() : "" };
+  }
+  const title = data.title || "Auftragsverwaltung";
+  const options = {
+    body: data.body || "",
+    icon: "/static/icon.svg",
+    badge: "/static/icon.svg",
+    data: { url: data.url || "/" },
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || "/";
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((cl) => {
+      for (const c of cl) {
+        if (c.url.includes(url) && "focus" in c) return c.focus();
+      }
+      if (clients.openWindow) return clients.openWindow(url);
+    })
   );
 });

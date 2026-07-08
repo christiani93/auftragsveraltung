@@ -24,6 +24,7 @@ from models.repos import (
     auftrag_bei_zeitbuchung_aktualisieren,
     auftraege,
     auftraege_fuer_kunde,
+    benachrichtigung_erstellen,
     dauer_aus_zeitspanne,
     ist_mitarbeiter_in_revision,
     kunden,
@@ -111,6 +112,31 @@ def _form_to_auftrag(form) -> dict:
         "revision_id": form.get("revision_id", "").strip() or None,
         "notizen": form.get("notizen", "").strip(),
     }
+
+
+def _benachrichtige_zuweisung(auftrag: dict, alt_zugewiesen: str = "") -> None:
+    """Benachrichtigt den zugewiesenen Mitarbeiter, wenn die Zuweisung NEU auf
+    ihn gesetzt wurde (und er nicht selbst der Zuweisende ist)."""
+    neu = (auftrag.get("zugewiesen_an") or "").strip()
+    if not neu or neu == (alt_zugewiesen or "").strip():
+        return
+    if neu == getattr(current_user, "username", None):
+        return  # sich selbst nicht benachrichtigen
+    von = getattr(current_user, "name", "") or getattr(current_user, "username", "")
+    text = f"Dir wurde der Auftrag „{auftrag.get('titel') or '—'}“ zugewiesen (von {von})."
+    benachrichtigung_erstellen(
+        user=neu,
+        text=text,
+        auftrag_id=auftrag.get("id", ""),
+        von=getattr(current_user, "username", ""),
+    )
+    # Web-Push (best effort — darf das Speichern nie brechen)
+    try:
+        from models.push import send_push_to_user
+        send_push_to_user(neu, "Neuer Auftrag", text,
+                          url=url_for("auftraege.detail", auftrag_id=auftrag.get("id", "")))
+    except Exception:
+        pass
 
 
 def _darf_auftrag_sehen(auftrag: dict) -> bool:
@@ -238,6 +264,7 @@ def new_auftrag():
                 kunde_revisionen=revisionen_fuer_kunde(data["kunde_id"]) if data["kunde_id"] else [],
             )
         record = auftraege.create(data)
+        _benachrichtige_zuweisung(record, alt_zugewiesen="")
         flash(f"Auftrag „{record['titel']}“ angelegt.", "success")
         return redirect(url_for("auftraege.detail", auftrag_id=record["id"]))
 
@@ -319,7 +346,9 @@ def edit_auftrag(auftrag_id: str):
                 monteure=list_monteure(),
                 kunde_revisionen=revisionen_fuer_kunde(data["kunde_id"]) if data["kunde_id"] else [],
             )
+        alt_zugewiesen = auftrag.get("zugewiesen_an") or ""
         auftraege.update(auftrag_id, data)
+        _benachrichtige_zuweisung({**auftrag, **data, "id": auftrag_id}, alt_zugewiesen=alt_zugewiesen)
         flash("Auftrag gespeichert.", "success")
         return redirect(url_for("auftraege.detail", auftrag_id=auftrag_id))
     return render_template(

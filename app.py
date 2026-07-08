@@ -18,6 +18,7 @@ from flask_login import LoginManager
 import config
 from routes.auftraege import bp as auftraege_bp
 from routes.auth import bp as auth_bp
+from routes.benachrichtigungen import bp as benachrichtigungen_bp
 from routes.customers import bp as customers_bp
 from routes.installations import bp as installations_bp
 from routes.kontrolle import bp as kontrolle_bp
@@ -112,6 +113,7 @@ def create_app() -> Flask:
     app.register_blueprint(zeit_bp, url_prefix="/zeit")
     app.register_blueprint(revisionen_bp, url_prefix="/revisionen")
     app.register_blueprint(pdf_bp, url_prefix="/pdf")
+    app.register_blueprint(benachrichtigungen_bp, url_prefix="/benachrichtigungen")
 
     from models.repos import fi_erforderlich
     app.jinja_env.globals["fi_erforderlich"] = fi_erforderlich
@@ -185,7 +187,17 @@ def create_app() -> Flask:
 
     @app.context_processor
     def inject_globals():
-        return {"firma_name": config.FIRMA_NAME}
+        from flask_login import current_user
+        daten = {"firma_name": config.FIRMA_NAME, "benachrichtigungen_ungelesen": 0, "vapid_public_key": ""}
+        if getattr(current_user, "is_authenticated", False):
+            from models.push import vapid_public_key
+            from models.repos import anzahl_ungelesen
+            try:
+                daten["benachrichtigungen_ungelesen"] = anzahl_ungelesen(current_user.username)
+                daten["vapid_public_key"] = vapid_public_key()
+            except Exception:
+                pass
+        return daten
 
     return app
 

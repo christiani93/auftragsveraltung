@@ -7,3 +7,4 @@ weasyprint>=63.0
 gunicorn>=23.0
 Pillow>=10.0
 pillow-heif>=0.18
+pywebpush>=2.0

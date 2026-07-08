@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Benachrichtigungen{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <h1 class="h3 m-0">🔔 Benachrichtigungen</h1>
+  <div class="d-flex gap-2">
+    <button type="button" class="btn btn-outline-primary" id="push-aktivieren">Push aktivieren</button>
+    {% if eintraege %}
+    <form method="post" action="{{ url_for('benachrichtigungen.alle_gelesen') }}">
+      <button type="submit" class="btn btn-outline-secondary">Alle als gelesen</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<div id="push-status" class="small text-muted mb-3"></div>
+
+{% if eintraege %}
+<div class="list-group">
+  {% for b in eintraege %}
+  <a href="{{ url_for('benachrichtigungen.oeffnen', b_id=b.id) }}"
+     class="list-group-item list-group-item-action {% if not b.gelesen %}list-group-item-warning{% endif %}">
+    <div class="d-flex justify-content-between">
+      <div>
+        {% if not b.gelesen %}<span class="badge bg-danger me-1">neu</span>{% endif %}
+        {{ b.text }}
+      </div>
+      <span class="text-muted small ms-2">{{ b.erstellt_am[:16]|replace('T', ' ') }}</span>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="alert alert-light border">Keine Benachrichtigungen.</div>
+{% endif %}
+
+<script>
+  (function () {
+    var btn = document.getElementById("push-aktivieren");
+    var status = document.getElementById("push-status");
+    function zeigeStatus() {
+      if (!("Notification" in window)) { status.textContent = "Dieser Browser unterstützt keine Benachrichtigungen."; return; }
+      if (Notification.permission === "granted") { status.textContent = "✓ Push-Benachrichtigungen sind aktiv."; btn.classList.add("d-none"); }
+      else if (Notification.permission === "denied") { status.textContent = "Push ist im Browser blockiert — bitte in den Website-Einstellungen erlauben."; }
+      else { status.textContent = "Push noch nicht aktiviert."; }
+    }
+    if (btn) {
+      btn.addEventListener("click", async function () {
+        var perm = await window.pushAktivieren();
+        zeigeStatus();
+        if (perm === "granted") status.textContent = "✓ Push aktiviert.";
+      });
+    }
+    zeigeStatus();
+  })();
+</script>
+{% endblock %}

@@ -50,6 +50,8 @@ zeitbuchungen = JsonStore("zeitbuchungen.json")
 stempelungen = JsonStore("stempelung.json")
 revisionen = JsonStore("revisionen.json")
 leistungsschalter = JsonStore("leistungsschalter.json")
+benachrichtigungen = JsonStore("benachrichtigungen.json")
+push_subscriptions = JsonStore("push_subscriptions.json")
 
 
 # ----- Konstanten -------------------------------------------------------------
@@ -190,6 +192,63 @@ def format_date_ch(value: Optional[str]) -> str:
 
 def anlagen_fuer_kunde(kunde_id: str) -> List[Dict[str, Any]]:
     return anlagen.filter(kunde_id=kunde_id)
+
+
+# ----- Benachrichtigungen (In-App) -------------------------------------------
+
+def benachrichtigung_erstellen(user: str, text: str, auftrag_id: str = "",
+                               von: str = "", typ: str = "auftrag_zugewiesen") -> Optional[Dict[str, Any]]:
+    """Legt eine Benachrichtigung fuer einen User an. user leer -> nichts."""
+    if not user:
+        return None
+    return benachrichtigungen.create({
+        "user": user,
+        "typ": typ,
+        "text": text,
+        "auftrag_id": auftrag_id or "",
+        "von": von or "",
+        "gelesen": False,
+        "erstellt_am": datetime.now().isoformat(timespec="seconds"),
+    })
+
+
+def benachrichtigungen_fuer(username: str) -> List[Dict[str, Any]]:
+    eintraege = [b for b in benachrichtigungen.list() if b.get("user") == username]
+    eintraege.sort(key=lambda b: b.get("erstellt_am", ""), reverse=True)
+    return eintraege
+
+
+def anzahl_ungelesen(username: str) -> int:
+    return sum(1 for b in benachrichtigungen.list()
+               if b.get("user") == username and not b.get("gelesen"))
+
+
+# ----- Push-Subscriptions (Web Push) -----------------------------------------
+
+def push_subscription_speichern(user: str, subscription: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Speichert eine Web-Push-Subscription fuer einen User (dedupe per endpoint)."""
+    endpoint = (subscription or {}).get("endpoint")
+    if not user or not endpoint:
+        return None
+    for s in push_subscriptions.list():
+        if s.get("endpoint") == endpoint:
+            return push_subscriptions.update(s["id"], {"user": user, "subscription": subscription})
+    return push_subscriptions.create({
+        "user": user,
+        "endpoint": endpoint,
+        "subscription": subscription,
+        "erstellt_am": datetime.now().isoformat(timespec="seconds"),
+    })
+
+
+def push_subscription_entfernen(endpoint: str) -> None:
+    for s in push_subscriptions.list():
+        if s.get("endpoint") == endpoint:
+            push_subscriptions.delete(s["id"])
+
+
+def push_subscriptions_fuer(username: str) -> List[Dict[str, Any]]:
+    return [s for s in push_subscriptions.list() if s.get("user") == username]
 
 
 # ----- Leistungsschalter-Wartung (Intervall, Default 5 Jahre) -----------------
