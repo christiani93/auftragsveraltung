@@ -58,6 +58,8 @@
           <th>Datum</th>
           <th>Kunde</th>
           <th>Titel</th>
+          <th>Termin</th>
+          <th>Zu erledigen bis</th>
           <th>Erteilt von</th>
           {% if zeigt_zuweisung %}<th>Zugewiesen an</th>{% endif %}
           <th>Teile</th>
@@ -74,6 +76,8 @@
             <a href="{{ url_for('auftraege.detail', auftrag_id=r.auftrag.id) }}" class="fw-semibold text-decoration-none">{{ r.auftrag.titel }}</a>
             {% if r.revision %}<a href="{{ url_for('revisionen.detail', revision_id=r.revision.id) }}" class="badge bg-info text-decoration-none ms-1" title="Teil der Revision">↻ {{ r.revision.titel }}</a>{% endif %}
           </td>
+          <td class="small">{{ r.auftrag.termin|datetime_ch or r.auftrag.termin_datum|datetime_ch or '—' }}</td>
+          <td class="small">{{ r.auftrag.zu_erledigen_bis|datetime_ch or '—' }}</td>
           <td>{{ r.auftrag.erteilt_von or '—' }}</td>
           {% if zeigt_zuweisung %}<td class="small">{% if r.auftrag.zugewiesen_an %}{{ r.auftrag.zugewiesen_an|mitarbeiter_name }}{% else %}<span class="text-muted">—</span>{% endif %}</td>{% endif %}
           <td>{{ r.auftrag.anlagenteil_ids|length }}</td>
@@ -110,6 +114,8 @@
       {% if r.kunde %}· {{ r.kunde.name }}{% endif %}
       {% if r.auftrag.erteilt_von %}· {{ r.auftrag.erteilt_von }}{% endif %}
       · {{ r.auftrag.anlagenteil_ids|length }} Teil(e)
+      {% if r.auftrag.termin or r.auftrag.termin_datum %}<br>📅 {{ r.auftrag.termin|datetime_ch or r.auftrag.termin_datum|datetime_ch }}{% endif %}
+      {% if r.auftrag.zu_erledigen_bis %} · bis {{ r.auftrag.zu_erledigen_bis|datetime_ch }}{% endif %}
     </div>
   </a>
   {% endfor %}
