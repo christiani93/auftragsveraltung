@@ -662,9 +662,12 @@ def delete_zeitbuchung(zeitbuchung_id: str):
     if not z:
         abort(404)
     auftrag_id = z.get("auftrag_id")
+    datum = z.get("datum")
     zeitbuchungen.delete(zeitbuchung_id)
     flash("Zeitbuchung gelöscht.", "info")
-    return redirect(url_for("auftraege.detail", auftrag_id=auftrag_id) if auftrag_id else url_for("auftraege.list_auftraege"))
+    if auftrag_id:
+        return redirect(url_for("auftraege.detail", auftrag_id=auftrag_id))
+    return redirect(url_for("zeit.heute", datum=datum) if datum else url_for("zeit.heute"))
 
 
 @bp.route("/<auftrag_id>/loeschen", methods=["POST"])
