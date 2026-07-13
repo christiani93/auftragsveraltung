@@ -217,6 +217,16 @@ def list_auftraege():
         else:
             sichtbar = [a for a in sichtbar if a.get("zugewiesen_an") == zugewiesen_filter]
 
+    # Sortierung wie in der Dashboard-Übersicht: Termin (bzw. datum-only Termin)
+    # zuerst, dann Fälligkeit, dann Erstellungsdatum. `sichtbar` ist bereits nach
+    # Erstellungsdatum absteigend vorsortiert; sorted() ist stabil -> Ties behalten
+    # diese Reihenfolge.
+    def _termin_sort(a):
+        termin = a.get("termin") or a.get("termin_datum") or "9999-99-99"
+        frist = a.get("zu_erledigen_bis") or "9999-99-99"
+        return (termin, frist)
+    sichtbar = sorted(sichtbar, key=_termin_sort)
+
     kunden_idx = {k["id"]: k for k in kunden.list()}
     rev_idx = {r["id"]: r for r in revisionen.list()}
     rows = [{
