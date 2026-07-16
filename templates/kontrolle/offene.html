@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Kontroll-Übersicht{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div>
+    <h1 class="h3 m-0">Kontroll-Übersicht</h1>
+    <div class="text-muted small">Offene Kontrollen nach Kunden{% if summe_offen or summe_maengel %} · {{ summe_offen }} offen · {{ summe_maengel }} Mängel{% endif %}</div>
+  </div>
+  <a class="btn btn-outline-secondary" href="{{ url_for('protocols.list_protocols') }}">Messprotokolle</a>
+</div>
+
+{% if offene_rows %}
+<div class="card mb-4">
+  <div class="table-responsive">
+    <table class="table table-kompakt table-hover m-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Kunde</th>
+          <th>Ort</th>
+          <th class="text-center">Offen</th>
+          <th class="text-center">Mängel</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in offene_rows %}
+        <tr>
+          <td class="fw-semibold">{{ r.kunde.name }}</td>
+          <td class="small text-muted">{{ r.kunde.plz }} {{ r.kunde.ort }}</td>
+          <td class="text-center">{% if r.anzahl_offen %}<span class="badge bg-secondary">{{ r.anzahl_offen }}</span>{% else %}—{% endif %}</td>
+          <td class="text-center">{% if r.anzahl_maengel %}<span class="badge bg-danger">{{ r.anzahl_maengel }}</span>{% else %}—{% endif %}</td>
+          <td class="text-end"><a class="btn btn-sm btn-primary" href="{{ url_for('kontrolle.kunde_uebersicht', kunde_id=r.kunde.id) }}">Übersicht öffnen</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="alert alert-success">Keine offenen Kontrollen — alle Anlagenteile sind als geprüft markiert. ✓</div>
+{% endif %}
+{% endblock %}

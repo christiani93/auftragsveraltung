@@ -47,6 +47,7 @@
         <li class="nav-item dropdown">
           <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">Kontrolle</a>
           <ul class="dropdown-menu">
+            <li><a class="dropdown-item" href="{{ url_for('kontrolle.offene_kontrollen') }}">Kontroll-Übersicht (offene)</a></li>
             <li><a class="dropdown-item" href="{{ url_for('protocols.list_protocols') }}">Messprotokolle</a></li>
             <li><a class="dropdown-item" href="{{ url_for('messgeraete.list_devices') }}">Messgeräte</a></li>
           </ul>

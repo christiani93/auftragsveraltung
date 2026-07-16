@@ -106,6 +106,17 @@ def dashboard():
     )
 
 
+@bp.route("/offene")
+def offene_kontrollen():
+    """Eigene Seite: offene Kontrollen nach Kunden (auch aus der Navigation erreichbar)."""
+    data = dashboard_data()
+    return render_template(
+        "kontrolle/offene.html",
+        kontroll_status_label=KONTROLL_STATUS_LABEL,
+        **data,
+    )
+
+
 @bp.route("/kunde/<kunde_id>")
 def kunde_uebersicht(kunde_id: str):
     kunde = kunden.get(kunde_id)
