@@ -8,12 +8,13 @@
     <h1 class="h3 m-0">Vermietung</h1>
     <div class="text-muted small">Maschinen-Verfügbarkeit{% if anzahl_ausgeliehen %} · {{ anzahl_ausgeliehen }} ausgeliehen{% endif %}</div>
   </div>
-  {% if ist_verwalter %}
   <div class="d-flex gap-2">
+    <a class="btn btn-outline-primary" href="{{ url_for('vermietung.reservationen') }}">Reservationen</a>
+    {% if ist_verwalter %}
     <a class="btn btn-outline-secondary" href="{{ url_for('vermietung.mitarbeiter_liste') }}">Mitarbeiter verwalten</a>
     <a class="btn btn-primary" href="{{ url_for('vermietung.neue_maschine') }}">+ Neue Maschine</a>
+    {% endif %}
   </div>
-  {% endif %}
 </div>
 
 {% if rows %}

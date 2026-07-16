@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Vermietung — Reservationen{% endblock %}
+{% block content %}
+{% set res_badge = {'angefragt': 'bg-info text-dark', 'bestaetigt': 'bg-success', 'abgelehnt': 'bg-secondary', 'storniert': 'bg-secondary'} %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3 m-0">Reservationen</h1>
+  <a class="btn btn-outline-secondary" href="{{ url_for('vermietung.liste') }}">← Zur Vermietung</a>
+</div>
+
+{% macro res_zeile(a, aktionen) %}
+<tr>
+  <td>{{ a.r.von }} – {{ a.r.bis }}</td>
+  <td class="fw-semibold">{% if a.maschine %}{{ a.maschine.bezeichnung }}{% else %}<span class="text-muted">— gelöscht —</span>{% endif %}</td>
+  <td class="small">{% if a.mieter %}{{ a.mieter.name }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+  <td class="small">{{ a.r.zweck or '—' }}</td>
+  <td class="small text-muted">{{ a.r.angefragt_von|mitarbeiter_name }}</td>
+  {% if aktionen %}
+  <td class="text-end">
+    {% if a.r.status == 'angefragt' and ist_verwalter %}
+    <form method="post" action="{{ url_for('vermietung.reservation_bestaetigen', res_id=a.r.id) }}" class="d-inline">
+      <button class="btn btn-sm btn-success">✓ Bestätigen</button>
+    </form>
+    <form method="post" action="{{ url_for('vermietung.reservation_ablehnen', res_id=a.r.id) }}" class="d-inline">
+      <button class="btn btn-sm btn-outline-danger">Ablehnen</button>
+    </form>
+    {% endif %}
+    {% if a.r.status in ('angefragt', 'bestaetigt') %}
+    <form method="post" action="{{ url_for('vermietung.reservation_stornieren', res_id=a.r.id) }}" class="d-inline"
+          onsubmit="return confirm('Reservation stornieren?');">
+      <button class="btn btn-sm btn-outline-secondary">Stornieren</button>
+    </form>
+    {% endif %}
+  </td>
+  {% endif %}
+</tr>
+{% endmacro %}
+
+<h2 class="h5 mb-2">Reservation anfragen</h2>
+<form method="post" action="{{ url_for('vermietung.reservation_neu') }}" class="card card-body mb-4">
+  <div class="row g-2 align-items-end">
+    <div class="col-md-3">
+      <label class="form-label small mb-0">Maschine</label>
+      <select name="maschine_id" class="form-select form-select-sm" required>
+        <option value="">— wählen —</option>
+        {% for m in maschinen %}<option value="{{ m.id }}">{{ m.bezeichnung }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label small mb-0">Mitarbeiter</label>
+      <select name="mieter_id" class="form-select form-select-sm" required>
+        <option value="">— wählen —</option>
+        {% for mi in alle_mieter %}<option value="{{ mi.id }}">{{ mi.name }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <label class="form-label small mb-0">Von</label>
+      <input type="date" name="von" class="form-control form-control-sm" value="{{ heute }}" required>
+    </div>
+    <div class="col-md-2">
+      <label class="form-label small mb-0">Bis</label>
+      <input type="date" name="bis" class="form-control form-control-sm" value="{{ heute }}" required>
+    </div>
+    <div class="col-md-2">
+      <button type="submit" class="btn btn-sm btn-primary w-100">{% if ist_verwalter %}Reservieren{% else %}Anfragen{% endif %}</button>
+    </div>
+    <div class="col-12">
+      <input type="text" name="zweck" class="form-control form-control-sm" placeholder="Zweck / Notiz (optional)">
+    </div>
+  </div>
+  {% if not ist_verwalter %}<div class="text-muted small mt-1">Deine Anfrage wird vom Verwalter bestätigt. Kollisionen mit bestätigten Reservationen werden automatisch geprüft.</div>{% endif %}
+</form>
+
+<h2 class="h5 mb-2">Offene Anfragen ({{ offen|length }})</h2>
+{% if offen %}
+<div class="card mb-4"><div class="table-responsive"><table class="table table-kompakt m-0 align-middle">
+  <thead class="table-light"><tr><th>Zeitraum</th><th>Maschine</th><th>Mitarbeiter</th><th>Zweck</th><th>Angefragt von</th><th></th></tr></thead>
+  <tbody>{% for a in offen %}{{ res_zeile(a, true) }}{% endfor %}</tbody>
+</table></div></div>
+{% else %}<div class="alert alert-light border">Keine offenen Anfragen.</div>{% endif %}
+
+<h2 class="h5 mb-2">Bestätigte Reservationen ({{ bestaetigt|length }})</h2>
+{% if bestaetigt %}
+<div class="card mb-4"><div class="table-responsive"><table class="table table-kompakt m-0 align-middle">
+  <thead class="table-light"><tr><th>Zeitraum</th><th>Maschine</th><th>Mitarbeiter</th><th>Zweck</th><th>Von</th><th></th></tr></thead>
+  <tbody>{% for a in bestaetigt %}{{ res_zeile(a, true) }}{% endfor %}</tbody>
+</table></div></div>
+{% else %}<div class="alert alert-light border">Keine bestätigten Reservationen.</div>{% endif %}
+
+{% if erledigt %}
+<h2 class="h6 mb-2 text-muted">Abgelehnt / storniert</h2>
+<div class="card"><div class="table-responsive"><table class="table table-kompakt table-sm m-0">
+  <tbody>
+    {% for a in erledigt %}
+    <tr class="text-muted">
+      <td><span class="badge {{ res_badge.get(a.r.status,'bg-secondary') }}">{{ status_label[a.r.status] }}</span></td>
+      <td>{{ a.r.von }} – {{ a.r.bis }}</td>
+      <td>{% if a.maschine %}{{ a.maschine.bezeichnung }}{% else %}—{% endif %}</td>
+      <td>{% if a.mieter %}{{ a.mieter.name }}{% else %}—{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table></div></div>
+{% endif %}
+{% endblock %}

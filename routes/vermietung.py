@@ -9,12 +9,17 @@ from datetime import date
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
+from datetime import datetime
+
 from models.repos import (
+    RESERVATION_STATUS_LABEL,
     VERMIET_STATUS,
     VERMIET_STATUS_LABEL,
     mieter,
     mieter_sortiert,
     mietmaschinen,
+    mietreservationen,
+    reservation_konflikt,
 )
 
 bp = Blueprint("vermietung", __name__)
@@ -187,3 +192,126 @@ def delete_mitarbeiter(mieter_id: str):
     mieter.delete(mieter_id)
     flash("Mitarbeiter gelöscht.", "info")
     return redirect(url_for("vermietung.mitarbeiter_liste"))
+
+
+# ----- Reservationen (mit Datumsprüfung + Anfrage-Workflow) --------------------
+
+@bp.route("/reservationen")
+@login_required
+def reservationen():
+    maschinen_idx = {m["id"]: m for m in mietmaschinen.list()}
+    mieter_idx = {m["id"]: m for m in mieter.list()}
+
+    def _aufbereiten(r):
+        return {
+            "r": r,
+            "maschine": maschinen_idx.get(r.get("maschine_id")),
+            "mieter": mieter_idx.get(r.get("mieter_id")),
+        }
+
+    alle = [_aufbereiten(r) for r in mietreservationen.list()]
+    offen = sorted([a for a in alle if a["r"].get("status") == "angefragt"],
+                   key=lambda a: a["r"].get("von", ""))
+    bestaetigt = sorted([a for a in alle if a["r"].get("status") == "bestaetigt"],
+                        key=lambda a: a["r"].get("von", ""))
+    erledigt = sorted([a for a in alle if a["r"].get("status") in ("abgelehnt", "storniert")],
+                      key=lambda a: a["r"].get("von", ""), reverse=True)
+    return render_template(
+        "vermietung/reservationen.html",
+        offen=offen, bestaetigt=bestaetigt, erledigt=erledigt,
+        maschinen=sorted(mietmaschinen.list(), key=lambda x: x.get("bezeichnung", "").lower()),
+        alle_mieter=mieter_sortiert(),
+        status_label=RESERVATION_STATUS_LABEL,
+        heute=date.today().isoformat(),
+        ist_verwalter=current_user.ist_vermietung_verwalter,
+    )
+
+
+@bp.route("/reservationen/neu", methods=["POST"])
+@login_required
+def reservation_neu():
+    maschine_id = request.form.get("maschine_id", "").strip()
+    mieter_id = request.form.get("mieter_id", "").strip()
+    von = request.form.get("von", "").strip()
+    bis = request.form.get("bis", "").strip()
+    if not (maschine_id and mietmaschinen.get(maschine_id)):
+        flash("Bitte eine Maschine wählen.", "warning")
+        return redirect(url_for("vermietung.reservationen"))
+    if not (mieter_id and mieter.get(mieter_id)):
+        flash("Bitte einen Mitarbeiter wählen.", "warning")
+        return redirect(url_for("vermietung.reservationen"))
+    if not von or not bis or von > bis:
+        flash("Bitte gültigen Zeitraum (von ≤ bis) angeben.", "warning")
+        return redirect(url_for("vermietung.reservationen"))
+
+    # Datumsprüfung gegen bestätigte Reservationen — kein Doppelbuchen.
+    konflikt = reservation_konflikt(maschine_id, von, bis)
+    if konflikt:
+        flash(f"Zeitraum kollidiert mit einer bestätigten Reservation ({konflikt.get('von')} – {konflikt.get('bis')}).", "warning")
+        return redirect(url_for("vermietung.reservationen"))
+
+    # Verwalter-Anfragen sind direkt bestätigt, sonst 'angefragt'.
+    verwalter = current_user.ist_vermietung_verwalter
+    mietreservationen.create({
+        "maschine_id": maschine_id,
+        "mieter_id": mieter_id,
+        "von": von,
+        "bis": bis,
+        "zweck": request.form.get("zweck", "").strip(),
+        "status": "bestaetigt" if verwalter else "angefragt",
+        "angefragt_von": current_user.username,
+        "angefragt_am": datetime.now().isoformat(timespec="seconds"),
+        "entschieden_von": current_user.username if verwalter else "",
+    })
+    flash("Reservation bestätigt." if verwalter else "Reservationsanfrage gesendet — der Verwalter entscheidet.", "success")
+    return redirect(url_for("vermietung.reservationen"))
+
+
+@bp.route("/reservationen/<res_id>/bestaetigen", methods=["POST"])
+@login_required
+def reservation_bestaetigen(res_id: str):
+    _require_verwalter()
+    r = mietreservationen.get(res_id)
+    if not r:
+        abort(404)
+    konflikt = reservation_konflikt(r.get("maschine_id"), r.get("von", ""), r.get("bis", ""), ignore_id=res_id)
+    if konflikt:
+        flash(f"Kann nicht bestätigen — kollidiert mit bestätigter Reservation ({konflikt.get('von')} – {konflikt.get('bis')}).", "warning")
+        return redirect(url_for("vermietung.reservationen"))
+    mietreservationen.update(res_id, {
+        "status": "bestaetigt",
+        "entschieden_von": current_user.username,
+        "entschieden_am": datetime.now().isoformat(timespec="seconds"),
+    })
+    flash("Reservation bestätigt.", "success")
+    return redirect(url_for("vermietung.reservationen"))
+
+
+@bp.route("/reservationen/<res_id>/ablehnen", methods=["POST"])
+@login_required
+def reservation_ablehnen(res_id: str):
+    _require_verwalter()
+    r = mietreservationen.get(res_id)
+    if not r:
+        abort(404)
+    mietreservationen.update(res_id, {
+        "status": "abgelehnt",
+        "entschieden_von": current_user.username,
+        "entschieden_am": datetime.now().isoformat(timespec="seconds"),
+    })
+    flash("Reservationsanfrage abgelehnt.", "info")
+    return redirect(url_for("vermietung.reservationen"))
+
+
+@bp.route("/reservationen/<res_id>/stornieren", methods=["POST"])
+@login_required
+def reservation_stornieren(res_id: str):
+    r = mietreservationen.get(res_id)
+    if not r:
+        abort(404)
+    # Eigene Anfrage stornieren, oder Verwalter storniert beliebige.
+    if not current_user.ist_vermietung_verwalter and r.get("angefragt_von") != current_user.username:
+        abort(403)
+    mietreservationen.update(res_id, {"status": "storniert"})
+    flash("Reservation storniert.", "info")
+    return redirect(url_for("vermietung.reservationen"))

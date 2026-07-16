@@ -54,6 +54,7 @@ benachrichtigungen = JsonStore("benachrichtigungen.json")
 push_subscriptions = JsonStore("push_subscriptions.json")
 mietmaschinen = JsonStore("mietmaschinen.json")
 mieter = JsonStore("mieter.json")
+mietreservationen = JsonStore("mietreservationen.json")
 
 VERMIET_STATUS = ["verfuegbar", "ausgeliehen", "wartung"]
 VERMIET_STATUS_LABEL = {
@@ -62,9 +63,33 @@ VERMIET_STATUS_LABEL = {
     "wartung": "Nicht verfügbar",
 }
 
+RESERVATION_STATUS_LABEL = {
+    "angefragt": "Angefragt",
+    "bestaetigt": "Bestätigt",
+    "abgelehnt": "Abgelehnt",
+    "storniert": "Storniert",
+}
+
 
 def mieter_sortiert() -> List[Dict[str, Any]]:
     return sorted(mieter.list(), key=lambda m: (m.get("name", "").lower()))
+
+
+def _zeitraum_ueberlappt(a_von: str, a_bis: str, b_von: str, b_bis: str) -> bool:
+    """Zwei Datums-Zeiträume überlappen (inklusive Randtage)."""
+    return a_von <= b_bis and b_von <= a_bis
+
+
+def reservation_konflikt(maschine_id: str, von: str, bis: str, ignore_id: str = "") -> Optional[Dict[str, Any]]:
+    """Erste kollidierende BESTÄTIGTE Reservation derselben Maschine, sonst None."""
+    for r in mietreservationen.list():
+        if r.get("maschine_id") != maschine_id or r.get("status") != "bestaetigt":
+            continue
+        if ignore_id and r.get("id") == ignore_id:
+            continue
+        if _zeitraum_ueberlappt(von, bis, r.get("von", ""), r.get("bis", "")):
+            return r
+    return None
 
 
 # ----- Konstanten -------------------------------------------------------------
