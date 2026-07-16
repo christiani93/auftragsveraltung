@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Vermietung — Mitarbeiter{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3 m-0">Mitarbeiter / Ausleiher</h1>
+  <a class="btn btn-outline-secondary" href="{{ url_for('vermietung.liste') }}">← Zurück zur Vermietung</a>
+</div>
+
+{% if alle_mieter %}
+<div class="card mb-4">
+  <div class="table-responsive">
+    <table class="table table-kompakt m-0 align-middle">
+      <thead class="table-light">
+        <tr><th>Name</th><th>Notiz</th><th>Account</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for m in alle_mieter %}
+        <tr>
+          <td class="fw-semibold">{{ m.name }}</td>
+          <td class="small">{{ m.notiz or '—' }}</td>
+          <td class="small">{% if m.user_username %}<code>{{ m.user_username }}</code>{% else %}<span class="text-muted">—</span>{% endif %}</td>
+          <td class="text-end">
+            <form method="post" action="{{ url_for('vermietung.delete_mitarbeiter', mieter_id=m.id) }}" class="d-inline"
+                  onsubmit="return confirm('Mitarbeiter „{{ m.name }}“ löschen? Zugeordnete Maschinen werden freigegeben.');">
+              <button type="submit" class="btn btn-sm btn-outline-danger">Löschen</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="alert alert-light border">Noch keine Mitarbeiter erfasst.</div>
+{% endif %}
+
+<h2 class="h5 mb-2">Neuer Mitarbeiter</h2>
+<form method="post" action="{{ url_for('vermietung.neuer_mitarbeiter') }}" class="card card-body">
+  <div class="row g-3 align-items-end">
+    <div class="col-md-4">
+      <label class="form-label">Name *</label>
+      <input type="text" name="name" class="form-control" required>
+    </div>
+    <div class="col-md-5">
+      <label class="form-label">Notiz</label>
+      <input type="text" name="notiz" class="form-control" placeholder="z.B. Abteilung / Telefon">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Login-Username (optional)</label>
+      <input type="text" name="user_username" class="form-control" placeholder="für spätere Account-Verknüpfung">
+    </div>
+    <div class="col-12">
+      <button type="submit" class="btn btn-primary">+ Hinzufügen</button>
+    </div>
+  </div>
+</form>
+{% endblock %}

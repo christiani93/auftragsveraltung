@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Vermietung{% endblock %}
+{% block content %}
+{% set status_badge = {'verfuegbar': 'bg-success', 'ausgeliehen': 'bg-warning text-dark', 'wartung': 'bg-secondary'} %}
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div>
+    <h1 class="h3 m-0">Vermietung</h1>
+    <div class="text-muted small">Maschinen-Verfügbarkeit{% if anzahl_ausgeliehen %} · {{ anzahl_ausgeliehen }} ausgeliehen{% endif %}</div>
+  </div>
+  {% if ist_verwalter %}
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{{ url_for('vermietung.mitarbeiter_liste') }}">Mitarbeiter verwalten</a>
+    <a class="btn btn-primary" href="{{ url_for('vermietung.neue_maschine') }}">+ Neue Maschine</a>
+  </div>
+  {% endif %}
+</div>
+
+{% if rows %}
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-kompakt table-hover m-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Status</th>
+          <th>Bezeichnung</th>
+          <th>Inventarnr.</th>
+          <th>Kategorie</th>
+          <th>Ausgeliehen an</th>
+          {% if ist_verwalter %}<th class="text-end">Aktion</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td><span class="badge {{ status_badge.get(r.m.status, 'bg-secondary') }}">{{ status_label.get(r.m.status, r.m.status) }}</span></td>
+          <td class="fw-semibold">
+            {% if ist_verwalter %}<a href="{{ url_for('vermietung.edit_maschine', maschine_id=r.m.id) }}" class="text-decoration-none">{{ r.m.bezeichnung }}</a>{% else %}{{ r.m.bezeichnung }}{% endif %}
+            {% if r.m.notizen %}<div class="text-muted small">{{ r.m.notizen }}</div>{% endif %}
+          </td>
+          <td class="small">{{ r.m.inventarnr or '—' }}</td>
+          <td class="small">{{ r.m.kategorie or '—' }}</td>
+          <td class="small">
+            {% if r.m.status == 'ausgeliehen' and r.mieter %}{{ r.mieter.name }}{% if r.m.ausgeliehen_seit %}<div class="text-muted">seit {{ r.m.ausgeliehen_seit }}</div>{% endif %}
+            {% else %}<span class="text-muted">—</span>{% endif %}
+          </td>
+          {% if ist_verwalter %}
+          <td class="text-end">
+            {% if r.m.status == 'verfuegbar' %}
+            <form method="post" action="{{ url_for('vermietung.ausleihen', maschine_id=r.m.id) }}" class="d-inline-flex align-items-center gap-1">
+              <select name="mieter_id" class="form-select form-select-sm" style="width:auto;" required>
+                <option value="">— Mitarbeiter —</option>
+                {% for mi in alle_mieter %}<option value="{{ mi.id }}">{{ mi.name }}</option>{% endfor %}
+              </select>
+              <input type="date" name="datum" class="form-control form-control-sm" style="width:auto;" value="{{ heute }}">
+              <button type="submit" class="btn btn-sm btn-warning">Ausleihen</button>
+            </form>
+            {% elif r.m.status == 'ausgeliehen' %}
+            <form method="post" action="{{ url_for('vermietung.zurueck', maschine_id=r.m.id) }}" class="d-inline">
+              <button type="submit" class="btn btn-sm btn-outline-success">✓ Zurückgenommen</button>
+            </form>
+            {% endif %}
+            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('vermietung.edit_maschine', maschine_id=r.m.id) }}">Bearbeiten</a>
+          </td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="alert alert-info">
+  Noch keine Maschinen erfasst.{% if ist_verwalter %} <a href="{{ url_for('vermietung.neue_maschine') }}">Erste Maschine anlegen →</a>{% endif %}
+</div>
+{% endif %}
+{% if not ist_verwalter %}
+<p class="text-muted small mt-2">Ausleihen und Rückgaben werden vom Vermietungs-Verwalter erfasst.</p>
+{% endif %}
+{% endblock %}

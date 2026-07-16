@@ -105,6 +105,14 @@ class User(UserMixin):
         return key in self.module_zugriff
 
     @property
+    def ist_vermietung_verwalter(self) -> bool:
+        """Verwalter darf im Vermietungs-Modul ausleihen/zurücknehmen und
+        Maschinen/Mitarbeiter verwalten. Admin ist immer Verwalter."""
+        if self.is_admin:
+            return True
+        return bool(self._data.get("vermietung_verwalter"))
+
+    @property
     def passwort_aendern_pflicht(self) -> bool:
         """True wenn der User sein Passwort beim naechsten Login zwingend aendern muss
         (z.B. weil Admin ihm ein Ersatz-Passwort vergeben hat)."""
@@ -177,6 +185,14 @@ def set_module(username: str, module_keys) -> bool:
         return False
     gueltig = [k for k in (module_keys or []) if k in MODULE]
     users_store.update(user.record_id, {"module": gueltig})
+    return True
+
+
+def set_vermietung_verwalter(username: str, wert: bool) -> bool:
+    user = find_user(username)
+    if not user:
+        return False
+    users_store.update(user.record_id, {"vermietung_verwalter": bool(wert)})
     return True
 
 

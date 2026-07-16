@@ -16,6 +16,7 @@ from models.users import (
     set_module,
     set_password,
     set_role,
+    set_vermietung_verwalter,
 )
 
 bp = Blueprint("auth", __name__)
@@ -71,7 +72,9 @@ def user_list():
 def change_module_route(username: str):
     _require_admin()
     keys = request.form.getlist("module")
-    if set_module(username, keys):
+    ok = set_module(username, keys)
+    set_vermietung_verwalter(username, request.form.get("vermietung_verwalter") == "on")
+    if ok:
         flash(f"Modul-Zugriff für „{username}“ gespeichert.", "success")
     else:
         flash("User nicht gefunden.", "warning")

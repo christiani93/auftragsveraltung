@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}{{ "Neue Maschine" if neu else "Maschine bearbeiten" }}{% endblock %}
+{% block content %}
+<h1 class="h3 mb-3">{{ "Neue Maschine" if neu else "Maschine bearbeiten" }}</h1>
+
+<form method="post" class="card card-body">
+  <div class="row g-3">
+    <div class="col-md-6">
+      <label class="form-label">Bezeichnung *</label>
+      <input type="text" name="bezeichnung" class="form-control" value="{{ maschine.bezeichnung or '' }}" required autofocus>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Inventarnummer</label>
+      <input type="text" name="inventarnr" class="form-control" value="{{ maschine.inventarnr or '' }}">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Kategorie</label>
+      <input type="text" name="kategorie" class="form-control" value="{{ maschine.kategorie or '' }}" placeholder="z.B. Bohrmaschine">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Status</label>
+      <select name="status" class="form-select">
+        {% for s in status_optionen %}
+        <option value="{{ s }}" {% if maschine.status == s %}selected{% endif %}>{{ status_label[s] }}</option>
+        {% endfor %}
+      </select>
+      <small class="text-muted">„Ausgeliehen" wird normalerweise über die Übersicht gesetzt.</small>
+    </div>
+    <div class="col-12">
+      <label class="form-label">Notizen</label>
+      <textarea name="notizen" class="form-control" rows="3">{{ maschine.notizen or '' }}</textarea>
+    </div>
+  </div>
+
+  <div class="mt-4 d-flex gap-2 justify-content-between">
+    <div class="d-flex gap-2">
+      <button type="submit" class="btn btn-primary">Speichern</button>
+      <a class="btn btn-outline-secondary" href="{{ url_for('vermietung.liste') }}">Abbrechen</a>
+    </div>
+    {% if not neu %}
+    <button type="button" class="btn btn-outline-danger"
+            onclick="if(confirm('Maschine löschen?')) document.getElementById('delete-form').submit();">Löschen</button>
+    {% endif %}
+  </div>
+</form>
+
+{% if not neu %}
+<form id="delete-form" method="post" action="{{ url_for('vermietung.delete_maschine', maschine_id=maschine.id) }}" class="d-none"></form>
+{% endif %}
+{% endblock %}

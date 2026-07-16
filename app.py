@@ -27,6 +27,7 @@ from routes.messgeraete import bp as messgeraete_bp
 from routes.pdf_export import bp as pdf_bp
 from routes.protocols import bp as protocols_bp
 from routes.revisionen import bp as revisionen_bp
+from routes.vermietung import bp as vermietung_bp
 from routes.zeit import bp as zeit_bp
 
 
@@ -114,6 +115,7 @@ def create_app() -> Flask:
     app.register_blueprint(revisionen_bp, url_prefix="/revisionen")
     app.register_blueprint(pdf_bp, url_prefix="/pdf")
     app.register_blueprint(benachrichtigungen_bp, url_prefix="/benachrichtigungen")
+    app.register_blueprint(vermietung_bp, url_prefix="/vermietung")
 
     from models.repos import fi_erforderlich
     app.jinja_env.globals["fi_erforderlich"] = fi_erforderlich

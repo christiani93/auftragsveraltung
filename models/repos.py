@@ -52,6 +52,19 @@ revisionen = JsonStore("revisionen.json")
 leistungsschalter = JsonStore("leistungsschalter.json")
 benachrichtigungen = JsonStore("benachrichtigungen.json")
 push_subscriptions = JsonStore("push_subscriptions.json")
+mietmaschinen = JsonStore("mietmaschinen.json")
+mieter = JsonStore("mieter.json")
+
+VERMIET_STATUS = ["verfuegbar", "ausgeliehen", "wartung"]
+VERMIET_STATUS_LABEL = {
+    "verfuegbar": "Verfügbar",
+    "ausgeliehen": "Ausgeliehen",
+    "wartung": "Nicht verfügbar",
+}
+
+
+def mieter_sortiert() -> List[Dict[str, Any]]:
+    return sorted(mieter.list(), key=lambda m: (m.get("name", "").lower()))
 
 
 # ----- Konstanten -------------------------------------------------------------
