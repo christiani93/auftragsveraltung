@@ -113,6 +113,7 @@ def _form_to_teil(form) -> dict:
         "kabel": form.get("kabel", "").strip(),
         "sicherungsnr": form.get("sicherungsnr", "").strip(),
         "sicherungstyp": form.get("sicherungstyp", "").strip(),
+        "charakteristik": form.get("charakteristik", "").strip(),
         "fi_typ_ma": form.get("fi_typ_ma", "").strip(),
         # Kontroll-Status — neue Anlagenteile gelten als geprueft (Bestand);
         # kontrollpflichtig werden sie erst, wenn ein Messprotokoll erstellt wird.

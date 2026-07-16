@@ -156,6 +156,7 @@ MESSPUNKT_FELDER = [
     {"name": "kabel",          "label": "Kabeltyp / Querschnitt", "input": "text", "gruppe": "Kabel",        "placeholder": "z.B. 3x1.5mm²", "width": "130"},
     {"name": "sicherungsnr",   "label": "Sicherungsnr.",          "input": "text", "gruppe": "Sicherung",    "placeholder": "z.B. F11", "width": "90"},
     {"name": "sicherungstyp",  "label": "LS / NH etc.",           "input": "text", "gruppe": "Schutzorgan",  "placeholder": "z.B. FI-LS", "width": "100"},
+    {"name": "charakteristik", "label": "Char. [B/C/D]",          "input": "text", "gruppe": "Schutzorgan",  "placeholder": "z.B. C", "width": "70"},
     {"name": "sicherung_a",    "label": "Nennstrom [A]",          "input": "text", "gruppe": "Schutzorgan",  "placeholder": "z.B. 16", "width": "90"},
     {"name": "fi_typ_ma",      "label": "FI Typ / I∆n [mA]",      "input": "text", "gruppe": "Schutzorgan",  "placeholder": "z.B. 30mA", "width": "100"},
     {"name": "sichtkontrolle", "label": "Sichtkontrolle",         "input": "io",   "gruppe": "Obligatorisch", "width": "90"},

@@ -91,6 +91,15 @@
       <label class="form-label">Sicherungstyp (LS / NH etc.)</label>
       <input type="text" name="sicherungstyp" class="form-control" value="{{ teil.sicherungstyp or '' }}" placeholder="z.B. LS B16 / FI-LS">
     </div>
+    <div class="col-md-2">
+      <label class="form-label">Charakteristik</label>
+      <input type="text" name="charakteristik" class="form-control" list="charakteristik-optionen" value="{{ teil.charakteristik or '' }}" placeholder="B / C / D">
+      <datalist id="charakteristik-optionen">
+        <option value="B"></option>
+        <option value="C"></option>
+        <option value="D"></option>
+      </datalist>
+    </div>
     <div class="col-md-6">
       <label class="form-label">FI Typ / I∆n [mA]</label>
       <input type="text" name="fi_typ_ma" class="form-control" value="{{ teil.fi_typ_ma or '' }}" placeholder="z.B. A 30mA">

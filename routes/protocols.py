@@ -65,6 +65,7 @@ def _messpunkt_aus_teil(teil: dict, datum: str, pruefer: str = "") -> dict:
         "kabel": teil.get("kabel", ""),
         "sicherungsnr": teil.get("sicherungsnr", ""),
         "sicherungstyp": teil.get("sicherungstyp", ""),
+        "charakteristik": teil.get("charakteristik", ""),
         "fi_typ_ma": teil.get("fi_typ_ma", ""),
         "sichtkontrolle": "",
         "schutzleiter": "",
@@ -143,6 +144,7 @@ def _aufbau_aus_messpunkten(anlage_id: str, messungen: list[dict], parent_id: st
             "kabel": (m.get("kabel") or "").strip(),
             "sicherungsnr": (m.get("sicherungsnr") or "").strip(),
             "sicherungstyp": (m.get("sicherungstyp") or "").strip(),
+            "charakteristik": (m.get("charakteristik") or "").strip(),
             "fi_typ_ma": (m.get("fi_typ_ma") or "").strip(),
             # Schutzorgan-Nennstrom als Stromstärke des Teils übernehmen
             "stromstaerke_a": (m.get("sicherung_a") or "").strip(),
