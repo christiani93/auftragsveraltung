@@ -4,6 +4,7 @@ from __future__ import annotations
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 
+from models.modules import MODULE
 from models.users import (
     USER_ROLE_LABEL,
     USER_ROLES,
@@ -12,6 +13,7 @@ from models.users import (
     find_user,
     generate_initial_password,
     list_users,
+    set_module,
     set_password,
     set_role,
 )
@@ -60,7 +62,20 @@ def user_list():
         users=list_users(),
         roles=USER_ROLES,
         role_label=USER_ROLE_LABEL,
+        module=MODULE,
     )
+
+
+@bp.route("/users/<username>/module", methods=["POST"])
+@login_required
+def change_module_route(username: str):
+    _require_admin()
+    keys = request.form.getlist("module")
+    if set_module(username, keys):
+        flash(f"Modul-Zugriff für „{username}“ gespeichert.", "success")
+    else:
+        flash("User nicht gefunden.", "warning")
+    return redirect(url_for("auth.user_list"))
 
 
 @bp.route("/users/neu", methods=["POST"])

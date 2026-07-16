@@ -7,6 +7,7 @@ from typing import Any, Dict, Optional
 from flask_login import UserMixin
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from .modules import MODULE, STANDARD_MODULE_KEYS
 from .storage import JsonStore
 
 users_store = JsonStore("users.json")
@@ -89,6 +90,21 @@ class User(UserMixin):
         return self.role in ("admin", "projektleiter")
 
     @property
+    def module_zugriff(self) -> set:
+        """Freigeschaltete Module. Ohne explizite Konfiguration -> Standardmodule
+        (rueckwaertskompatibel; bestehende User behalten alle heutigen Funktionen)."""
+        gespeichert = self._data.get("module")
+        if isinstance(gespeichert, list):
+            return set(gespeichert)
+        return set(STANDARD_MODULE_KEYS)
+
+    def darf_modul(self, key: str) -> bool:
+        """Admin darf alles; sonst nur freigeschaltete Module."""
+        if self.is_admin:
+            return True
+        return key in self.module_zugriff
+
+    @property
     def passwort_aendern_pflicht(self) -> bool:
         """True wenn der User sein Passwort beim naechsten Login zwingend aendern muss
         (z.B. weil Admin ihm ein Ersatz-Passwort vergeben hat)."""
@@ -151,6 +167,16 @@ def set_role(username: str, new_role: str) -> bool:
     if role not in USER_ROLES:
         raise ValueError(f"Ungültige Rolle: {new_role}")
     users_store.update(user.record_id, {"role": role})
+    return True
+
+
+def set_module(username: str, module_keys) -> bool:
+    """Setzt die freigeschalteten Module eines Users (nur gültige Keys)."""
+    user = find_user(username)
+    if not user:
+        return False
+    gueltig = [k for k in (module_keys or []) if k in MODULE]
+    users_store.update(user.record_id, {"module": gueltig})
     return True
 
 

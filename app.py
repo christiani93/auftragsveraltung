@@ -148,7 +148,7 @@ def create_app() -> Flask:
 
     @app.before_request
     def require_login():
-        from flask import request
+        from flask import flash, request
         from flask_login import current_user
         # Diese Pfade brauchen keinen Login
         public_endpoints = {"auth.login", "service_worker", "static"}
@@ -167,6 +167,14 @@ def create_app() -> Flask:
             erlaubt = {"auth.profil", "auth.change_password_route", "auth.logout"}
             if request.endpoint not in erlaubt:
                 return redirect(url_for("auth.profil"))
+        # Modul-Zugriffssteuerung: gehoert der Blueprint zu einem Modul, das der
+        # User nicht freigeschaltet hat -> zurueck aufs Dashboard.
+        from models.modules import BLUEPRINT_MODULE
+        bp_name = (request.endpoint or "").split(".")[0]
+        modul = BLUEPRINT_MODULE.get(bp_name)
+        if modul and not current_user.darf_modul(modul):
+            flash("Kein Zugriff auf diesen Bereich.", "warning")
+            return redirect(url_for("kontrolle.dashboard"))
         return None
 
     @app.route("/")
