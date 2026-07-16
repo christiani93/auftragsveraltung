@@ -30,6 +30,24 @@
       <label class="form-label">Zählernummer</label>
       <input type="text" name="zaehlernummer" class="form-control" value="{{ anlage.zaehlernummer or '' }}" placeholder="z.B. Zähler-Nr. des EW">
     </div>
+    <div class="col-md-4">
+      <label class="form-label">Spannung</label>
+      <input type="text" name="spannung" class="form-control" value="{{ anlage.spannung or '' }}" placeholder="z.B. 3x400V / 230V">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Erdungsart</label>
+      <input type="text" name="erdungsart" class="form-control" list="erdungsart-optionen" value="{{ anlage.erdungsart or '' }}" placeholder="z.B. Fundament">
+      <datalist id="erdungsart-optionen">
+        <option value="Fundament"></option>
+        <option value="Wasserleitung"></option>
+        <option value="Wasserleitung / Fundament"></option>
+        <option value="Tiefenerder"></option>
+      </datalist>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">HAK-Sicherung</label>
+      <input type="text" name="hak_sicherung" class="form-control" value="{{ anlage.hak_sicherung or '' }}" placeholder="z.B. 3x50A">
+    </div>
     <div class="col-md-6">
       <label class="form-label">Nächste periodische Kontrolle</label>
       <input type="date" name="naechste_periodische_kontrolle" class="form-control"

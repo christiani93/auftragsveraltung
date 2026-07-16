@@ -8,6 +8,13 @@
     </div>
     <h1 class="h3 m-0">{{ anlage.bezeichnung }}</h1>
     <div class="text-muted">{{ anlage.standort or '' }}{% if anlage.baujahr %} · Baujahr {{ anlage.baujahr }}{% endif %}{% if anlage.zaehlernummer %} · Zähler-Nr. {{ anlage.zaehlernummer }}{% endif %}</div>
+    {% if anlage.spannung or anlage.erdungsart or anlage.hak_sicherung %}
+    <div class="text-muted small">
+      {% if anlage.spannung %}Spannung {{ anlage.spannung }}{% endif %}
+      {% if anlage.erdungsart %}{% if anlage.spannung %} · {% endif %}Erdung: {{ anlage.erdungsart }}{% endif %}
+      {% if anlage.hak_sicherung %}{% if anlage.spannung or anlage.erdungsart %} · {% endif %}HAK: {{ anlage.hak_sicherung }}{% endif %}
+    </div>
+    {% endif %}
   </div>
   <div class="d-flex gap-2 flex-wrap">
     <a class="btn btn-outline-secondary" href="{{ url_for('installations.edit_installation', anlage_id=anlage.id) }}">Bearbeiten</a>

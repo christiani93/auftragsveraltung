@@ -39,7 +39,9 @@
 <div class="print-header d-none d-print-block mb-3">
   <h2>Messprotokoll</h2>
   {% if kunde %}<div><strong>Kunde:</strong> {{ kunde.name }}{% if kunde.ort %}, {{ kunde.plz }} {{ kunde.ort }}{% endif %}</div>{% endif %}
-  {% if anlage %}<div><strong>Anlage:</strong> {{ anlage.bezeichnung }}{% if anlage.standort %} – {{ anlage.standort }}{% endif %}{% if anlage.zaehlernummer %} · <strong>Zähler-Nr.:</strong> {{ anlage.zaehlernummer }}{% endif %}</div>{% endif %}
+  {% if anlage %}<div><strong>Anlage:</strong> {{ anlage.bezeichnung }}{% if anlage.standort %} – {{ anlage.standort }}{% endif %}{% if anlage.zaehlernummer %} · <strong>Zähler-Nr.:</strong> {{ anlage.zaehlernummer }}{% endif %}</div>
+  {% if anlage.spannung or anlage.erdungsart or anlage.hak_sicherung %}<div>{% if anlage.spannung %}<strong>Spannung:</strong> {{ anlage.spannung }}{% endif %}{% if anlage.erdungsart %} · <strong>Erdungsart:</strong> {{ anlage.erdungsart }}{% endif %}{% if anlage.hak_sicherung %} · <strong>HAK-Sicherung:</strong> {{ anlage.hak_sicherung }}{% endif %}</div>{% endif %}
+  {% endif %}
 </div>
 
 <div class="card card-body mb-3 protokoll-meta">
@@ -74,6 +76,24 @@
     <div class="col-md-4">
       <div class="text-muted small">Zählernummer</div>
       <div class="fw-semibold">{{ anlage.zaehlernummer }}</div>
+    </div>
+    {% endif %}
+    {% if anlage and anlage.spannung %}
+    <div class="col-md-4">
+      <div class="text-muted small">Spannung</div>
+      <div class="fw-semibold">{{ anlage.spannung }}</div>
+    </div>
+    {% endif %}
+    {% if anlage and anlage.erdungsart %}
+    <div class="col-md-4">
+      <div class="text-muted small">Erdungsart</div>
+      <div class="fw-semibold">{{ anlage.erdungsart }}</div>
+    </div>
+    {% endif %}
+    {% if anlage and anlage.hak_sicherung %}
+    <div class="col-md-4">
+      <div class="text-muted small">HAK-Sicherung</div>
+      <div class="fw-semibold">{{ anlage.hak_sicherung }}</div>
     </div>
     {% endif %}
     <div class="col-12">
