@@ -39,7 +39,7 @@
 <div class="print-header d-none d-print-block mb-3">
   <h2>Messprotokoll</h2>
   {% if kunde %}<div><strong>Kunde:</strong> {{ kunde.name }}{% if kunde.ort %}, {{ kunde.plz }} {{ kunde.ort }}{% endif %}</div>{% endif %}
-  {% if anlage %}<div><strong>Anlage:</strong> {{ anlage.bezeichnung }}{% if anlage.standort %} – {{ anlage.standort }}{% endif %}</div>{% endif %}
+  {% if anlage %}<div><strong>Anlage:</strong> {{ anlage.bezeichnung }}{% if anlage.standort %} – {{ anlage.standort }}{% endif %}{% if anlage.zaehlernummer %} · <strong>Zähler-Nr.:</strong> {{ anlage.zaehlernummer }}{% endif %}</div>{% endif %}
 </div>
 
 <div class="card card-body mb-3 protokoll-meta">
@@ -70,6 +70,12 @@
       <div class="text-muted small">Messpunkte</div>
       <div class="fw-semibold">{{ protokoll.messungen|length }}</div>
     </div>
+    {% if anlage and anlage.zaehlernummer %}
+    <div class="col-md-4">
+      <div class="text-muted small">Zählernummer</div>
+      <div class="fw-semibold">{{ anlage.zaehlernummer }}</div>
+    </div>
+    {% endif %}
     <div class="col-12">
       <div class="text-muted small">Verwendete Messgeräte (inkl. Seriennummer und Kalibrierdaten)</div>
       {% if geraete %}

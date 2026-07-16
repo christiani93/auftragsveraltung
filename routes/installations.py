@@ -88,6 +88,7 @@ def _form_to_anlage(form) -> dict:
         "kunde_id": form.get("kunde_id", "").strip(),
         "bezeichnung": form.get("bezeichnung", "").strip(),
         "standort": form.get("standort", "").strip(),
+        "zaehlernummer": form.get("zaehlernummer", "").strip(),
         "baujahr": form.get("baujahr", "").strip(),
         "naechste_periodische_kontrolle": form.get("naechste_periodische_kontrolle", "").strip(),
         "notizen": form.get("notizen", "").strip(),

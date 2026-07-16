@@ -5,6 +5,7 @@
 {% block subheading %}
   {% if kunde %}<strong>{{ kunde.name }}</strong> · {% endif %}
   {% if anlage %}{{ anlage.bezeichnung }}{% if anlage.standort %} · {{ anlage.standort }}{% endif %}{% endif %}
+  {% if anlage and anlage.zaehlernummer %} · Zähler-Nr.: {{ anlage.zaehlernummer }}{% endif %}
   <br>Datum: {{ protokoll.datum }} · Monteur: {{ protokoll.monteur or '—' }}
 {% endblock %}
 

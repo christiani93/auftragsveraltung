@@ -27,6 +27,10 @@
       <input type="text" name="baujahr" class="form-control" value="{{ anlage.baujahr or '' }}">
     </div>
     <div class="col-md-6">
+      <label class="form-label">Zählernummer</label>
+      <input type="text" name="zaehlernummer" class="form-control" value="{{ anlage.zaehlernummer or '' }}" placeholder="z.B. Zähler-Nr. des EW">
+    </div>
+    <div class="col-md-6">
       <label class="form-label">Nächste periodische Kontrolle</label>
       <input type="date" name="naechste_periodische_kontrolle" class="form-control"
              value="{{ anlage.naechste_periodische_kontrolle or '' }}">

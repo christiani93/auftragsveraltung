@@ -7,7 +7,7 @@
       {% if kunde %}<a href="{{ url_for('customers.detail', kunde_id=kunde.id) }}">{{ kunde.name }}</a> ›{% endif %} Anlage
     </div>
     <h1 class="h3 m-0">{{ anlage.bezeichnung }}</h1>
-    <div class="text-muted">{{ anlage.standort or '' }}{% if anlage.baujahr %} · Baujahr {{ anlage.baujahr }}{% endif %}</div>
+    <div class="text-muted">{{ anlage.standort or '' }}{% if anlage.baujahr %} · Baujahr {{ anlage.baujahr }}{% endif %}{% if anlage.zaehlernummer %} · Zähler-Nr. {{ anlage.zaehlernummer }}{% endif %}</div>
   </div>
   <div class="d-flex gap-2 flex-wrap">
     <a class="btn btn-outline-secondary" href="{{ url_for('installations.edit_installation', anlage_id=anlage.id) }}">Bearbeiten</a>
