@@ -15,16 +15,18 @@
     </div>
     <div class="col-md-3">
       <label class="form-label">Kategorie</label>
-      <input type="text" name="kategorie" class="form-control" value="{{ maschine.kategorie or '' }}" placeholder="z.B. Bohrmaschine">
+      <input type="text" name="kategorie" class="form-control" value="{{ maschine.kategorie or '' }}" placeholder="z.B. Lichterkette">
     </div>
-    <div class="col-md-4">
-      <label class="form-label">Status</label>
-      <select name="status" class="form-select">
-        {% for s in status_optionen %}
-        <option value="{{ s }}" {% if maschine.status == s %}selected{% endif %}>{{ status_label[s] }}</option>
-        {% endfor %}
-      </select>
-      <small class="text-muted">„Ausgeliehen" wird normalerweise über die Übersicht gesetzt.</small>
+    <div class="col-md-3">
+      <label class="form-label">Anzahl (Bestand)</label>
+      <input type="number" name="anzahl" class="form-control" min="1" step="1" value="{{ maschine.anzahl or 1 }}">
+      <small class="text-muted">Gesamtstückzahl, z.B. 5.</small>
+    </div>
+    <div class="col-md-4 d-flex align-items-end">
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" name="wartung" id="wartung" {% if maschine.wartung %}checked{% endif %}>
+        <label class="form-check-label" for="wartung">Nicht verfügbar (Wartung / defekt)</label>
+      </div>
     </div>
     <div class="col-12">
       <label class="form-label">Notizen</label>

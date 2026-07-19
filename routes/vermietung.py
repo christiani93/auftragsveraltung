@@ -9,18 +9,41 @@ from datetime import date
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
+import uuid
 from datetime import datetime
 
 from models.repos import (
     RESERVATION_STATUS_LABEL,
-    VERMIET_STATUS,
-    VERMIET_STATUS_LABEL,
+    maschine_bestand,
     mieter,
     mieter_sortiert,
     mietmaschinen,
     mietreservationen,
     reservation_konflikt,
 )
+
+
+def _als_int(wert, default=1):
+    try:
+        return int(wert)
+    except (TypeError, ValueError):
+        return default
+
+
+def _normalisiere(loans: list) -> list:
+    """Ausleihen mit echten IDs versehen (Alt-Datensaetze bekommen eine ID)."""
+    out = []
+    for l in loans:
+        lid = l.get("id")
+        if not lid or lid == "legacy":
+            lid = uuid.uuid4().hex[:8]
+        out.append({
+            "id": lid,
+            "mieter_id": l.get("mieter_id"),
+            "anzahl": max(1, _als_int(l.get("anzahl"), 1)),
+            "seit": l.get("seit", ""),
+        })
+    return out
 
 bp = Blueprint("vermietung", __name__)
 
@@ -36,18 +59,18 @@ def _require_verwalter():
 @login_required
 def liste():
     mieter_idx = {m["id"]: m for m in mieter.list()}
-    order = {"ausgeliehen": 0, "wartung": 1, "verfuegbar": 2}
-    maschinen = sorted(
-        mietmaschinen.list(),
-        key=lambda x: (order.get(x.get("status"), 9), x.get("bezeichnung", "").lower()),
-    )
-    rows = [{"m": x, "mieter": mieter_idx.get(x.get("mieter_id"))} for x in maschinen]
-    anzahl_ausgeliehen = sum(1 for x in maschinen if x.get("status") == "ausgeliehen")
+    maschinen = sorted(mietmaschinen.list(), key=lambda x: x.get("bezeichnung", "").lower())
+    rows = []
+    for x in maschinen:
+        b = maschine_bestand(x)
+        for l in b["loans"]:
+            l["mieter"] = mieter_idx.get(l.get("mieter_id"))
+        rows.append({"m": x, "bestand": b})
+    anzahl_ausgeliehen = sum(r["bestand"]["verliehen"] for r in rows)
     return render_template(
         "vermietung/liste.html",
         rows=rows,
         alle_mieter=mieter_sortiert(),
-        status_label=VERMIET_STATUS_LABEL,
         heute=date.today().isoformat(),
         anzahl_ausgeliehen=anzahl_ausgeliehen,
         ist_verwalter=current_user.ist_vermietung_verwalter,
@@ -63,43 +86,57 @@ def ausleihen(maschine_id: str):
     m = mietmaschinen.get(maschine_id)
     if not m:
         abort(404)
-    if m.get("status") != "verfuegbar":
-        flash("Maschine ist nicht verfügbar.", "warning")
+    bestand = maschine_bestand(m)
+    if bestand["wartung"]:
+        flash("Position ist in Wartung / nicht verfügbar.", "warning")
         return redirect(url_for("vermietung.liste"))
     mieter_id = request.form.get("mieter_id", "").strip()
     if not mieter_id or not mieter.get(mieter_id):
         flash("Bitte einen Mitarbeiter wählen.", "warning")
         return redirect(url_for("vermietung.liste"))
-    mietmaschinen.update(maschine_id, {
-        "status": "ausgeliehen",
+    menge = max(1, _als_int(request.form.get("anzahl", "1"), 1))
+    if menge > bestand["verfuegbar"]:
+        flash(f"Nur noch {bestand['verfuegbar']} von {bestand['anzahl']} verfügbar.", "warning")
+        return redirect(url_for("vermietung.liste"))
+    loans = _normalisiere(bestand["loans"])
+    loans.append({
+        "id": uuid.uuid4().hex[:8],
         "mieter_id": mieter_id,
-        "ausgeliehen_seit": request.form.get("datum", "").strip() or date.today().isoformat(),
+        "anzahl": menge,
+        "seit": request.form.get("datum", "").strip() or date.today().isoformat(),
     })
-    flash("Maschine als ausgeliehen erfasst.", "success")
+    mietmaschinen.update(maschine_id, {"ausleihen": loans, "status": None, "mieter_id": None, "ausgeliehen_seit": None})
+    flash(f"{menge} Stück als ausgeliehen erfasst.", "success")
     return redirect(url_for("vermietung.liste"))
 
 
-@bp.route("/maschine/<maschine_id>/zurueck", methods=["POST"])
+@bp.route("/maschine/<maschine_id>/zurueck/<loan_id>", methods=["POST"])
 @login_required
-def zurueck(maschine_id: str):
+def zurueck(maschine_id: str, loan_id: str):
     _require_verwalter()
     m = mietmaschinen.get(maschine_id)
     if not m:
         abort(404)
-    mietmaschinen.update(maschine_id, {"status": "verfuegbar", "mieter_id": None, "ausgeliehen_seit": None})
-    flash("Rückgabe bestätigt — Maschine wieder verfügbar.", "success")
+    bestand = maschine_bestand(m)
+    # passende Ausleihe (per angezeigter ID) entfernen, Rest mit echten IDs speichern
+    verbleibend = [l for l in bestand["loans"] if (l.get("id") or "") != loan_id]
+    mietmaschinen.update(maschine_id, {
+        "ausleihen": _normalisiere(verbleibend),
+        "status": None, "mieter_id": None, "ausgeliehen_seit": None,
+    })
+    flash("Rückgabe bestätigt.", "success")
     return redirect(url_for("vermietung.liste"))
 
 
 # ----- Maschinen-Stammdaten (Verwalter) ---------------------------------------
 
 def _form_to_maschine(form) -> dict:
-    status = form.get("status", "verfuegbar")
     return {
         "bezeichnung": form.get("bezeichnung", "").strip(),
         "inventarnr": form.get("inventarnr", "").strip(),
         "kategorie": form.get("kategorie", "").strip(),
-        "status": status if status in VERMIET_STATUS else "verfuegbar",
+        "anzahl": max(1, _als_int(form.get("anzahl", "1"), 1)),
+        "wartung": form.get("wartung") == "on",
         "notizen": form.get("notizen", "").strip(),
     }
 
@@ -112,11 +149,11 @@ def neue_maschine():
         data = _form_to_maschine(request.form)
         if not data["bezeichnung"]:
             flash("Bezeichnung ist erforderlich.", "warning")
-            return render_template("vermietung/maschine_edit.html", maschine=data, neu=True, status_label=VERMIET_STATUS_LABEL, status_optionen=VERMIET_STATUS)
+            return render_template("vermietung/maschine_edit.html", maschine=data, neu=True)
         record = mietmaschinen.create(data)
-        flash(f"Maschine {record['bezeichnung']} angelegt.", "success")
+        flash(f"Position {record['bezeichnung']} angelegt.", "success")
         return redirect(url_for("vermietung.liste"))
-    return render_template("vermietung/maschine_edit.html", maschine={"status": "verfuegbar"}, neu=True, status_label=VERMIET_STATUS_LABEL, status_optionen=VERMIET_STATUS)
+    return render_template("vermietung/maschine_edit.html", maschine={"anzahl": 1}, neu=True)
 
 
 @bp.route("/maschine/<maschine_id>/bearbeiten", methods=["GET", "POST"])
@@ -130,15 +167,11 @@ def edit_maschine(maschine_id: str):
         data = _form_to_maschine(request.form)
         if not data["bezeichnung"]:
             flash("Bezeichnung ist erforderlich.", "warning")
-            return render_template("vermietung/maschine_edit.html", maschine={**m, **data}, neu=False, status_label=VERMIET_STATUS_LABEL, status_optionen=VERMIET_STATUS)
-        # Wird der Status weg von 'ausgeliehen' gesetzt, Mieter-Zuordnung loeschen
-        if data["status"] != "ausgeliehen":
-            data["mieter_id"] = None
-            data["ausgeliehen_seit"] = None
+            return render_template("vermietung/maschine_edit.html", maschine={**m, **data}, neu=False)
         mietmaschinen.update(maschine_id, data)
-        flash("Maschine gespeichert.", "success")
+        flash("Position gespeichert.", "success")
         return redirect(url_for("vermietung.liste"))
-    return render_template("vermietung/maschine_edit.html", maschine=m, neu=False, status_label=VERMIET_STATUS_LABEL, status_optionen=VERMIET_STATUS)
+    return render_template("vermietung/maschine_edit.html", maschine=m, neu=False)
 
 
 @bp.route("/maschine/<maschine_id>/loeschen", methods=["POST"])
@@ -185,10 +218,12 @@ def delete_mitarbeiter(mieter_id: str):
     _require_verwalter()
     if not mieter.get(mieter_id):
         abort(404)
-    # Maschinen freigeben, die diesem Mitarbeiter zugeordnet sind
+    # Ausleihen dieses Mitarbeiters freigeben
     for x in mietmaschinen.list():
-        if x.get("mieter_id") == mieter_id:
-            mietmaschinen.update(x["id"], {"status": "verfuegbar", "mieter_id": None, "ausgeliehen_seit": None})
+        b = maschine_bestand(x)
+        verbleibend = [l for l in b["loans"] if l.get("mieter_id") != mieter_id]
+        if len(verbleibend) != len(b["loans"]) or x.get("mieter_id") == mieter_id:
+            mietmaschinen.update(x["id"], {"ausleihen": _normalisiere(verbleibend), "status": None, "mieter_id": None, "ausgeliehen_seit": None})
     mieter.delete(mieter_id)
     flash("Mitarbeiter gelöscht.", "info")
     return redirect(url_for("vermietung.mitarbeiter_liste"))
@@ -243,11 +278,12 @@ def reservation_neu():
     if not von or not bis or von > bis:
         flash("Bitte gültigen Zeitraum (von ≤ bis) angeben.", "warning")
         return redirect(url_for("vermietung.reservationen"))
+    menge = max(1, _als_int(request.form.get("anzahl", "1"), 1))
 
-    # Datumsprüfung gegen bestätigte Reservationen — kein Doppelbuchen.
-    konflikt = reservation_konflikt(maschine_id, von, bis)
+    # Datumsprüfung: genug Bestand im Zeitraum frei? Kein Überbuchen.
+    konflikt = reservation_konflikt(maschine_id, von, bis, benoetigt=menge)
     if konflikt:
-        flash(f"Zeitraum kollidiert mit einer bestätigten Reservation ({konflikt.get('von')} – {konflikt.get('bis')}).", "warning")
+        flash(f"Nicht genug Bestand im Zeitraum: {konflikt['frei']} von {konflikt['total']} frei.", "warning")
         return redirect(url_for("vermietung.reservationen"))
 
     # Verwalter-Anfragen sind direkt bestätigt, sonst 'angefragt'.
@@ -255,6 +291,7 @@ def reservation_neu():
     mietreservationen.create({
         "maschine_id": maschine_id,
         "mieter_id": mieter_id,
+        "anzahl": menge,
         "von": von,
         "bis": bis,
         "zweck": request.form.get("zweck", "").strip(),
@@ -274,9 +311,10 @@ def reservation_bestaetigen(res_id: str):
     r = mietreservationen.get(res_id)
     if not r:
         abort(404)
-    konflikt = reservation_konflikt(r.get("maschine_id"), r.get("von", ""), r.get("bis", ""), ignore_id=res_id)
+    konflikt = reservation_konflikt(r.get("maschine_id"), r.get("von", ""), r.get("bis", ""),
+                                    benoetigt=max(1, _als_int(r.get("anzahl"), 1)), ignore_id=res_id)
     if konflikt:
-        flash(f"Kann nicht bestätigen — kollidiert mit bestätigter Reservation ({konflikt.get('von')} – {konflikt.get('bis')}).", "warning")
+        flash(f"Kann nicht bestätigen — nur {konflikt['frei']} von {konflikt['total']} im Zeitraum frei.", "warning")
         return redirect(url_for("vermietung.reservationen"))
     mietreservationen.update(res_id, {
         "status": "bestaetigt",

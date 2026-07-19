@@ -80,15 +80,51 @@ def _zeitraum_ueberlappt(a_von: str, a_bis: str, b_von: str, b_bis: str) -> bool
     return a_von <= b_bis and b_von <= a_bis
 
 
-def reservation_konflikt(maschine_id: str, von: str, bis: str, ignore_id: str = "") -> Optional[Dict[str, Any]]:
-    """Erste kollidierende BESTÄTIGTE Reservation derselben Maschine, sonst None."""
+def _als_int(wert, default: int = 1) -> int:
+    try:
+        return int(wert)
+    except (TypeError, ValueError):
+        return default
+
+
+def maschine_bestand(m: Dict[str, Any]) -> Dict[str, Any]:
+    """Bestand/Verfügbarkeit einer Verleih-Position (mengenfähig).
+
+    Liefert: anzahl (Gesamtbestand), verliehen, verfuegbar, wartung (bool),
+    loans (Liste aktiver Ausleihen [{id, mieter_id, anzahl, seit}]).
+    Beruecksichtigt Alt-Datensaetze (einzelne Ausleihe ueber status/mieter_id).
+    """
+    anzahl = max(1, _als_int(m.get("anzahl"), 1))
+    loans = [dict(l) for l in (m.get("ausleihen") or [])]
+    if not loans and m.get("status") == "ausgeliehen" and m.get("mieter_id"):
+        loans = [{"id": "legacy", "mieter_id": m["mieter_id"], "anzahl": 1, "seit": m.get("ausgeliehen_seit", "")}]
+    verliehen = sum(max(1, _als_int(l.get("anzahl"), 1)) for l in loans)
+    wartung = bool(m.get("wartung")) or m.get("status") == "wartung"
+    return {
+        "anzahl": anzahl,
+        "verliehen": verliehen,
+        "verfuegbar": max(0, anzahl - verliehen),
+        "wartung": wartung,
+        "loans": loans,
+    }
+
+
+def reservation_konflikt(maschine_id: str, von: str, bis: str, benoetigt: int = 1, ignore_id: str = "") -> Optional[Dict[str, Any]]:
+    """Prüft, ob im Zeitraum genug Bestand frei ist. Summiert die Mengen aller
+    überlappenden BESTÄTIGTEN Reservationen; überschreitet (belegt + benoetigt)
+    den Gesamtbestand, wird ein Konflikt-Dict {belegt, frei, total} geliefert."""
+    m = mietmaschinen.get(maschine_id) or {}
+    total = maschine_bestand(m)["anzahl"]
+    belegt = 0
     for r in mietreservationen.list():
         if r.get("maschine_id") != maschine_id or r.get("status") != "bestaetigt":
             continue
         if ignore_id and r.get("id") == ignore_id:
             continue
         if _zeitraum_ueberlappt(von, bis, r.get("von", ""), r.get("bis", "")):
-            return r
+            belegt += max(1, _als_int(r.get("anzahl"), 1))
+    if belegt + max(1, benoetigt) > total:
+        return {"belegt": belegt, "frei": max(0, total - belegt), "total": total}
     return None
 
 

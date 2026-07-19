@@ -11,7 +11,7 @@
 {% macro res_zeile(a, aktionen) %}
 <tr>
   <td>{{ a.r.von }} – {{ a.r.bis }}</td>
-  <td class="fw-semibold">{% if a.maschine %}{{ a.maschine.bezeichnung }}{% else %}<span class="text-muted">— gelöscht —</span>{% endif %}</td>
+  <td class="fw-semibold">{{ a.r.anzahl or 1 }}× {% if a.maschine %}{{ a.maschine.bezeichnung }}{% else %}<span class="text-muted">— gelöscht —</span>{% endif %}</td>
   <td class="small">{% if a.mieter %}{{ a.mieter.name }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
   <td class="small">{{ a.r.zweck or '—' }}</td>
   <td class="small text-muted">{{ a.r.angefragt_von|mitarbeiter_name }}</td>
@@ -53,6 +53,10 @@
         {% for mi in alle_mieter %}<option value="{{ mi.id }}">{{ mi.name }}</option>{% endfor %}
       </select>
     </div>
+    <div class="col-md-1">
+      <label class="form-label small mb-0">Menge</label>
+      <input type="number" name="anzahl" class="form-control form-control-sm" min="1" step="1" value="1">
+    </div>
     <div class="col-md-2">
       <label class="form-label small mb-0">Von</label>
       <input type="date" name="von" class="form-control form-control-sm" value="{{ heute }}" required>
@@ -61,8 +65,8 @@
       <label class="form-label small mb-0">Bis</label>
       <input type="date" name="bis" class="form-control form-control-sm" value="{{ heute }}" required>
     </div>
-    <div class="col-md-2">
-      <button type="submit" class="btn btn-sm btn-primary w-100">{% if ist_verwalter %}Reservieren{% else %}Anfragen{% endif %}</button>
+    <div class="col-md-1">
+      <button type="submit" class="btn btn-sm btn-primary w-100">{% if ist_verwalter %}OK{% else %}Anfragen{% endif %}</button>
     </div>
     <div class="col-12">
       <input type="text" name="zweck" class="form-control form-control-sm" placeholder="Zweck / Notiz (optional)">
