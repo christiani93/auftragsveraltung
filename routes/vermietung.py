@@ -21,6 +21,7 @@ from models.repos import (
     mietreservationen,
     reservation_konflikt,
 )
+from models.users import list_users
 
 
 def _als_int(wert, default=1):
@@ -191,7 +192,20 @@ def delete_maschine(maschine_id: str):
 @login_required
 def mitarbeiter_liste():
     _require_verwalter()
-    return render_template("vermietung/mieter.html", alle_mieter=mieter_sortiert())
+    return render_template("vermietung/mieter.html", alle_mieter=mieter_sortiert(), alle_user=list_users())
+
+
+@bp.route("/mitarbeiter/<mieter_id>/account", methods=["POST"])
+@login_required
+def mitarbeiter_account(mieter_id: str):
+    """Verknüpft (auch nachträglich) einen Mitarbeiter mit einem Login-Account."""
+    _require_verwalter()
+    if not mieter.get(mieter_id):
+        abort(404)
+    username = request.form.get("user_username", "").strip()
+    mieter.update(mieter_id, {"user_username": username})
+    flash("Account-Verknüpfung gespeichert." if username else "Account-Verknüpfung entfernt.", "success")
+    return redirect(url_for("vermietung.mitarbeiter_liste"))
 
 
 @bp.route("/mitarbeiter/neu", methods=["POST"])

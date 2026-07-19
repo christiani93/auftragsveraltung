@@ -18,7 +18,20 @@
         <tr>
           <td class="fw-semibold">{{ m.name }}</td>
           <td class="small">{{ m.notiz or '—' }}</td>
-          <td class="small">{% if m.user_username %}<code>{{ m.user_username }}</code>{% else %}<span class="text-muted">—</span>{% endif %}</td>
+          <td class="small">
+            {% set usernames = alle_user|map(attribute='username')|list %}
+            <form method="post" action="{{ url_for('vermietung.mitarbeiter_account', mieter_id=m.id) }}" class="d-inline-flex align-items-center gap-1">
+              <select name="user_username" class="form-select form-select-sm" style="width:auto;" onchange="this.form.submit()">
+                <option value="">— kein Account —</option>
+                {% for u in alle_user %}
+                <option value="{{ u.username }}" {% if m.user_username == u.username %}selected{% endif %}>{{ u.name }} ({{ u.username }})</option>
+                {% endfor %}
+                {% if m.user_username and m.user_username not in usernames %}
+                <option value="{{ m.user_username }}" selected>{{ m.user_username }} (unbekannt)</option>
+                {% endif %}
+              </select>
+            </form>
+          </td>
           <td class="text-end">
             <form method="post" action="{{ url_for('vermietung.delete_mitarbeiter', mieter_id=m.id) }}" class="d-inline"
                   onsubmit="return confirm('Mitarbeiter „{{ m.name }}“ löschen? Zugeordnete Maschinen werden freigegeben.');">
@@ -47,8 +60,11 @@
       <input type="text" name="notiz" class="form-control" placeholder="z.B. Abteilung / Telefon">
     </div>
     <div class="col-md-3">
-      <label class="form-label">Login-Username (optional)</label>
-      <input type="text" name="user_username" class="form-control" placeholder="für spätere Account-Verknüpfung">
+      <label class="form-label">Account verknüpfen (optional)</label>
+      <select name="user_username" class="form-select">
+        <option value="">— kein Account —</option>
+        {% for u in alle_user %}<option value="{{ u.username }}">{{ u.name }} ({{ u.username }})</option>{% endfor %}
+      </select>
     </div>
     <div class="col-12">
       <button type="submit" class="btn btn-primary">+ Hinzufügen</button>
