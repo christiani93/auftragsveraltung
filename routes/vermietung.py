@@ -134,7 +134,6 @@ def zurueck(maschine_id: str, loan_id: str):
 def _form_to_maschine(form) -> dict:
     return {
         "bezeichnung": form.get("bezeichnung", "").strip(),
-        "inventarnr": form.get("inventarnr", "").strip(),
         "kategorie": form.get("kategorie", "").strip(),
         "anzahl": max(1, _als_int(form.get("anzahl", "1"), 1)),
         "wartung": form.get("wartung") == "on",

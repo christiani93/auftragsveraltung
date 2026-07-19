@@ -23,7 +23,6 @@
         <tr>
           <th>Verfügbarkeit</th>
           <th>Bezeichnung</th>
-          <th>Inventarnr.</th>
           <th>Kategorie</th>
           <th>Ausgeliehen an</th>
           {% if ist_verwalter %}<th class="text-end">Ausleihen</th>{% endif %}
@@ -44,7 +43,6 @@
             {% if ist_verwalter %}<a href="{{ url_for('vermietung.edit_maschine', maschine_id=r.m.id) }}" class="text-decoration-none">{{ r.m.bezeichnung }}</a>{% else %}{{ r.m.bezeichnung }}{% endif %}
             {% if r.m.notizen %}<div class="text-muted small">{{ r.m.notizen }}</div>{% endif %}
           </td>
-          <td class="small">{{ r.m.inventarnr or '—' }}</td>
           <td class="small">{{ r.m.kategorie or '—' }}</td>
           <td class="small">
             {% for l in b.loans %}
