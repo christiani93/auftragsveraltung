@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Vermietung — Reservationen{% endblock %}
+{% block title %}Verleih — Reservationen{% endblock %}
 {% block content %}
 {% set res_badge = {'angefragt': 'bg-info text-dark', 'bestaetigt': 'bg-success', 'abgelehnt': 'bg-secondary', 'storniert': 'bg-secondary'} %}
 
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h1 class="h3 m-0">Reservationen</h1>
-  <a class="btn btn-outline-secondary" href="{{ url_for('vermietung.liste') }}">← Zur Vermietung</a>
+  <a class="btn btn-outline-secondary" href="{{ url_for('vermietung.liste') }}">← Zum Verleih</a>
 </div>
 
 {% macro res_zeile(a, aktionen) %}

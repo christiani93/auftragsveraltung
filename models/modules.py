@@ -11,7 +11,7 @@ MODULE = {
     "zeit":       {"label": "Zeiterfassung",    "blueprints": ("zeit",)},
     "kunden":     {"label": "Kunden & Anlagen", "blueprints": ("customers", "revisionen", "installations", "leistungsschalter")},
     "pruefung":   {"label": "Kontrolle (Messprotokolle & Messgeräte)", "blueprints": ("protocols", "messgeraete")},
-    "vermietung": {"label": "Vermietung",       "blueprints": ("vermietung",)},
+    "vermietung": {"label": "Verleih",          "blueprints": ("vermietung",)},
 }
 
 # Diese Module sind default aktiv (bestehende User ohne explizite Konfiguration
