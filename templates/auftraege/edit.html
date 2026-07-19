@@ -44,6 +44,21 @@
         <small class="text-muted">Monteur sieht nur eigene + unzugewiesene Aufträge. Projektleiter/Admin sehen alle.</small>
       </div>
 
+      <div class="col-md-4">
+        <label class="form-label">Zusätzlich freigeben für</label>
+        {% set frei = auftrag.freigegeben_an or [] %}
+        <div class="border rounded p-2" style="max-height: 160px; overflow-y: auto;">
+          {% for m in monteure %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="freigegeben_an" value="{{ m.username }}"
+                   id="frei-{{ m.username }}" {% if m.username in frei %}checked{% endif %}>
+            <label class="form-check-label small" for="frei-{{ m.username }}">{{ m.name }} ({{ m.username }})</label>
+          </div>
+          {% endfor %}
+        </div>
+        <small class="text-muted">Diese Monteure sehen den Auftrag zusätzlich — auch ohne direkte Zuweisung.</small>
+      </div>
+
       {% if kunde_revisionen %}
       <div class="col-md-4">
         <label class="form-label">Revision (Betriebsferien-Pool)</label>

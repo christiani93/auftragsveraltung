@@ -39,6 +39,8 @@ def _darf_auftrag_sehen(auftrag: dict) -> bool:
         return True
     if ist_mitarbeiter_in_revision(auftrag.get("revision_id"), current_user.username):
         return True
+    if current_user.username in (auftrag.get("freigegeben_an") or []):
+        return True
     zugewiesen = (auftrag.get("zugewiesen_an") or "").strip()
     if not zugewiesen:
         return True

@@ -12,6 +12,9 @@ from models.repos import (
     ist_mitarbeiter_in_revision,
     kunden,
     revisionen_fuer_kunde,
+    todo_hinzufuegen,
+    todo_loeschen,
+    todo_toggle,
 )
 
 
@@ -22,6 +25,8 @@ def _darf_auftrag_sehen(auftrag: dict) -> bool:
     if current_user.sieht_alle_auftraege:
         return True
     if ist_mitarbeiter_in_revision(auftrag.get("revision_id"), current_user.username):
+        return True
+    if current_user.username in (auftrag.get("freigegeben_an") or []):
         return True
     zugewiesen = (auftrag.get("zugewiesen_an") or "").strip()
     if not zugewiesen:
@@ -132,6 +137,31 @@ def edit_customer(kunde_id: str):
         flash("Änderungen gespeichert.", "success")
         return redirect(url_for("customers.detail", kunde_id=kunde_id))
     return render_template("customers/edit.html", kunde=kunde, neu=False)
+
+
+@bp.route("/<kunde_id>/todo/neu", methods=["POST"])
+def add_todo(kunde_id: str):
+    if not kunden.get(kunde_id):
+        abort(404)
+    if not todo_hinzufuegen(kunden, kunde_id, request.form.get("text", "")):
+        flash("ToDo-Text ist erforderlich.", "warning")
+    return redirect(url_for("customers.detail", kunde_id=kunde_id))
+
+
+@bp.route("/<kunde_id>/todo/<todo_id>/toggle", methods=["POST"])
+def toggle_todo(kunde_id: str, todo_id: str):
+    if not kunden.get(kunde_id):
+        abort(404)
+    todo_toggle(kunden, kunde_id, todo_id)
+    return redirect(url_for("customers.detail", kunde_id=kunde_id))
+
+
+@bp.route("/<kunde_id>/todo/<todo_id>/loeschen", methods=["POST"])
+def delete_todo(kunde_id: str, todo_id: str):
+    if not kunden.get(kunde_id):
+        abort(404)
+    todo_loeschen(kunden, kunde_id, todo_id)
+    return redirect(url_for("customers.detail", kunde_id=kunde_id))
 
 
 @bp.route("/<kunde_id>/loeschen", methods=["POST"])

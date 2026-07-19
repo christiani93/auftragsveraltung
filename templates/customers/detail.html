@@ -76,6 +76,32 @@
 <div class="alert alert-light border mb-4">Noch keine Kontaktpersonen erfasst. <a href="{{ url_for('customers.edit_customer', kunde_id=kunde.id) }}#kontakte-container">Jetzt hinzufügen</a></div>
 {% endif %}
 
+{% set todos = kunde.todos or [] %}
+<h2 class="h5 mb-2 mt-4">ToDos {% if todos %}<span class="text-muted small">({{ todos|selectattr('erledigt')|list|length }}/{{ todos|length }} erledigt)</span>{% endif %}</h2>
+<div class="card mb-4">
+  <ul class="list-group list-group-flush">
+    {% for t in todos %}
+    <li class="list-group-item d-flex align-items-center gap-2">
+      <form method="post" action="{{ url_for('customers.toggle_todo', kunde_id=kunde.id, todo_id=t.id) }}" class="d-inline">
+        <button type="submit" class="btn btn-sm {% if t.erledigt %}btn-success{% else %}btn-outline-secondary{% endif %} py-0 px-2" title="Umschalten">{% if t.erledigt %}✓{% else %}○{% endif %}</button>
+      </form>
+      <span class="flex-grow-1 {% if t.erledigt %}text-decoration-line-through text-muted{% endif %}">{{ t.text }}</span>
+      <form method="post" action="{{ url_for('customers.delete_todo', kunde_id=kunde.id, todo_id=t.id) }}" class="d-inline" onsubmit="return confirm('ToDo löschen?');">
+        <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2">×</button>
+      </form>
+    </li>
+    {% else %}
+    <li class="list-group-item text-muted small">Noch keine ToDos.</li>
+    {% endfor %}
+  </ul>
+  <div class="card-body py-2">
+    <form method="post" action="{{ url_for('customers.add_todo', kunde_id=kunde.id) }}" class="d-flex gap-2">
+      <input type="text" name="text" class="form-control form-control-sm" placeholder="Neues ToDo …" required>
+      <button type="submit" class="btn btn-sm btn-primary">+ Hinzufügen</button>
+    </form>
+  </div>
+</div>
+
 <div class="d-flex justify-content-between align-items-center mt-4 mb-2">
   <h2 class="h5 m-0">Revisionen ({{ revisionen|length }})</h2>
   {% if darf_revision_anlegen %}

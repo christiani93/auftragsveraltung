@@ -31,6 +31,7 @@ Messprotokoll (gehört zu einer Anlage, optional zu einem Anlagenteil)
 from __future__ import annotations
 
 import math
+import uuid
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional
@@ -73,6 +74,39 @@ RESERVATION_STATUS_LABEL = {
 
 def mieter_sortiert() -> List[Dict[str, Any]]:
     return sorted(mieter.list(), key=lambda m: (m.get("name", "").lower()))
+
+
+# ----- ToDos (generisch: auf Records mit 'todos'-Liste) -----------------------
+
+def todo_hinzufuegen(store, record_id: str, text: str) -> bool:
+    rec = store.get(record_id)
+    if not rec or not text.strip():
+        return False
+    todos = list(rec.get("todos") or [])
+    todos.append({"id": uuid.uuid4().hex[:12], "text": text.strip(), "erledigt": False})
+    store.update(record_id, {"todos": todos})
+    return True
+
+
+def todo_toggle(store, record_id: str, todo_id: str) -> bool:
+    rec = store.get(record_id)
+    if not rec:
+        return False
+    todos = list(rec.get("todos") or [])
+    for t in todos:
+        if t.get("id") == todo_id:
+            t["erledigt"] = not t.get("erledigt", False)
+            break
+    store.update(record_id, {"todos": todos})
+    return True
+
+
+def todo_loeschen(store, record_id: str, todo_id: str) -> bool:
+    rec = store.get(record_id)
+    if not rec:
+        return False
+    store.update(record_id, {"todos": [t for t in (rec.get("todos") or []) if t.get("id") != todo_id]})
+    return True
 
 
 def _zeitraum_ueberlappt(a_von: str, a_bis: str, b_von: str, b_bis: str) -> bool:

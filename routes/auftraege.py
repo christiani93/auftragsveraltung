@@ -30,6 +30,9 @@ from models.repos import (
     kunden,
     revisionen,
     revisionen_fuer_kunde,
+    todo_hinzufuegen,
+    todo_loeschen,
+    todo_toggle,
     zeitbuchungen,
     zeitbuchungen_fuer_auftrag,
     zeitsumme_h,
@@ -104,6 +107,8 @@ def _form_to_auftrag(form) -> dict:
         "erteilt_von_telefon": form.get("erteilt_von_telefon", "").strip(),
         "anlagenteil_ids": form.getlist("anlagenteil_ids"),
         "zugewiesen_an": form.get("zugewiesen_an", "").strip(),
+        # Zusaetzlich freigegebene Monteure (sehen den Auftrag ebenfalls)
+        "freigegeben_an": [u.strip() for u in form.getlist("freigegeben_an") if u.strip()],
         "status": form.get("status", "offen") if form.get("status") in AUFTRAG_STATUS else "offen",
         "erledigt_am": form.get("erledigt_am", "").strip() or None,
         "zu_erledigen_bis": form.get("zu_erledigen_bis", "").strip() or None,
@@ -149,6 +154,9 @@ def _darf_auftrag_sehen(auftrag: dict) -> bool:
         return True
     # Revisions-Mitgliedschaft hat Vorrang — Mitarbeiter sieht alle Auftraege der Revision
     if ist_mitarbeiter_in_revision(auftrag.get("revision_id"), current_user.username):
+        return True
+    # Zusaetzlich freigegebene Monteure
+    if current_user.username in (auftrag.get("freigegeben_an") or []):
         return True
     zugewiesen = (auftrag.get("zugewiesen_an") or "").strip()
     if not zugewiesen:
@@ -678,6 +686,40 @@ def delete_zeitbuchung(zeitbuchung_id: str):
     if auftrag_id:
         return redirect(url_for("auftraege.detail", auftrag_id=auftrag_id))
     return redirect(url_for("zeit.heute", datum=datum) if datum else url_for("zeit.heute"))
+
+
+@bp.route("/<auftrag_id>/todo/neu", methods=["POST"])
+def add_todo(auftrag_id: str):
+    a = auftraege.get(auftrag_id)
+    if not a:
+        abort(404)
+    if not _darf_auftrag_sehen(a):
+        abort(403)
+    if not todo_hinzufuegen(auftraege, auftrag_id, request.form.get("text", "")):
+        flash("ToDo-Text ist erforderlich.", "warning")
+    return redirect(url_for("auftraege.detail", auftrag_id=auftrag_id))
+
+
+@bp.route("/<auftrag_id>/todo/<todo_id>/toggle", methods=["POST"])
+def toggle_todo(auftrag_id: str, todo_id: str):
+    a = auftraege.get(auftrag_id)
+    if not a:
+        abort(404)
+    if not _darf_auftrag_sehen(a):
+        abort(403)
+    todo_toggle(auftraege, auftrag_id, todo_id)
+    return redirect(url_for("auftraege.detail", auftrag_id=auftrag_id))
+
+
+@bp.route("/<auftrag_id>/todo/<todo_id>/loeschen", methods=["POST"])
+def delete_todo(auftrag_id: str, todo_id: str):
+    a = auftraege.get(auftrag_id)
+    if not a:
+        abort(404)
+    if not _darf_auftrag_sehen(a):
+        abort(403)
+    todo_loeschen(auftraege, auftrag_id, todo_id)
+    return redirect(url_for("auftraege.detail", auftrag_id=auftrag_id))
 
 
 @bp.route("/<auftrag_id>/loeschen", methods=["POST"])
