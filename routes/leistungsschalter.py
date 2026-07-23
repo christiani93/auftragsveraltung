@@ -9,13 +9,14 @@ from __future__ import annotations
 from datetime import date
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 from models.repos import (
     WARTUNG_INTERVALL_JAHRE_DEFAULT,
     anlagen,
     anlagenteile,
     kunden,
+    sichtbare_kunden,
     leistungsschalter,
     wartung_status,
 )
@@ -75,7 +76,7 @@ def _teile_optionen() -> list:
 def _edit_context(schalter: dict, neu: bool, **extra) -> dict:
     return dict(
         schalter=schalter, neu=neu,
-        alle_kunden=sorted(kunden.list(), key=lambda k: k.get("name", "").lower()),
+        alle_kunden=sorted(sichtbare_kunden(current_user), key=lambda k: k.get("name", "").lower()),
         alle_anlagen=sorted(anlagen.list(), key=lambda a: a.get("bezeichnung", "").lower()),
         teile_optionen=_teile_optionen(),
         default_intervall=WARTUNG_INTERVALL_JAHRE_DEFAULT,

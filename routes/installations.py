@@ -23,6 +23,7 @@ from models.repos import (
     baue_aufbau_baum,
     fi_erforderlich,
     kunden,
+    sichtbare_kunden,
     messprotokolle_fuer_anlage,
     moegliche_eltern,
 )
@@ -156,7 +157,7 @@ def new_installation():
             flash("Kunde und Bezeichnung sind erforderlich.", "warning")
             return render_template(
                 "installations/edit.html",
-                anlage=data, neu=True, alle_kunden=sorted(kunden.list(), key=lambda k: k["name"].lower()),
+                anlage=data, neu=True, alle_kunden=sorted(sichtbare_kunden(current_user), key=lambda k: k["name"].lower()),
             )
         record = anlagen.create(data)
         flash(f"Anlage „{record['bezeichnung']}“ angelegt.", "success")
@@ -166,7 +167,7 @@ def new_installation():
     return render_template(
         "installations/edit.html",
         anlage={"kunde_id": vorgewaehlt}, neu=True,
-        alle_kunden=sorted(kunden.list(), key=lambda k: k["name"].lower()),
+        alle_kunden=sorted(sichtbare_kunden(current_user), key=lambda k: k["name"].lower()),
     )
 
 
@@ -218,7 +219,7 @@ def edit_installation(anlage_id: str):
             return render_template(
                 "installations/edit.html",
                 anlage={**anlage, **data}, neu=False,
-                alle_kunden=sorted(kunden.list(), key=lambda k: k["name"].lower()),
+                alle_kunden=sorted(sichtbare_kunden(current_user), key=lambda k: k["name"].lower()),
             )
         anlagen.update(anlage_id, data)
         flash("Anlage gespeichert.", "success")
@@ -226,7 +227,7 @@ def edit_installation(anlage_id: str):
     return render_template(
         "installations/edit.html",
         anlage=anlage, neu=False,
-        alle_kunden=sorted(kunden.list(), key=lambda k: k["name"].lower()),
+        alle_kunden=sorted(sichtbare_kunden(current_user), key=lambda k: k["name"].lower()),
     )
 
 

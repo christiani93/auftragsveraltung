@@ -503,6 +503,49 @@ def auftrag_sichtbar_fuer(auftrag: Dict[str, Any], user) -> bool:
     return not zug
 
 
+def kunde_teams(kunde: Dict[str, Any]) -> List[str]:
+    """Alle Teams (PL-Usernames), die diesen Kunden sehen dürfen:
+    das besitzende Team (projektleiter) + zusätzlich freigegebene Teams."""
+    teams: List[str] = []
+    prim = (kunde.get("projektleiter") or "").strip()
+    if prim:
+        teams.append(prim)
+    for t in (kunde.get("freigegeben_an_teams") or []):
+        t = (t or "").strip()
+        if t and t not in teams:
+            teams.append(t)
+    return teams
+
+
+def kunde_sichtbar_fuer(kunde: Dict[str, Any], user) -> bool:
+    """Zentrale Sichtbarkeitsregel für Kunden (Team-Modell mit Mehrfach-Freigabe).
+
+    Admin sieht alles. Sonst sichtbar, wenn das Team des Users den Kunden besitzt
+    oder dafür freigegeben wurde. Alt-Kunden OHNE Team bleiben für alle sichtbar.
+    Fallback: Wer einen Auftrag dieses Kunden sehen darf, sieht auch den Kunden
+    (verhindert tote Links bei team-übergreifend zugewiesenen/freigegebenen Aufträgen).
+    """
+    if not getattr(user, "is_authenticated", False):
+        return False
+    if getattr(user, "is_admin", False):
+        return True
+    teams = kunde_teams(kunde)
+    if not teams:
+        return True  # Alt-Kunde ohne Team: wie bisher für alle sichtbar
+    team = getattr(user, "team_leiter", None)
+    if team and team in teams:
+        return True
+    for a in auftraege_fuer_kunde(kunde.get("id")):
+        if auftrag_sichtbar_fuer(a, user):
+            return True
+    return False
+
+
+def sichtbare_kunden(user) -> List[Dict[str, Any]]:
+    """Alle für den User sichtbaren Kunden (Team-gefiltert)."""
+    return [k for k in kunden.list() if kunde_sichtbar_fuer(k, user)]
+
+
 def messgeraete_fuer_user(username: str, ist_admin: bool = False) -> List[Dict[str, Any]]:
     """Liefert die fuer den aktuellen User sichtbaren Messgeraete.
     Admin sieht alle, andere User nur ihre eigenen (owner == username) plus

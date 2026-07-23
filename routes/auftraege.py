@@ -29,6 +29,7 @@ from models.repos import (
     dauer_aus_zeitspanne,
     ist_mitarbeiter_in_revision,
     kunden,
+    sichtbare_kunden,
     revisionen,
     revisionen_fuer_kunde,
     todo_hinzufuegen,
@@ -272,7 +273,7 @@ def new_auftrag():
             return render_template(
                 "auftraege/edit.html",
                 auftrag=data, neu=True,
-                alle_kunden=sorted(kunden.list(), key=lambda k: k["name"].lower()),
+                alle_kunden=sorted(sichtbare_kunden(current_user), key=lambda k: k["name"].lower()),
                 kunde=kunde,
                 anlagen_mit_teilen=_teile_strukturiert(data["kunde_id"]) if data["kunde_id"] else [],
                 status_optionen=AUFTRAG_STATUS, status_label=AUFTRAG_STATUS_LABEL,
@@ -296,7 +297,7 @@ def new_auftrag():
             "revision_id": vor_revision_id,
         },
         neu=True,
-        alle_kunden=sorted(kunden.list(), key=lambda k: k["name"].lower()),
+        alle_kunden=sorted(sichtbare_kunden(current_user), key=lambda k: k["name"].lower()),
         kunde=kunde,
         anlagen_mit_teilen=_teile_strukturiert(kunde_id) if kunde_id else [],
         status_optionen=AUFTRAG_STATUS, status_label=AUFTRAG_STATUS_LABEL,
@@ -356,7 +357,7 @@ def edit_auftrag(auftrag_id: str):
             return render_template(
                 "auftraege/edit.html",
                 auftrag={**auftrag, **data}, neu=False,
-                alle_kunden=sorted(kunden.list(), key=lambda k: k["name"].lower()),
+                alle_kunden=sorted(sichtbare_kunden(current_user), key=lambda k: k["name"].lower()),
                 kunde=kunden.get(data["kunde_id"]) if data["kunde_id"] else None,
                 anlagen_mit_teilen=_teile_strukturiert(data["kunde_id"]) if data["kunde_id"] else [],
                 status_optionen=AUFTRAG_STATUS, status_label=AUFTRAG_STATUS_LABEL,
@@ -375,7 +376,7 @@ def edit_auftrag(auftrag_id: str):
     return render_template(
         "auftraege/edit.html",
         auftrag=auftrag, neu=False,
-        alle_kunden=sorted(kunden.list(), key=lambda k: k["name"].lower()),
+        alle_kunden=sorted(sichtbare_kunden(current_user), key=lambda k: k["name"].lower()),
         kunde=kunden.get(auftrag.get("kunde_id")),
         anlagen_mit_teilen=_teile_strukturiert(auftrag.get("kunde_id", "")),
         status_optionen=AUFTRAG_STATUS, status_label=AUFTRAG_STATUS_LABEL,

@@ -7,6 +7,16 @@
       {% if kunde.ist_stammkunde %}<span class="badge bg-info align-middle ms-2">Stammkunde</span>{% endif %}
     </h1>
     <div class="text-muted">{{ kunde.adresse }}{% if kunde.adresse %}, {% endif %}{{ kunde.plz }} {{ kunde.ort }}</div>
+    {% if current_user.sieht_alle_auftraege %}
+    <div class="mt-1">
+      {% if kunde.projektleiter %}
+        <span class="badge bg-primary">Team: {{ kunde.projektleiter }}</span>
+        {% for t in kunde.freigegeben_an_teams or [] %}<span class="badge bg-secondary">+ {{ t }}</span>{% endfor %}
+      {% else %}
+        <span class="badge bg-light text-dark border">kein Team — für alle sichtbar</span>
+      {% endif %}
+    </div>
+    {% endif %}
   </div>
   <div class="d-flex gap-2 flex-wrap">
     <a class="btn btn-outline-secondary" href="{{ url_for('customers.edit_customer', kunde_id=kunde.id) }}">Bearbeiten</a>

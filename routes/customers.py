@@ -11,16 +11,35 @@ from models.repos import (
     auftraege_fuer_kunde,
     auftraege_in_revision,
     ist_mitarbeiter_in_revision,
+    kunde_sichtbar_fuer,
     kunden,
     revisionen_fuer_kunde,
     todo_hinzufuegen,
     todo_loeschen,
     todo_toggle,
 )
+from models.users import list_projektleiter
 
 
 def _darf_auftrag_sehen(auftrag: dict) -> bool:
     return auftrag_sichtbar_fuer(auftrag, current_user)
+
+
+def _kunde_team_aus_form(form, bestehend: dict) -> dict:
+    """Team-Zuordnung eines Kunden übernehmen. Nur PL/Admin dürfen Team + Freigaben
+    setzen; ein Monteur behält die bestehende Zuordnung (Neukunde -> eigenes Team)."""
+    if current_user.sieht_alle_auftraege:
+        return {
+            "projektleiter": form.get("projektleiter", "").strip(),
+            "freigegeben_an_teams": [
+                t.strip() for t in form.getlist("freigegeben_an_teams") if t.strip()
+            ],
+        }
+    prim = (bestehend.get("projektleiter") or "").strip() or (current_user.team_leiter or "")
+    return {
+        "projektleiter": prim,
+        "freigegeben_an_teams": bestehend.get("freigegeben_an_teams") or [],
+    }
 
 bp = Blueprint("customers", __name__)
 
@@ -64,7 +83,10 @@ def _form_to_kunde(form) -> dict:
 
 @bp.route("/")
 def list_customers():
-    alle = sorted(kunden.list(), key=lambda k: k["name"].lower())
+    alle = sorted(
+        (k for k in kunden.list() if kunde_sichtbar_fuer(k, current_user)),
+        key=lambda k: k["name"].lower(),
+    )
     return render_template("customers/list.html", kunden=alle)
 
 
@@ -74,11 +96,14 @@ def new_customer():
         data = _form_to_kunde(request.form)
         if not data["name"]:
             flash("Name ist erforderlich.", "warning")
-            return render_template("customers/edit.html", kunde=data, neu=True)
+            return render_template("customers/edit.html", kunde=data, neu=True,
+                                   alle_projektleiter=list_projektleiter())
+        data.update(_kunde_team_aus_form(request.form, {}))
         record = kunden.create(data)
         flash(f"Kunde „{record['name']}“ angelegt.", "success")
         return redirect(url_for("customers.detail", kunde_id=record["id"]))
-    return render_template("customers/edit.html", kunde={}, neu=True)
+    return render_template("customers/edit.html", kunde={}, neu=True,
+                           alle_projektleiter=list_projektleiter())
 
 
 @bp.route("/<kunde_id>")
@@ -86,6 +111,8 @@ def detail(kunde_id: str):
     kunde = kunden.get(kunde_id)
     if not kunde:
         abort(404)
+    if not kunde_sichtbar_fuer(kunde, current_user):
+        abort(403)
     auftraege_dieses_kunden = sorted(
         [a for a in auftraege_fuer_kunde(kunde_id)
          if _darf_auftrag_sehen(a) and not a.get("revision_id")],
@@ -117,15 +144,20 @@ def edit_customer(kunde_id: str):
     kunde = kunden.get(kunde_id)
     if not kunde:
         abort(404)
+    if not kunde_sichtbar_fuer(kunde, current_user):
+        abort(403)
     if request.method == "POST":
         data = _form_to_kunde(request.form)
         if not data["name"]:
             flash("Name ist erforderlich.", "warning")
-            return render_template("customers/edit.html", kunde={**kunde, **data}, neu=False)
+            return render_template("customers/edit.html", kunde={**kunde, **data}, neu=False,
+                                   alle_projektleiter=list_projektleiter())
+        data.update(_kunde_team_aus_form(request.form, kunde))
         kunden.update(kunde_id, data)
         flash("Änderungen gespeichert.", "success")
         return redirect(url_for("customers.detail", kunde_id=kunde_id))
-    return render_template("customers/edit.html", kunde=kunde, neu=False)
+    return render_template("customers/edit.html", kunde=kunde, neu=False,
+                           alle_projektleiter=list_projektleiter())
 
 
 @bp.route("/<kunde_id>/todo/neu", methods=["POST"])
