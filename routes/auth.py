@@ -12,9 +12,11 @@ from models.users import (
     delete_user,
     find_user,
     generate_initial_password,
+    list_projektleiter,
     list_users,
     set_module,
     set_password,
+    set_projektleiter,
     set_role,
     set_vermietung_verwalter,
 )
@@ -64,7 +66,17 @@ def user_list():
         roles=USER_ROLES,
         role_label=USER_ROLE_LABEL,
         module=MODULE,
+        alle_projektleiter=list_projektleiter(),
     )
+
+
+@bp.route("/users/<username>/projektleiter", methods=["POST"])
+@login_required
+def change_projektleiter_route(username: str):
+    _require_admin()
+    set_projektleiter(username, request.form.get("projektleiter", ""))
+    flash(f"Team-Zuordnung für „{username}“ gespeichert.", "success")
+    return redirect(url_for("auth.user_list"))
 
 
 @bp.route("/users/<username>/module", methods=["POST"])

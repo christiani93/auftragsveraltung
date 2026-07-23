@@ -196,6 +196,29 @@
   </div>
 </div>
 
+{% set personen = auftrag.weitere_personen or [] %}
+<h2 class="h5 mb-2 mt-4">Weitere Personen <span class="text-muted small">(nicht im System)</span></h2>
+<div class="card mb-3">
+  <ul class="list-group list-group-flush">
+    {% for p in personen %}
+    <li class="list-group-item d-flex align-items-center gap-2 py-1">
+      <span class="flex-grow-1">👤 {{ p }}</span>
+      <form method="post" action="{{ url_for('auftraege.delete_person', auftrag_id=auftrag.id, idx=loop.index0) }}" class="d-inline" onsubmit="return confirm('Person entfernen?');">
+        <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2">×</button>
+      </form>
+    </li>
+    {% else %}
+    <li class="list-group-item text-muted small">Keine weiteren Personen erfasst.</li>
+    {% endfor %}
+  </ul>
+  <div class="card-body py-2">
+    <form method="post" action="{{ url_for('auftraege.add_person', auftrag_id=auftrag.id) }}" class="d-flex gap-2">
+      <input type="text" name="name" class="form-control form-control-sm" placeholder="Name einer nicht erfassten Person …" required>
+      <button type="submit" class="btn btn-sm btn-primary">+ Hinzufügen</button>
+    </form>
+  </div>
+</div>
+
 <div class="d-flex justify-content-between align-items-center mt-4 mb-2">
   <h2 class="h5 m-0">Bilder ({{ (auftrag.bilder or [])|length }})</h2>
 </div>

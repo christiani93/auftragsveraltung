@@ -90,6 +90,22 @@ class User(UserMixin):
         return self.role in ("admin", "projektleiter")
 
     @property
+    def projektleiter(self) -> str:
+        """Zugeordneter Projektleiter (Username). Nur fuer Monteure relevant."""
+        return (self._data.get("projektleiter") or "").strip()
+
+    @property
+    def team_leiter(self):
+        """Der Projektleiter, dessen Team dieser User angehoert — massgeblich fuer
+        die Auftrags-Sichtbarkeit. Projektleiter fuehren ihr eigenes Team (self),
+        Monteur -> zugeordneter PL, Admin -> None (sieht alles)."""
+        if self.is_admin:
+            return None
+        if self.is_projektleiter:
+            return self.username
+        return self.projektleiter or None
+
+    @property
     def module_zugriff(self) -> set:
         """Freigeschaltete Module. Ohne explizite Konfiguration -> Standardmodule
         (rueckwaertskompatibel; bestehende User behalten alle heutigen Funktionen)."""
@@ -193,6 +209,19 @@ def set_vermietung_verwalter(username: str, wert: bool) -> bool:
     if not user:
         return False
     users_store.update(user.record_id, {"vermietung_verwalter": bool(wert)})
+    return True
+
+
+def list_projektleiter() -> list:
+    return [u for u in list_users() if u.role == "projektleiter"]
+
+
+def set_projektleiter(username: str, pl_username: str) -> bool:
+    """Ordnet einen Monteur einem Projektleiter zu (leer = keiner)."""
+    user = find_user(username)
+    if not user:
+        return False
+    users_store.update(user.record_id, {"projektleiter": (pl_username or "").strip()})
     return True
 
 

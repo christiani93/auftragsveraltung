@@ -19,6 +19,7 @@ from models.repos import (
     aktive_stempelung_von,
     alle_aktiven_stempelungen,
     auftrag_bei_zeitbuchung_aktualisieren,
+    auftrag_sichtbar_fuer,
     auftraege,
     dauer_aus_zeitspanne,
     ist_mitarbeiter_in_revision,
@@ -33,18 +34,7 @@ bp = Blueprint("zeit", __name__)
 
 
 def _darf_auftrag_sehen(auftrag: dict) -> bool:
-    if not current_user.is_authenticated:
-        return False
-    if current_user.sieht_alle_auftraege:
-        return True
-    if ist_mitarbeiter_in_revision(auftrag.get("revision_id"), current_user.username):
-        return True
-    if current_user.username in (auftrag.get("freigegeben_an") or []):
-        return True
-    zugewiesen = (auftrag.get("zugewiesen_an") or "").strip()
-    if not zugewiesen:
-        return True
-    return zugewiesen.lower() == current_user.username.lower()
+    return auftrag_sichtbar_fuer(auftrag, current_user)
 
 
 def _parse_dt(value: str) -> datetime:

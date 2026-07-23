@@ -7,6 +7,7 @@ from models.repos import (
     AUFTRAG_STATUS_LABEL,
     REVISION_STATUS_LABEL,
     anlagen_fuer_kunde,
+    auftrag_sichtbar_fuer,
     auftraege_fuer_kunde,
     auftraege_in_revision,
     ist_mitarbeiter_in_revision,
@@ -19,19 +20,7 @@ from models.repos import (
 
 
 def _darf_auftrag_sehen(auftrag: dict) -> bool:
-    """Spiegelt routes/auftraege.py._darf_auftrag_sehen."""
-    if not current_user.is_authenticated:
-        return False
-    if current_user.sieht_alle_auftraege:
-        return True
-    if ist_mitarbeiter_in_revision(auftrag.get("revision_id"), current_user.username):
-        return True
-    if current_user.username in (auftrag.get("freigegeben_an") or []):
-        return True
-    zugewiesen = (auftrag.get("zugewiesen_an") or "").strip()
-    if not zugewiesen:
-        return True
-    return zugewiesen.lower() == current_user.username.lower()
+    return auftrag_sichtbar_fuer(auftrag, current_user)
 
 bp = Blueprint("customers", __name__)
 

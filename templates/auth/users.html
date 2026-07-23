@@ -50,6 +50,17 @@
                   class="d-inline ms-1" onsubmit="return confirm('User „{{ u.username }}“ löschen?');">
               <button type="submit" class="btn btn-sm btn-outline-danger">Löschen</button>
             </form>
+            {% if u.role == 'monteur' %}
+            <form method="post" action="{{ url_for('auth.change_projektleiter_route', username=u.username) }}" class="mt-2 text-start d-flex align-items-center gap-1">
+              <span class="small text-muted">Team (Projektleiter):</span>
+              <select name="projektleiter" class="form-select form-select-sm" style="width:auto;" onchange="this.form.submit()">
+                <option value="">— keiner —</option>
+                {% for p in alle_projektleiter %}
+                <option value="{{ p.username }}" {% if u.projektleiter == p.username %}selected{% endif %}>{{ p.name }} ({{ p.username }})</option>
+                {% endfor %}
+              </select>
+            </form>
+            {% endif %}
             {% if u.role != 'admin' %}
             <form method="post" action="{{ url_for('auth.change_module_route', username=u.username) }}" class="mt-2 text-start">
               <div class="small text-muted mb-1">Zugriff auf Module:</div>

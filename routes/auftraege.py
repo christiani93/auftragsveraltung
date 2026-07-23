@@ -22,6 +22,7 @@ from models.repos import (
     anlagenteile,
     anlagenteile_fuer_anlage,
     auftrag_bei_zeitbuchung_aktualisieren,
+    auftrag_sichtbar_fuer,
     auftraege,
     auftraege_fuer_kunde,
     benachrichtigung_erstellen,
@@ -37,7 +38,7 @@ from models.repos import (
     zeitbuchungen_fuer_auftrag,
     zeitsumme_h,
 )
-from models.users import find_user, list_monteure, list_users
+from models.users import find_user, list_monteure, list_projektleiter, list_users
 
 bp = Blueprint("auftraege", __name__)
 
@@ -107,6 +108,8 @@ def _form_to_auftrag(form) -> dict:
         "erteilt_von_telefon": form.get("erteilt_von_telefon", "").strip(),
         "anlagenteil_ids": form.getlist("anlagenteil_ids"),
         "zugewiesen_an": form.get("zugewiesen_an", "").strip(),
+        # Team-Zuordnung (Projektleiter, dem der Auftrag gehoert)
+        "projektleiter": form.get("projektleiter", "").strip(),
         # Zusaetzlich freigegebene Monteure (sehen den Auftrag ebenfalls)
         "freigegeben_an": [u.strip() for u in form.getlist("freigegeben_an") if u.strip()],
         "status": form.get("status", "offen") if form.get("status") in AUFTRAG_STATUS else "offen",
@@ -117,6 +120,16 @@ def _form_to_auftrag(form) -> dict:
         "revision_id": form.get("revision_id", "").strip() or None,
         "notizen": form.get("notizen", "").strip(),
     }
+
+
+def _auftrag_team_setzen(data: dict) -> dict:
+    """Legt das Team (projektleiter) des Auftrags fest. Monteur -> sein PL
+    (Formularwert egal). Projektleiter -> sich selbst (falls leer). Admin -> frei."""
+    if current_user.is_monteur:
+        data["projektleiter"] = current_user.team_leiter or data.get("projektleiter") or ""
+    elif current_user.is_projektleiter and not data.get("projektleiter"):
+        data["projektleiter"] = current_user.username
+    return data
 
 
 def _benachrichtige_zuweisung(auftrag: dict, alt_zugewiesen: str = "") -> None:
@@ -145,23 +158,8 @@ def _benachrichtige_zuweisung(auftrag: dict, alt_zugewiesen: str = "") -> None:
 
 
 def _darf_auftrag_sehen(auftrag: dict) -> bool:
-    """Sichtbarkeitsregel: Admin/Projektleiter sehen alles, Monteur sieht eigene +
-    unzugewiesene + Aufträge von Revisionen, in denen er als Mitarbeiter eingetragen ist.
-    """
-    if not current_user.is_authenticated:
-        return False
-    if current_user.sieht_alle_auftraege:
-        return True
-    # Revisions-Mitgliedschaft hat Vorrang — Mitarbeiter sieht alle Auftraege der Revision
-    if ist_mitarbeiter_in_revision(auftrag.get("revision_id"), current_user.username):
-        return True
-    # Zusaetzlich freigegebene Monteure
-    if current_user.username in (auftrag.get("freigegeben_an") or []):
-        return True
-    zugewiesen = (auftrag.get("zugewiesen_an") or "").strip()
-    if not zugewiesen:
-        return True
-    return zugewiesen.lower() == current_user.username.lower()
+    """Team-basierte Sichtbarkeit — siehe repos.auftrag_sichtbar_fuer."""
+    return auftrag_sichtbar_fuer(auftrag, current_user)
 
 
 def _teile_strukturiert(kunde_id: str):
@@ -278,9 +276,10 @@ def new_auftrag():
                 kunde=kunde,
                 anlagen_mit_teilen=_teile_strukturiert(data["kunde_id"]) if data["kunde_id"] else [],
                 status_optionen=AUFTRAG_STATUS, status_label=AUFTRAG_STATUS_LABEL,
-                monteure=list_monteure(),
+                monteure=list_monteure(), alle_projektleiter=list_projektleiter(),
                 kunde_revisionen=revisionen_fuer_kunde(data["kunde_id"]) if data["kunde_id"] else [],
             )
+        data = _auftrag_team_setzen(data)
         record = auftraege.create(data)
         _benachrichtige_zuweisung(record, alt_zugewiesen="")
         flash(f"Auftrag „{record['titel']}“ angelegt.", "success")
@@ -301,7 +300,7 @@ def new_auftrag():
         kunde=kunde,
         anlagen_mit_teilen=_teile_strukturiert(kunde_id) if kunde_id else [],
         status_optionen=AUFTRAG_STATUS, status_label=AUFTRAG_STATUS_LABEL,
-        monteure=list_monteure(),
+        monteure=list_monteure(), alle_projektleiter=list_projektleiter(),
         kunde_revisionen=revisionen_fuer_kunde(kunde_id) if kunde_id else [],
     )
 
@@ -361,10 +360,14 @@ def edit_auftrag(auftrag_id: str):
                 kunde=kunden.get(data["kunde_id"]) if data["kunde_id"] else None,
                 anlagen_mit_teilen=_teile_strukturiert(data["kunde_id"]) if data["kunde_id"] else [],
                 status_optionen=AUFTRAG_STATUS, status_label=AUFTRAG_STATUS_LABEL,
-                monteure=list_monteure(),
+                monteure=list_monteure(), alle_projektleiter=list_projektleiter(),
                 kunde_revisionen=revisionen_fuer_kunde(data["kunde_id"]) if data["kunde_id"] else [],
             )
         alt_zugewiesen = auftrag.get("zugewiesen_an") or ""
+        # Bestehendes Team beibehalten, wenn kein neues gesetzt wird
+        if not data.get("projektleiter"):
+            data["projektleiter"] = auftrag.get("projektleiter") or ""
+        data = _auftrag_team_setzen(data)
         auftraege.update(auftrag_id, data)
         _benachrichtige_zuweisung({**auftrag, **data, "id": auftrag_id}, alt_zugewiesen=alt_zugewiesen)
         flash("Auftrag gespeichert.", "success")
@@ -376,7 +379,7 @@ def edit_auftrag(auftrag_id: str):
         kunde=kunden.get(auftrag.get("kunde_id")),
         anlagen_mit_teilen=_teile_strukturiert(auftrag.get("kunde_id", "")),
         status_optionen=AUFTRAG_STATUS, status_label=AUFTRAG_STATUS_LABEL,
-        monteure=list_monteure(),
+        monteure=list_monteure(), alle_projektleiter=list_projektleiter(),
         kunde_revisionen=revisionen_fuer_kunde(auftrag.get("kunde_id", "")),
     )
 
@@ -719,6 +722,36 @@ def delete_todo(auftrag_id: str, todo_id: str):
     if not _darf_auftrag_sehen(a):
         abort(403)
     todo_loeschen(auftraege, auftrag_id, todo_id)
+    return redirect(url_for("auftraege.detail", auftrag_id=auftrag_id))
+
+
+@bp.route("/<auftrag_id>/person/neu", methods=["POST"])
+def add_person(auftrag_id: str):
+    """Fügt eine nicht im System erfasste Person zum Auftrag hinzu (Freitext)."""
+    a = auftraege.get(auftrag_id)
+    if not a:
+        abort(404)
+    if not _darf_auftrag_sehen(a):
+        abort(403)
+    name = request.form.get("name", "").strip()
+    if name:
+        personen = list(a.get("weitere_personen") or [])
+        personen.append(name)
+        auftraege.update(auftrag_id, {"weitere_personen": personen})
+    return redirect(url_for("auftraege.detail", auftrag_id=auftrag_id))
+
+
+@bp.route("/<auftrag_id>/person/<int:idx>/loeschen", methods=["POST"])
+def delete_person(auftrag_id: str, idx: int):
+    a = auftraege.get(auftrag_id)
+    if not a:
+        abort(404)
+    if not _darf_auftrag_sehen(a):
+        abort(403)
+    personen = list(a.get("weitere_personen") or [])
+    if 0 <= idx < len(personen):
+        personen.pop(idx)
+        auftraege.update(auftrag_id, {"weitere_personen": personen})
     return redirect(url_for("auftraege.detail", auftrag_id=auftrag_id))
 
 

@@ -475,6 +475,34 @@ def ist_mitarbeiter_in_revision(revision_id: Optional[str], username: str) -> bo
     return any((m or "").lower() == uname_lc for m in liste)
 
 
+def auftrag_sichtbar_fuer(auftrag: Dict[str, Any], user) -> bool:
+    """Zentrale Sichtbarkeitsregel für Aufträge (Team-Modell).
+
+    Admin sieht alles. Sonst sichtbar, wenn:
+    - der User Mitarbeiter der zugehörigen Revision ist,
+    - der Auftrag ihm zugewiesen oder zusätzlich freigegeben wurde, oder
+    - der Auftrag zum Team des Users gehört (auftrag.projektleiter == user.team_leiter).
+    Alt-Aufträge OHNE Team: unzugewiesene bleiben (wie bisher) sichtbar.
+    """
+    if not getattr(user, "is_authenticated", False):
+        return False
+    if getattr(user, "is_admin", False):
+        return True
+    username = user.username
+    if ist_mitarbeiter_in_revision(auftrag.get("revision_id"), username):
+        return True
+    if username in (auftrag.get("freigegeben_an") or []):
+        return True
+    zug = (auftrag.get("zugewiesen_an") or "").strip()
+    if zug and zug.lower() == username.lower():
+        return True
+    team = (auftrag.get("projektleiter") or "").strip()
+    if team:
+        return getattr(user, "team_leiter", None) == team
+    # Alt-Auftrag ohne Team: unzugewiesene sichtbar
+    return not zug
+
+
 def messgeraete_fuer_user(username: str, ist_admin: bool = False) -> List[Dict[str, Any]]:
     """Liefert die fuer den aktuellen User sichtbaren Messgeraete.
     Admin sieht alle, andere User nur ihre eigenen (owner == username) plus

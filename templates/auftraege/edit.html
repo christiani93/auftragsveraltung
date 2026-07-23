@@ -59,6 +59,19 @@
         <small class="text-muted">Diese Monteure sehen den Auftrag zusätzlich — auch ohne direkte Zuweisung.</small>
       </div>
 
+      {% if current_user.sieht_alle_auftraege %}
+      <div class="col-md-4">
+        <label class="form-label">Team / Projektleiter</label>
+        <select name="projektleiter" class="form-select">
+          <option value="">— kein Team (offen) —</option>
+          {% for p in alle_projektleiter %}
+          <option value="{{ p.username }}" {% if auftrag.projektleiter == p.username %}selected{% endif %}>{{ p.name }} ({{ p.username }})</option>
+          {% endfor %}
+        </select>
+        <small class="text-muted">Nur dieses Team (Projektleiter + seine Monteure) sieht den Auftrag.</small>
+      </div>
+      {% endif %}
+
       {% if kunde_revisionen %}
       <div class="col-md-4">
         <label class="form-label">Revision (Betriebsferien-Pool)</label>
