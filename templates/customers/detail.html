@@ -8,10 +8,10 @@
     </h1>
     <div class="text-muted">{{ kunde.adresse }}{% if kunde.adresse %}, {% endif %}{{ kunde.plz }} {{ kunde.ort }}</div>
     {% if current_user.sieht_alle_auftraege %}
+    {% set k_teams = kunde.teams or ((kunde.freigegeben_an_teams or []) + ([kunde.projektleiter] if kunde.projektleiter else [])) %}
     <div class="mt-1">
-      {% if kunde.projektleiter %}
-        <span class="badge bg-primary">Team: {{ kunde.projektleiter }}</span>
-        {% for t in kunde.freigegeben_an_teams or [] %}<span class="badge bg-secondary">+ {{ t }}</span>{% endfor %}
+      {% if k_teams %}
+        {% for t in k_teams %}<span class="badge bg-primary me-1">Team: {{ t }}</span>{% endfor %}
       {% else %}
         <span class="badge bg-light text-dark border">kein Team — für alle sichtbar</span>
       {% endif %}

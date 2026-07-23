@@ -475,13 +475,34 @@ def ist_mitarbeiter_in_revision(revision_id: Optional[str], username: str) -> bo
     return any((m or "").lower() == uname_lc for m in liste)
 
 
+def eintrag_teams(record: Dict[str, Any]) -> List[str]:
+    """Die Teams (PL-Usernames), denen ein Auftrag/Kunde zugeordnet ist.
+
+    Kanonisch ist die Liste 'teams'. Für Alt-Datensätze ohne 'teams' greifen
+    die früheren Einzelfelder ('projektleiter' + 'freigegeben_an_teams')."""
+    teams = [(t or "").strip() for t in (record.get("teams") or [])]
+    teams = [t for t in teams if t]
+    if teams:
+        return teams
+    # Rückwärtskompatibilität: alte Einzelfelder
+    legacy: List[str] = []
+    prim = (record.get("projektleiter") or "").strip()
+    if prim:
+        legacy.append(prim)
+    for t in (record.get("freigegeben_an_teams") or []):
+        t = (t or "").strip()
+        if t and t not in legacy:
+            legacy.append(t)
+    return legacy
+
+
 def auftrag_sichtbar_fuer(auftrag: Dict[str, Any], user) -> bool:
     """Zentrale Sichtbarkeitsregel für Aufträge (Team-Modell).
 
     Admin sieht alles. Sonst sichtbar, wenn:
     - der User Mitarbeiter der zugehörigen Revision ist,
     - der Auftrag ihm zugewiesen oder zusätzlich freigegeben wurde, oder
-    - der Auftrag zum Team des Users gehört (auftrag.projektleiter == user.team_leiter).
+    - der Auftrag einem Team des Users zugeordnet ist (user.team_leiter in teams).
     Alt-Aufträge OHNE Team: unzugewiesene bleiben (wie bisher) sichtbar.
     """
     if not getattr(user, "is_authenticated", False):
@@ -496,25 +517,16 @@ def auftrag_sichtbar_fuer(auftrag: Dict[str, Any], user) -> bool:
     zug = (auftrag.get("zugewiesen_an") or "").strip()
     if zug and zug.lower() == username.lower():
         return True
-    team = (auftrag.get("projektleiter") or "").strip()
-    if team:
-        return getattr(user, "team_leiter", None) == team
+    teams = eintrag_teams(auftrag)
+    if teams:
+        return getattr(user, "team_leiter", None) in teams
     # Alt-Auftrag ohne Team: unzugewiesene sichtbar
     return not zug
 
 
 def kunde_teams(kunde: Dict[str, Any]) -> List[str]:
-    """Alle Teams (PL-Usernames), die diesen Kunden sehen dürfen:
-    das besitzende Team (projektleiter) + zusätzlich freigegebene Teams."""
-    teams: List[str] = []
-    prim = (kunde.get("projektleiter") or "").strip()
-    if prim:
-        teams.append(prim)
-    for t in (kunde.get("freigegeben_an_teams") or []):
-        t = (t or "").strip()
-        if t and t not in teams:
-            teams.append(t)
-    return teams
+    """Alle Teams (PL-Usernames), die diesen Kunden sehen dürfen."""
+    return eintrag_teams(kunde)
 
 
 def kunde_sichtbar_fuer(kunde: Dict[str, Any], user) -> bool:

@@ -60,15 +60,19 @@
       </div>
 
       {% if current_user.sieht_alle_auftraege %}
+      {% set a_teams = auftrag.teams or ([auftrag.projektleiter] if auftrag.projektleiter else []) %}
       <div class="col-md-4">
-        <label class="form-label">Team / Projektleiter</label>
-        <select name="projektleiter" class="form-select">
-          <option value="">— kein Team (offen) —</option>
+        <label class="form-label">Teams</label>
+        <div class="border rounded p-2" style="max-height: 160px; overflow-y: auto;">
           {% for p in alle_projektleiter %}
-          <option value="{{ p.username }}" {% if auftrag.projektleiter == p.username %}selected{% endif %}>{{ p.name }} ({{ p.username }})</option>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="teams" value="{{ p.username }}"
+                   id="team-{{ p.username }}" {% if p.username in a_teams %}checked{% endif %}>
+            <label class="form-check-label small" for="team-{{ p.username }}">{{ p.name }} ({{ p.username }})</label>
+          </div>
           {% endfor %}
-        </select>
-        <small class="text-muted">Nur dieses Team (Projektleiter + seine Monteure) sieht den Auftrag.</small>
+        </div>
+        <small class="text-muted">Nur angekreuzte Teams (Projektleiter + ihre Monteure) sehen den Auftrag. Keins = für alle offen.</small>
       </div>
       {% endif %}
 

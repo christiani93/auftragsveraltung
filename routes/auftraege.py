@@ -27,6 +27,7 @@ from models.repos import (
     auftraege_fuer_kunde,
     benachrichtigung_erstellen,
     dauer_aus_zeitspanne,
+    eintrag_teams,
     ist_mitarbeiter_in_revision,
     kunden,
     sichtbare_kunden,
@@ -109,8 +110,8 @@ def _form_to_auftrag(form) -> dict:
         "erteilt_von_telefon": form.get("erteilt_von_telefon", "").strip(),
         "anlagenteil_ids": form.getlist("anlagenteil_ids"),
         "zugewiesen_an": form.get("zugewiesen_an", "").strip(),
-        # Team-Zuordnung (Projektleiter, dem der Auftrag gehoert)
-        "projektleiter": form.get("projektleiter", "").strip(),
+        # Team-Zuordnung (Liste von Projektleiter-Usernames, Mehrfachauswahl)
+        "teams": [t.strip() for t in form.getlist("teams") if t.strip()],
         # Zusaetzlich freigegebene Monteure (sehen den Auftrag ebenfalls)
         "freigegeben_an": [u.strip() for u in form.getlist("freigegeben_an") if u.strip()],
         "status": form.get("status", "offen") if form.get("status") in AUFTRAG_STATUS else "offen",
@@ -123,13 +124,21 @@ def _form_to_auftrag(form) -> dict:
     }
 
 
-def _auftrag_team_setzen(data: dict) -> dict:
-    """Legt das Team (projektleiter) des Auftrags fest. Monteur -> sein PL
-    (Formularwert egal). Projektleiter -> sich selbst (falls leer). Admin -> frei."""
-    if current_user.is_monteur:
-        data["projektleiter"] = current_user.team_leiter or data.get("projektleiter") or ""
-    elif current_user.is_projektleiter and not data.get("projektleiter"):
-        data["projektleiter"] = current_user.username
+def _auftrag_team_setzen(data: dict, bestehend: dict | None = None) -> dict:
+    """Legt die Team-Zuordnung (Liste) fest. Nur PL/Admin duerfen sie via Formular
+    setzen; ein Monteur behaelt die bestehende Zuordnung (Neuauftrag -> eigenes Team).
+    Das alte Einzelfeld 'projektleiter' wird beim Speichern geraeumt."""
+    if current_user.sieht_alle_auftraege:
+        teams = [t.strip() for t in (data.get("teams") or []) if t.strip()]
+        if not teams and current_user.is_projektleiter:
+            teams = [current_user.username]
+    else:
+        teams = list(eintrag_teams(bestehend) if bestehend else [])
+        tl = current_user.team_leiter
+        if not teams and tl:
+            teams = [tl]
+    data["teams"] = teams
+    data["projektleiter"] = ""  # Legacy-Feld raeumen — Zuordnung lebt in 'teams'
     return data
 
 
@@ -365,10 +374,7 @@ def edit_auftrag(auftrag_id: str):
                 kunde_revisionen=revisionen_fuer_kunde(data["kunde_id"]) if data["kunde_id"] else [],
             )
         alt_zugewiesen = auftrag.get("zugewiesen_an") or ""
-        # Bestehendes Team beibehalten, wenn kein neues gesetzt wird
-        if not data.get("projektleiter"):
-            data["projektleiter"] = auftrag.get("projektleiter") or ""
-        data = _auftrag_team_setzen(data)
+        data = _auftrag_team_setzen(data, bestehend=auftrag)
         auftraege.update(auftrag_id, data)
         _benachrichtige_zuweisung({**auftrag, **data, "id": auftrag_id}, alt_zugewiesen=alt_zugewiesen)
         flash("Auftrag gespeichert.", "success")

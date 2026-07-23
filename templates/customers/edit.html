@@ -47,29 +47,19 @@
     </div>
 
     {% if current_user.sieht_alle_auftraege %}
-    <div class="col-md-4">
-      <label class="form-label">Team / Projektleiter</label>
-      <select name="projektleiter" class="form-select">
-        <option value="">— kein Team (für alle sichtbar) —</option>
-        {% for p in alle_projektleiter %}
-        <option value="{{ p.username }}" {% if kunde.projektleiter == p.username %}selected{% endif %}>{{ p.name }} ({{ p.username }})</option>
-        {% endfor %}
-      </select>
-      <small class="text-muted">Besitzendes Team — nur dieses (+ freigegebene) sieht den Kunden.</small>
-    </div>
-    <div class="col-md-8">
-      <label class="form-label">Zusätzlich freigeben für Teams</label>
-      {% set frei_teams = kunde.freigegeben_an_teams or [] %}
-      <div class="border rounded p-2 d-flex flex-wrap gap-3" style="max-height: 140px; overflow-y: auto;">
+    {% set k_teams = kunde.teams or ((kunde.freigegeben_an_teams or []) + ([kunde.projektleiter] if kunde.projektleiter else [])) %}
+    <div class="col-12">
+      <label class="form-label">Teams</label>
+      <div class="border rounded p-2 d-flex flex-wrap gap-3" style="max-height: 160px; overflow-y: auto;">
         {% for p in alle_projektleiter %}
         <div class="form-check">
-          <input class="form-check-input" type="checkbox" name="freigegeben_an_teams" value="{{ p.username }}"
-                 id="team-frei-{{ p.username }}" {% if p.username in frei_teams %}checked{% endif %}>
-          <label class="form-check-label small" for="team-frei-{{ p.username }}">{{ p.name }} ({{ p.username }})</label>
+          <input class="form-check-input" type="checkbox" name="teams" value="{{ p.username }}"
+                 id="team-{{ p.username }}" {% if p.username in k_teams %}checked{% endif %}>
+          <label class="form-check-label small" for="team-{{ p.username }}">{{ p.name }} ({{ p.username }})</label>
         </div>
         {% endfor %}
       </div>
-      <small class="text-muted">Diese weiteren Teams sehen den Kunden ebenfalls (Mehrfachauswahl).</small>
+      <small class="text-muted">Angekreuzte Teams sehen den Kunden (Mehrfachauswahl). Keins = für alle sichtbar.</small>
     </div>
     {% endif %}
   </div>

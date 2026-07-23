@@ -10,6 +10,7 @@ from models.repos import (
     auftrag_sichtbar_fuer,
     auftraege_fuer_kunde,
     auftraege_in_revision,
+    eintrag_teams,
     ist_mitarbeiter_in_revision,
     kunde_sichtbar_fuer,
     kunden,
@@ -26,20 +27,16 @@ def _darf_auftrag_sehen(auftrag: dict) -> bool:
 
 
 def _kunde_team_aus_form(form, bestehend: dict) -> dict:
-    """Team-Zuordnung eines Kunden übernehmen. Nur PL/Admin dürfen Team + Freigaben
-    setzen; ein Monteur behält die bestehende Zuordnung (Neukunde -> eigenes Team)."""
+    """Team-Zuordnung (Liste) eines Kunden übernehmen. Nur PL/Admin dürfen sie via
+    Checkboxen setzen; ein Monteur behält die bestehende Zuordnung (Neukunde ->
+    eigenes Team). Alte Einzelfelder werden beim Speichern geräumt."""
     if current_user.sieht_alle_auftraege:
-        return {
-            "projektleiter": form.get("projektleiter", "").strip(),
-            "freigegeben_an_teams": [
-                t.strip() for t in form.getlist("freigegeben_an_teams") if t.strip()
-            ],
-        }
-    prim = (bestehend.get("projektleiter") or "").strip() or (current_user.team_leiter or "")
-    return {
-        "projektleiter": prim,
-        "freigegeben_an_teams": bestehend.get("freigegeben_an_teams") or [],
-    }
+        teams = [t.strip() for t in form.getlist("teams") if t.strip()]
+    else:
+        teams = list(eintrag_teams(bestehend) if bestehend else [])
+        if not teams and current_user.team_leiter:
+            teams = [current_user.team_leiter]
+    return {"teams": teams, "projektleiter": "", "freigegeben_an_teams": []}
 
 bp = Blueprint("customers", __name__)
 
