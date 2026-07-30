@@ -658,6 +658,15 @@ def zeitbuchungen_am_tag(datum_iso: str) -> List[Dict[str, Any]]:
     return [z for z in zeitbuchungen.list() if z.get("datum") == datum_iso]
 
 
+def zeitbuchungen_im_zeitraum(von_iso: str, bis_iso: str) -> List[Dict[str, Any]]:
+    """Alle Zeitbuchungen mit von_iso <= datum <= bis_iso (inklusive Grenzen).
+    ISO-Datumsstrings sind lexikografisch vergleichbar."""
+    return [
+        z for z in zeitbuchungen.list()
+        if von_iso <= (z.get("datum") or "") <= bis_iso
+    ]
+
+
 # ----- Last-/Aufbau-Berechnung -----------------------------------------------
 
 def _to_float(value: Any) -> Optional[float]:

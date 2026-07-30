@@ -12,6 +12,7 @@
            onchange="this.form.submit();">
     <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('zeit.heute', datum=next_tag) }}" title="Nächster Tag">›</a>
     {% if not ist_heute %}<a class="btn btn-sm btn-outline-primary" href="{{ url_for('zeit.heute') }}">Heute</a>{% endif %}
+    <a class="btn btn-sm btn-outline-dark" href="{{ url_for('zeit.woche', woche=datum) }}">📅 Woche</a>
   </form>
 </div>
 

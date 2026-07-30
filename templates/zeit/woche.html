@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Wochenübersicht KW {{ kw }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <h1 class="h3 m-0">
+    Wochenübersicht
+    <small class="text-muted">KW {{ kw }} · {{ montag|datetime_ch }}–{{ sonntag|datetime_ch }}</small>
+  </h1>
+  <div class="d-flex gap-2 align-items-center flex-wrap">
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('zeit.woche', woche=prev_woche) }}" title="Vorwoche">‹</a>
+    {% if not ist_aktuelle_woche %}<a class="btn btn-sm btn-outline-primary" href="{{ url_for('zeit.woche') }}">Aktuelle Woche</a>{% endif %}
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('zeit.woche', woche=next_woche) }}" title="Nächste Woche">›</a>
+    <a class="btn btn-sm btn-outline-dark" href="{{ url_for('zeit.heute') }}">Tagesansicht</a>
+  </div>
+</div>
+
+{% if mitarbeiter_liste %}
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-bordered table-hover align-middle m-0 text-nowrap">
+      <thead class="table-light">
+        <tr>
+          <th>Mitarbeiter</th>
+          {% for t in tage %}
+          <th class="text-center {% if t.ist_heute %}table-primary{% elif t.ist_wochenende %}table-secondary{% endif %}">
+            <a class="text-decoration-none text-reset" href="{{ url_for('zeit.heute', datum=t.iso) }}" title="Tagesansicht {{ t.tag }}">
+              {{ t.label }}<div class="small text-muted fw-normal">{{ t.tag }}</div>
+            </a>
+          </th>
+          {% endfor %}
+          <th class="text-center">Summe</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in mitarbeiter_liste %}
+        <tr>
+          <td class="fw-semibold">{{ m.username|mitarbeiter_name or m.username or '— ohne Mitarbeiter —' }}</td>
+          {% for t in tage %}
+          {% set zelle = m.tage[t.iso] %}
+          <td class="text-center {% if t.ist_heute %}table-primary{% elif t.ist_wochenende %}table-light{% endif %}">
+            {% if zelle.summe %}
+              {{ '%.2f'|format(zelle.summe) }}
+              {% if zelle.unproduktiv %}<div class="small text-muted" title="davon unproduktiv">({{ '%.2f'|format(zelle.unproduktiv) }})</div>{% endif %}
+            {% else %}
+              <span class="text-muted">–</span>
+            {% endif %}
+          </td>
+          {% endfor %}
+          <td class="text-center fw-bold">
+            {{ '%.2f'|format(m.summe) }}
+            {% if m.unproduktiv %}<div class="small text-muted fw-normal" title="davon unproduktiv">unpr. {{ '%.2f'|format(m.unproduktiv) }}</div>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr class="table-light fw-bold">
+          <td>Total</td>
+          {% for t in tage %}
+          <td class="text-center {% if t.ist_heute %}table-primary{% endif %}">{{ '%.2f'|format(spalten[t.iso]) }}</td>
+          {% endfor %}
+          <td class="text-center fs-6"><span class="badge bg-primary">{{ '%.2f'|format(gesamtsumme) }} h</span></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+<p class="text-muted small mt-2 mb-0">Werte in Stunden (brutto, ohne Pausenabzug). Zahl in Klammern = davon unproduktiv. Klick auf einen Wochentag öffnet die Tagesansicht.</p>
+{% else %}
+<div class="alert alert-light border">Keine Buchungen in dieser Woche ({{ montag|datetime_ch }}–{{ sonntag|datetime_ch }}).</div>
+{% endif %}
+{% endblock %}

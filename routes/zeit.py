@@ -27,6 +27,7 @@ from models.repos import (
     stempelungen,
     zeitbuchungen,
     zeitbuchungen_am_tag,
+    zeitbuchungen_im_zeitraum,
 )
 from models.users import find_user, list_users
 
@@ -372,6 +373,101 @@ def unproduktiv_neu():
     })
     flash(f"{dauer} h unproduktive Zeit erfasst{(' — ' + kategorie) if kategorie else ''}.", "success")
     return redirect(url_for("zeit.heute", datum=datum))
+
+
+WOCHENTAGE = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
+
+
+@bp.route("/woche")
+@login_required
+def woche():
+    """Wochenübersicht der Arbeitszeit: Matrix Mitarbeiter × Wochentag mit
+    Tages-/Wochensummen (produktiv + unproduktiv). Sichtbarkeit wie in der
+    Tagesansicht — Monteur sieht nur eigene Buchungen, PL/Admin alle sichtbaren."""
+    woche_str = request.args.get("woche", "").strip()
+    try:
+        ref = date.fromisoformat(woche_str) if woche_str else date.today()
+    except ValueError:
+        ref = date.today()
+    montag = ref - timedelta(days=ref.weekday())
+    sonntag = montag + timedelta(days=6)
+
+    tage = []
+    for i in range(7):
+        d = montag + timedelta(days=i)
+        tage.append({
+            "iso": d.isoformat(),
+            "label": WOCHENTAGE[i],
+            "tag": d.strftime("%d.%m."),
+            "ist_heute": d == date.today(),
+            "ist_wochenende": i >= 5,
+        })
+    tag_isos = [t["iso"] for t in tage]
+
+    eintraege = zeitbuchungen_im_zeitraum(montag.isoformat(), sonntag.isoformat())
+    auftraege_idx = {a["id"]: a for a in auftraege.list()}
+
+    pro_mitarbeiter: dict[str, dict] = {}
+    for z in eintraege:
+        a = auftraege_idx.get(z.get("auftrag_id") or "")
+        if a and not _darf_auftrag_sehen(a):
+            continue
+        mit = z.get("mitarbeiter") or ""
+        if (not current_user.sieht_alle_auftraege
+                and mit.lower() != current_user.username.lower()):
+            continue
+        if mit not in pro_mitarbeiter:
+            pro_mitarbeiter[mit] = {
+                "username": mit,
+                "tage": {iso: {"summe": 0.0, "unproduktiv": 0.0} for iso in tag_isos},
+                "summe": 0.0,
+                "unproduktiv": 0.0,
+            }
+        try:
+            dauer = float(z.get("dauer_h") or 0)
+        except (TypeError, ValueError):
+            dauer = 0.0
+        datum = z.get("datum") or ""
+        eintrag = pro_mitarbeiter[mit]
+        eintrag["summe"] += dauer
+        if datum in eintrag["tage"]:
+            eintrag["tage"][datum]["summe"] += dauer
+        if z.get("unproduktiv"):
+            eintrag["unproduktiv"] += dauer
+            if datum in eintrag["tage"]:
+                eintrag["tage"][datum]["unproduktiv"] += dauer
+
+    # Runden + Spaltensummen (pro Tag über alle Mitarbeiter)
+    spalten = {iso: 0.0 for iso in tag_isos}
+    for eintrag in pro_mitarbeiter.values():
+        eintrag["summe"] = round(eintrag["summe"], 2)
+        eintrag["unproduktiv"] = round(eintrag["unproduktiv"], 2)
+        for iso in tag_isos:
+            zelle = eintrag["tage"][iso]
+            zelle["summe"] = round(zelle["summe"], 2)
+            zelle["unproduktiv"] = round(zelle["unproduktiv"], 2)
+            spalten[iso] += zelle["summe"]
+    spalten = {iso: round(v, 2) for iso, v in spalten.items()}
+    gesamtsumme = round(sum(e["summe"] for e in pro_mitarbeiter.values()), 2)
+
+    mitarbeiter_liste = sorted(
+        pro_mitarbeiter.values(),
+        key=lambda e: (e["username"] or "").lower(),
+    )
+
+    return render_template(
+        "zeit/woche.html",
+        tage=tage,
+        mitarbeiter_liste=mitarbeiter_liste,
+        spalten=spalten,
+        gesamtsumme=gesamtsumme,
+        montag=montag.isoformat(),
+        sonntag=sonntag.isoformat(),
+        kw=montag.isocalendar()[1],
+        prev_woche=(montag - timedelta(days=7)).isoformat(),
+        next_woche=(montag + timedelta(days=7)).isoformat(),
+        ist_aktuelle_woche=(montag <= date.today() <= sonntag),
+    )
 
 
 @bp.route("/")
