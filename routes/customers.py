@@ -4,6 +4,7 @@ from flask import Blueprint, abort, flash, redirect, render_template, request, u
 from flask_login import current_user
 
 from models.repos import (
+    AUFTRAG_STATUS_ARCHIVIERT,
     AUFTRAG_STATUS_LABEL,
     REVISION_STATUS_LABEL,
     anlagen_fuer_kunde,
@@ -110,9 +111,16 @@ def detail(kunde_id: str):
         abort(404)
     if not kunde_sichtbar_fuer(kunde, current_user):
         abort(403)
+    archiv_anzeigen = request.args.get("archiv") == "1"
+    auftraege_kunde_alle = [
+        a for a in auftraege_fuer_kunde(kunde_id)
+        if _darf_auftrag_sehen(a) and not a.get("revision_id")
+    ]
+    anzahl_archiviert = sum(1 for a in auftraege_kunde_alle if a.get("status") in AUFTRAG_STATUS_ARCHIVIERT)
+    if not archiv_anzeigen:
+        auftraege_kunde_alle = [a for a in auftraege_kunde_alle if a.get("status") not in AUFTRAG_STATUS_ARCHIVIERT]
     auftraege_dieses_kunden = sorted(
-        [a for a in auftraege_fuer_kunde(kunde_id)
-         if _darf_auftrag_sehen(a) and not a.get("revision_id")],
+        auftraege_kunde_alle,
         key=lambda a: (a.get("status") != "offen", a.get("status") != "in_arbeit", a.get("erteilungsdatum", "")),
     )
     # Revisionen mit Counts vorbereiten
@@ -133,6 +141,8 @@ def detail(kunde_id: str):
         revisionen=rev_rows,
         revision_status_label=REVISION_STATUS_LABEL,
         darf_revision_anlegen=current_user.is_authenticated,
+        archiv_anzeigen=archiv_anzeigen,
+        anzahl_archiviert=anzahl_archiviert,
     )
 
 

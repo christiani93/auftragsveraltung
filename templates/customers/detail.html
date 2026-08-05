@@ -189,7 +189,14 @@
 {% endif %}
 
 <div class="d-flex justify-content-between align-items-center mt-4 mb-2">
-  <h2 class="h5 m-0">Aufträge ({{ auftraege|length }})</h2>
+  <h2 class="h5 m-0">
+    Aufträge ({{ auftraege|length }})
+    {% if anzahl_archiviert %}
+    <a class="small ms-2" href="{{ url_for('customers.detail', kunde_id=kunde.id, archiv=0 if archiv_anzeigen else 1) }}">
+      {% if archiv_anzeigen %}– abgerechnete ausblenden{% else %}+ {{ anzahl_archiviert }} abgerechnete anzeigen{% endif %}
+    </a>
+    {% endif %}
+  </h2>
   <a class="btn btn-sm btn-primary" href="{{ url_for('auftraege.new_auftrag', kunde_id=kunde.id) }}">+ Neuer Auftrag</a>
 </div>
 {% if auftraege %}
