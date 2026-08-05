@@ -312,6 +312,13 @@
                   {% for u in moegliche_mitarbeiter %}
                   <option value="{{ u.username }}" {% if z.mitarbeiter == u.username %}selected{% endif %}>{{ u.name }}</option>
                   {% endfor %}
+                  {% if personen %}
+                  <optgroup label="Weitere Personen">
+                    {% for p in personen %}
+                    <option value="{{ p }}" {% if z.mitarbeiter == p %}selected{% endif %}>{{ p }}</option>
+                    {% endfor %}
+                  </optgroup>
+                  {% endif %}
                 </select>
               </form>
             {% else %}
@@ -426,6 +433,22 @@
           {% for u in moegliche_mitarbeiter %}
           <option value="{{ u.username }}" {% if u.username == current_user.username %}selected{% endif %}>{{ u.name }}</option>
           {% endfor %}
+          {% if personen %}
+          <optgroup label="Weitere Personen">
+            {% for p in personen %}
+            <option value="{{ p }}">{{ p }}</option>
+            {% endfor %}
+          </optgroup>
+          {% endif %}
+        </select>
+      {% elif personen %}
+        <select name="mitarbeiter" class="form-select form-select-sm">
+          <option value="{{ current_user.username }}">{{ current_user.name }} (ich)</option>
+          <optgroup label="Weitere Personen">
+            {% for p in personen %}
+            <option value="{{ p }}">{{ p }}</option>
+            {% endfor %}
+          </optgroup>
         </select>
       {% else %}
         <input type="text" class="form-control form-control-sm" value="{{ current_user.name }}" readonly>

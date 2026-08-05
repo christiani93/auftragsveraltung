@@ -413,6 +413,8 @@ def add_zeitbuchung(auftrag_id: str):
     auftrag = auftraege.get(auftrag_id)
     if not auftrag:
         abort(404)
+    if not _darf_auftrag_sehen(auftrag):
+        abort(403)
     von = request.form.get("von_zeit", "").strip() or None
     bis = request.form.get("bis_zeit", "").strip() or None
     dauer_str = request.form.get("dauer_h", "").strip()
@@ -430,11 +432,15 @@ def add_zeitbuchung(auftrag_id: str):
         flash("Bitte Stunden direkt eintragen oder gültige Von/Bis-Zeiten angeben.", "warning")
         return redirect(url_for("auftraege.detail", auftrag_id=auftrag_id))
 
-    # Mitarbeiter: Admin/Projektleiter darf beliebig waehlen, Monteur immer self
+    # Mitarbeiter: Admin/Projektleiter darf beliebig waehlen. Monteur darf sich
+    # selbst oder eine am Auftrag erfasste "weitere Person" (nicht im System)
+    # waehlen — sonst faellt es auf sich selbst zurueck.
     if current_user.sieht_alle_auftraege:
         mitarbeiter = request.form.get("mitarbeiter", "").strip()
     else:
-        mitarbeiter = current_user.username
+        gewuenscht = request.form.get("mitarbeiter", "").strip()
+        erlaubt = {current_user.username} | set(auftrag.get("weitere_personen") or [])
+        mitarbeiter = gewuenscht if gewuenscht in erlaubt else current_user.username
 
     zeitbuchungen.create({
         "auftrag_id": auftrag_id,
@@ -460,8 +466,11 @@ def set_zeitbuchung_mitarbeiter(zeitbuchung_id: str):
     if not z:
         abort(404)
     neuer = request.form.get("mitarbeiter", "").strip()
-    # Validieren: leer ist OK (zurueck auf 'nicht zugeordnet'), sonst muss User existieren
-    if neuer and not find_user(neuer):
+    auftrag = auftraege.get(z.get("auftrag_id") or "")
+    weitere_personen = (auftrag or {}).get("weitere_personen") or []
+    # Validieren: leer ist OK (zurueck auf 'nicht zugeordnet'), sonst muss User
+    # existieren ODER eine am Auftrag erfasste "weitere Person" (nicht im System) sein.
+    if neuer and not find_user(neuer) and neuer not in weitere_personen:
         flash(f"Mitarbeiter „{neuer}“ nicht gefunden.", "warning")
         return redirect(url_for("auftraege.detail", auftrag_id=z.get("auftrag_id")) if z.get("auftrag_id") else url_for("auftraege.list_auftraege"))
     zeitbuchungen.update(zeitbuchung_id, {"mitarbeiter": neuer})
@@ -515,11 +524,15 @@ def edit_zeitbuchung(zeitbuchung_id: str):
             flash("Bitte Stunden oder gueltige Von/Bis-Zeiten angeben.", "warning")
             return redirect(url_for("auftraege.edit_zeitbuchung", zeitbuchung_id=zeitbuchung_id))
 
-        # Mitarbeiter: Admin/PL darf aendern, Monteur behaelt den bestehenden Wert
+        # Mitarbeiter: Admin/PL darf frei aendern. Monteur darf zwischen sich
+        # selbst und den "weiteren Personen" des (bisherigen) Auftrags wechseln,
+        # sonst bleibt der bestehende Wert erhalten.
         if current_user.sieht_alle_auftraege:
             mitarbeiter = request.form.get("mitarbeiter", "").strip()
         else:
-            mitarbeiter = z.get("mitarbeiter") or ""
+            gewuenscht = request.form.get("mitarbeiter", "").strip()
+            erlaubt = {current_user.username} | set((auftrag or {}).get("weitere_personen") or [])
+            mitarbeiter = gewuenscht if gewuenscht in erlaubt else (z.get("mitarbeiter") or "")
 
         # Auftrag aendern/zuordnen (leer = ohne Auftrag). Validieren: muss sichtbar sein.
         neuer_auftrag_id = request.form.get("auftrag_id", "").strip()

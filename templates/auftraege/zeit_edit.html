@@ -22,6 +22,7 @@
       <label class="form-label">Datum *</label>
       <input type="date" name="datum" class="form-control" value="{{ z.datum or '' }}" required>
     </div>
+    {% set personen = auftrag.weitere_personen or [] %}
     {% if current_user.sieht_alle_auftraege %}
     <div class="col-md-4">
       <label class="form-label">Mitarbeiter</label>
@@ -30,6 +31,25 @@
         {% for u in moegliche_mitarbeiter %}
         <option value="{{ u.username }}" {% if z.mitarbeiter == u.username %}selected{% endif %}>{{ u.name }}</option>
         {% endfor %}
+        {% if personen %}
+        <optgroup label="Weitere Personen">
+          {% for p in personen %}
+          <option value="{{ p }}" {% if z.mitarbeiter == p %}selected{% endif %}>{{ p }}</option>
+          {% endfor %}
+        </optgroup>
+        {% endif %}
+      </select>
+    </div>
+    {% elif personen %}
+    <div class="col-md-4">
+      <label class="form-label">Mitarbeiter</label>
+      <select name="mitarbeiter" class="form-select">
+        <option value="{{ current_user.username }}" {% if z.mitarbeiter == current_user.username %}selected{% endif %}>{{ current_user.name }} (ich)</option>
+        <optgroup label="Weitere Personen">
+          {% for p in personen %}
+          <option value="{{ p }}" {% if z.mitarbeiter == p %}selected{% endif %}>{{ p }}</option>
+          {% endfor %}
+        </optgroup>
       </select>
     </div>
     {% else %}

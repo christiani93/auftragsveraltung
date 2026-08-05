@@ -38,6 +38,18 @@ def _darf_auftrag_sehen(auftrag: dict) -> bool:
     return auftrag_sichtbar_fuer(auftrag, current_user)
 
 
+def _zeile_sichtbar(mitarbeiter: str, auftrag_vorhanden: bool) -> bool:
+    """Ob eine Zeitbuchung fuer einen nicht-privilegierten User (Monteur) sichtbar
+    ist: eigene Buchungen immer, dazu Buchungen fuer 'weitere Personen' (nicht im
+    System) auf einem Auftrag, den er sowieso schon sehen darf — der Aufruf-Ort
+    hat die Auftrags-Sichtbarkeit bereits geprueft, bevor diese Funktion greift."""
+    if current_user.sieht_alle_auftraege:
+        return True
+    if mitarbeiter.lower() == current_user.username.lower():
+        return True
+    return auftrag_vorhanden and bool(mitarbeiter) and not find_user(mitarbeiter)
+
+
 def _parse_dt(value: str) -> datetime:
     """ISO-Datetime parsen (mit Fallback auf jetzt)."""
     try:
@@ -413,8 +425,7 @@ def woche():
         if a and not _darf_auftrag_sehen(a):
             continue
         mit = z.get("mitarbeiter") or ""
-        if (not current_user.sieht_alle_auftraege
-                and mit.lower() != current_user.username.lower()):
+        if not _zeile_sichtbar(mit, bool(a)):
             continue
         if mit not in pro_mitarbeiter:
             pro_mitarbeiter[mit] = {
@@ -503,8 +514,7 @@ def heute():
         a = auftraege_idx.get(z.get("auftrag_id") or "")
         if a and not _darf_auftrag_sehen(a):
             continue
-        if (not current_user.sieht_alle_auftraege
-                and (z.get("mitarbeiter") or "").lower() != current_user.username.lower()):
+        if not _zeile_sichtbar(z.get("mitarbeiter") or "", bool(a)):
             continue
         sichtbare.append({
             "z": z,
