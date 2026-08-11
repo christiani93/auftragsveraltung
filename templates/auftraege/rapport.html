@@ -41,47 +41,67 @@
       <div class="fw-bold">{{ '%.2f'|format(gesamtsumme) }} h</div>
     </div>
     <div class="col-md-2">
-      <div class="text-muted small">Meine offenen Stunden</div>
-      <div class="fw-bold text-primary">{{ '%.2f'|format(meine_offen_summe) }} h</div>
+      <div class="text-muted small">Abgerechnet / Offen</div>
+      <div><span class="fw-semibold">{{ '%.2f'|format(abgerechnet_summe) }}</span> / <span class="fw-semibold text-primary">{{ '%.2f'|format(offen_summe) }}</span> h</div>
     </div>
   </div>
 </div>
 
+{% if rapport_tage %}
 <div class="card card-body mb-3 no-print">
-  <div class="text-muted small mb-2">
-    <strong>Rapport schreiben</strong> — markiert deine eigenen Stunden als „auf ein Rapport-Formular geschrieben“.
-    Ein physisches Rapport-Formular fasst max. 7 Tage; der Auftrag läuft dabei unverändert weiter.
-  </div>
   <div class="row g-3 align-items-end">
     <div class="col-md-7">
-      <label class="form-label mb-1">Bis und mit einem bestimmten Tag markieren (Teil-Rapport)</label>
-      <form method="post" action="{{ url_for('auftraege.rapport_markieren', auftrag_id=auftrag.id) }}" class="d-flex gap-2">
+      <label class="form-label mb-1"><strong>Teilabrechnung</strong> — Buchungen bis und mit diesem Tag als abgerechnet markieren</label>
+      <form method="post" action="{{ url_for('auftraege.abrechnen', auftrag_id=auftrag.id) }}" class="d-flex gap-2">
         <input type="hidden" name="modus" value="teil">
-        <select name="bis_datum" class="form-select" {% if not meine_offenen_tage %}disabled{% endif %} required>
-          {% for d in meine_offenen_tage %}
+        <select name="bis_datum" class="form-select" {% if not offene_tage %}disabled{% endif %} required>
+          {% for d in offene_tage %}
           <option value="{{ d }}" {% if loop.last %}selected{% endif %}>{{ d }}</option>
           {% endfor %}
         </select>
-        <button type="submit" class="btn btn-outline-primary text-nowrap" {% if not meine_offenen_tage %}disabled{% endif %}>Teil rapportieren</button>
+        <button type="submit" class="btn btn-outline-primary text-nowrap" {% if not offene_tage %}disabled{% endif %}>Teil abrechnen</button>
       </form>
+      {% if not offene_tage %}<small class="text-muted">Keine offenen Tage mehr.</small>{% endif %}
     </div>
     <div class="col-md-5">
-      <label class="form-label mb-1">Alle meine offenen Stunden markieren</label>
-      <form method="post" action="{{ url_for('auftraege.rapport_markieren', auftrag_id=auftrag.id) }}">
-        <input type="hidden" name="modus" value="alle">
-        <button type="submit" class="btn btn-dark w-100" {% if not meine_offenen_tage %}disabled{% endif %}>Alles rapportiert</button>
+      <label class="form-label mb-1"><strong>Komplettabrechnung</strong> — alles abrechnen + Auftrag schliessen</label>
+      <form method="post" action="{{ url_for('auftraege.abrechnen', auftrag_id=auftrag.id) }}"
+            onsubmit="return confirm('Gesamten Auftrag als abgerechnet markieren und den Status auf „Abgerechnet“ setzen?');">
+        <input type="hidden" name="modus" value="komplett">
+        <button type="submit" class="btn btn-dark w-100">Komplett abgerechnet</button>
       </form>
     </div>
   </div>
-  {% if not meine_offenen_tage %}<small class="text-muted d-block mt-2">Keine offenen eigenen Stunden auf diesem Auftrag.</small>{% endif %}
 </div>
+{% endif %}
 
 {% if rapport_tage %}
 {% for tag in rapport_tage %}
 <div class="card mb-3">
-  <div class="card-header">
+  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
     <strong>{{ tag.datum }}{% if tag.wochentag %} <span class="text-muted fw-normal">· {{ tag.wochentag }}</span>{% endif %}</strong>
-    <span class="badge bg-primary fs-6 float-end">{{ '%.2f'|format(tag.summe) }} h</span>
+    <div class="d-flex align-items-center gap-2">
+      {% if tag.status == 'abgerechnet' %}
+        <span class="badge bg-dark">abgerechnet{% if tag.abgerechnet_am %} am {{ tag.abgerechnet_am }}{% endif %}</span>
+      {% elif tag.status == 'teilweise' %}
+        <span class="badge bg-warning text-dark">teilweise abgerechnet</span>
+      {% else %}
+        <span class="badge bg-secondary">offen</span>
+      {% endif %}
+      {% if tag.datum != '—' %}
+      <form method="post" action="{{ url_for('auftraege.tag_abrechnung', auftrag_id=auftrag.id) }}" class="d-inline no-print">
+        <input type="hidden" name="datum" value="{{ tag.datum }}">
+        {% if tag.status == 'abgerechnet' %}
+          <input type="hidden" name="abgerechnet" value="0">
+          <button type="submit" class="btn btn-sm btn-outline-secondary py-0">zurücksetzen</button>
+        {% else %}
+          <input type="hidden" name="abgerechnet" value="1">
+          <button type="submit" class="btn btn-sm btn-outline-dark py-0">Tag abrechnen</button>
+        {% endif %}
+      </form>
+      {% endif %}
+      <span class="badge bg-primary fs-6">{{ '%.2f'|format(tag.summe) }} h</span>
+    </div>
   </div>
   <div class="table-responsive">
     <table class="table table-sm table-bordered protokoll-tabelle m-0">
@@ -89,40 +109,15 @@
         <tr>
           <th style="width: 220px;">Mitarbeiter</th>
           <th>Tätigkeit</th>
-          <th style="width: 90px;" class="text-end">Stunden</th>
-          <th style="width: 160px;">Rapport-Status</th>
-          <th class="no-print" style="width: 120px;"></th>
+          <th style="width: 100px;" class="text-end">Stunden</th>
         </tr>
       </thead>
       <tbody>
         {% for m in tag.mitarbeiter %}
         <tr>
-          <td>{{ (m.mitarbeiter|mitarbeiter_name) or '— ohne Mitarbeiter —' }}{% if m.ist_eigene %} <span class="text-muted small">(ich)</span>{% endif %}</td>
+          <td>{{ (m.mitarbeiter|mitarbeiter_name) or '— ohne Mitarbeiter —' }}</td>
           <td>{{ m.taetigkeiten|join(' · ') if m.taetigkeiten else '' }}</td>
           <td class="text-end fw-semibold">{{ '%.2f'|format(m.summe) }}</td>
-          <td>
-            {% if m.status == 'rapportiert' %}
-              <span class="badge bg-dark" title="{% if m.rapportiert_am %}rapportiert am {{ m.rapportiert_am }}{% endif %}">rapportiert</span>
-            {% elif m.status == 'teilweise' %}
-              <span class="badge bg-warning text-dark">teilweise</span>
-            {% else %}
-              <span class="badge bg-secondary">offen</span>
-            {% endif %}
-          </td>
-          <td class="no-print">
-            {% if m.ist_eigene and tag.datum != '—' %}
-            <form method="post" action="{{ url_for('auftraege.rapport_tag_markieren', auftrag_id=auftrag.id) }}" class="d-inline">
-              <input type="hidden" name="datum" value="{{ tag.datum }}">
-              {% if m.status == 'rapportiert' %}
-                <input type="hidden" name="rapportiert" value="0">
-                <button type="submit" class="btn btn-sm btn-outline-secondary py-0">zurücksetzen</button>
-              {% else %}
-                <input type="hidden" name="rapportiert" value="1">
-                <button type="submit" class="btn btn-sm btn-outline-dark py-0">markieren</button>
-              {% endif %}
-            </form>
-            {% endif %}
-          </td>
         </tr>
         {% endfor %}
       </tbody>
@@ -130,7 +125,6 @@
         <tr>
           <td colspan="2" class="text-end fw-semibold">Tagestotal</td>
           <td class="text-end fw-bold">{{ '%.2f'|format(tag.summe) }}</td>
-          <td colspan="2"></td>
         </tr>
       </tfoot>
     </table>
@@ -142,7 +136,7 @@
   <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
     <strong>Gesamttotal</strong>
     <div>
-      <span class="text-muted small me-2">davon meine: {{ '%.2f'|format(meine_summe) }} h · davon meine offen: {{ '%.2f'|format(meine_offen_summe) }} h</span>
+      <span class="text-muted small me-2">abgerechnet {{ '%.2f'|format(abgerechnet_summe) }} h · offen {{ '%.2f'|format(offen_summe) }} h</span>
       <span class="badge bg-dark fs-6">{{ '%.2f'|format(gesamtsumme) }} h</span>
     </div>
   </div>

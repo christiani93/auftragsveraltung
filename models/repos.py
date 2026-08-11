@@ -614,45 +614,36 @@ def zeitsumme_h(eintraege: List[Dict[str, Any]]) -> float:
     return round(total, 2)
 
 
-def zeit_rapportieren(auftrag_id: str, mitarbeiter: str, bis_datum: Optional[str] = None,
-                      rapportiert_am: Optional[str] = None) -> int:
-    """Markiert die (noch nicht rapportierten) Zeitbuchungen EINES Mitarbeiters auf
-    einem Auftrag als 'auf einen Rapport geschrieben'.
+def auftrag_zeit_abrechnen(auftrag_id: str, bis_datum: Optional[str] = None,
+                           abgerechnet_am: Optional[str] = None) -> int:
+    """Markiert (noch nicht abgerechnete) Zeitbuchungen eines Auftrags als abgerechnet.
 
-    Hintergrund: ein Monteur kann auf ein physisches Rapport-Formular nur max. 7
-    Tage eintragen. Diese Funktion ist eine persoenliche Markierung fuer den
-    buchenden Mitarbeiter selbst — der Auftrag laeuft unveraendert weiter, es
-    werden i.d.R. spaeter weitere Zeiten erfasst (naechstes Rapport-Formular).
-
-    bis_datum (ISO) = nur Buchungen mit datum <= bis_datum (Teil-Rapport);
-    None = alle noch offenen Buchungen dieses Mitarbeiters. Liefert die Anzahl
-    neu markierter Buchungen."""
+    bis_datum (ISO) = nur Buchungen mit datum <= bis_datum (Teilabrechnung);
+    None = alle offenen Buchungen. Liefert die Anzahl neu markierter Buchungen.
+    Darf von jedem gebucht werden, der den Auftrag sehen darf (typischerweise
+    der Monteur selbst — er schreibt die Rapporte), nicht nur vom Projektleiter."""
     n = 0
     for z in zeitbuchungen_fuer_auftrag(auftrag_id):
-        if (z.get("mitarbeiter") or "") != mitarbeiter:
-            continue
-        if z.get("rapportiert"):
+        if z.get("abgerechnet"):
             continue
         if bis_datum and (z.get("datum") or "") > bis_datum:
             continue
-        zeitbuchungen.update(z["id"], {"rapportiert": True, "rapportiert_am": rapportiert_am})
+        zeitbuchungen.update(z["id"], {"abgerechnet": True, "abgerechnet_am": abgerechnet_am})
         n += 1
     return n
 
 
-def zeit_rapportierung_setzen(auftrag_id: str, mitarbeiter: str, datum: str, rapportiert: bool,
-                              rapportiert_am: Optional[str] = None) -> int:
-    """Setzt/entfernt die Rapport-Markierung fuer die Buchungen EINES Mitarbeiters
-    an einem bestimmten Tag (Korrektur/Undo). Liefert die Anzahl geaenderter Buchungen."""
+def auftrag_tag_abrechnung_setzen(auftrag_id: str, datum: str, abgerechnet: bool,
+                                  abgerechnet_am: Optional[str] = None) -> int:
+    """Setzt/entfernt das Abgerechnet-Flag fuer alle Buchungen eines bestimmten
+    Tages eines Auftrags (Toggle / Undo). Liefert die Anzahl geaenderter Buchungen."""
     n = 0
     for z in zeitbuchungen_fuer_auftrag(auftrag_id):
         if (z.get("datum") or "") != datum:
             continue
-        if (z.get("mitarbeiter") or "") != mitarbeiter:
-            continue
         zeitbuchungen.update(z["id"], {
-            "rapportiert": bool(rapportiert),
-            "rapportiert_am": rapportiert_am if rapportiert else None,
+            "abgerechnet": bool(abgerechnet),
+            "abgerechnet_am": abgerechnet_am if abgerechnet else None,
         })
         n += 1
     return n
