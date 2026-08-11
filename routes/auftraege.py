@@ -352,6 +352,58 @@ def detail(auftrag_id: str):
     )
 
 
+@bp.route("/<auftrag_id>/rapport")
+def rapport(auftrag_id: str):
+    """Druckbare Übersicht für den externen Rapport: wann der Auftrag erfasst
+    wurde und wer an welchem Tag wie viele Stunden gearbeitet hat."""
+    auftrag = auftraege.get(auftrag_id)
+    if not auftrag:
+        abort(404)
+    if not _darf_auftrag_sehen(auftrag):
+        abort(403)
+    kunde = kunden.get(auftrag.get("kunde_id"))
+    eintraege = zeitbuchungen_fuer_auftrag(auftrag_id)
+
+    pro_mitarbeiter: dict[str, dict] = {}
+    for z in eintraege:
+        mit = z.get("mitarbeiter") or ""
+        if mit not in pro_mitarbeiter:
+            pro_mitarbeiter[mit] = {"mitarbeiter": mit, "tage": {}, "summe": 0.0}
+        try:
+            dauer = float(z.get("dauer_h") or 0)
+        except (TypeError, ValueError):
+            dauer = 0.0
+        eintrag = pro_mitarbeiter[mit]
+        eintrag["summe"] += dauer
+        datum = z.get("datum") or "—"
+        tag = eintrag["tage"].setdefault(datum, {"datum": datum, "summe": 0.0, "taetigkeiten": []})
+        tag["summe"] += dauer
+        taetigkeit = (z.get("taetigkeit") or "").strip()
+        if taetigkeit and taetigkeit not in tag["taetigkeiten"]:
+            tag["taetigkeiten"].append(taetigkeit)
+
+    rapport_zeilen = []
+    for eintrag in pro_mitarbeiter.values():
+        tage = sorted(eintrag["tage"].values(), key=lambda t: t["datum"])
+        for t in tage:
+            t["summe"] = round(t["summe"], 2)
+        rapport_zeilen.append({
+            "mitarbeiter": eintrag["mitarbeiter"],
+            "tage": tage,
+            "summe": round(eintrag["summe"], 2),
+        })
+    rapport_zeilen.sort(key=lambda e: (e["mitarbeiter"] or "").lower())
+    gesamtsumme = round(sum(e["summe"] for e in rapport_zeilen), 2)
+
+    return render_template(
+        "auftraege/rapport.html",
+        auftrag=auftrag, kunde=kunde,
+        rapport_zeilen=rapport_zeilen,
+        gesamtsumme=gesamtsumme,
+        status_label=AUFTRAG_STATUS_LABEL,
+    )
+
+
 @bp.route("/<auftrag_id>/bearbeiten", methods=["GET", "POST"])
 def edit_auftrag(auftrag_id: str):
     auftrag = auftraege.get(auftrag_id)

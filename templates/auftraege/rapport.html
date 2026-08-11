@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Rapport-Übersicht – {{ auftrag.titel }}{% endblock %}
+{% block content %}
+{% set status_farbe = {'offen': 'bg-secondary', 'in_arbeit': 'bg-warning text-dark', 'erledigt': 'bg-success', 'abgerechnet': 'bg-dark'} %}
+
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2 no-print">
+  <div>
+    <div class="text-muted small">
+      {% if kunde %}<a href="{{ url_for('customers.detail', kunde_id=kunde.id) }}">{{ kunde.name }}</a> ›{% endif %}
+      <a href="{{ url_for('auftraege.detail', auftrag_id=auftrag.id) }}">{{ auftrag.titel }}</a> › Rapport-Übersicht
+    </div>
+    <h1 class="h3 m-0">Rapport-Übersicht</h1>
+  </div>
+  <button class="btn btn-primary" onclick="window.print()">🖨 Drucken / als PDF speichern</button>
+</div>
+
+<div class="print-header d-none d-print-block mb-2">
+  <h2>Rapport-Übersicht</h2>
+  <div>
+    <strong>{{ auftrag.titel }}</strong>
+    {% if kunde %} · {{ kunde.name }}{% endif %}
+  </div>
+</div>
+
+<div class="card card-body mb-3 protokoll-meta">
+  <div class="row g-2">
+    <div class="col-md-3">
+      <div class="text-muted small">Auftrag erfasst am</div>
+      <div class="fw-semibold">{{ auftrag.erteilungsdatum or '—' }}</div>
+    </div>
+    <div class="col-md-3">
+      <div class="text-muted small">Kunde</div>
+      <div class="fw-semibold">{{ kunde.name if kunde else '—' }}</div>
+    </div>
+    <div class="col-md-3">
+      <div class="text-muted small">Status</div>
+      <div><span class="badge {{ status_farbe.get(auftrag.status, 'bg-secondary') }}">{{ status_label.get(auftrag.status, auftrag.status) }}</span></div>
+    </div>
+    <div class="col-md-3">
+      <div class="text-muted small">Total Stunden</div>
+      <div class="fw-bold">{{ '%.2f'|format(gesamtsumme) }} h</div>
+    </div>
+  </div>
+</div>
+
+{% if rapport_zeilen %}
+{% for e in rapport_zeilen %}
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <strong>{{ (e.mitarbeiter|mitarbeiter_name) or '— ohne Mitarbeiter —' }}</strong>
+    <span class="badge bg-primary fs-6">{{ '%.2f'|format(e.summe) }} h</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm table-bordered protokoll-tabelle m-0">
+      <thead class="table-light">
+        <tr>
+          <th style="width: 120px;">Datum</th>
+          <th>Tätigkeit</th>
+          <th style="width: 100px;" class="text-end">Stunden</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in e.tage %}
+        <tr>
+          <td>{{ t.datum }}</td>
+          <td>{{ t.taetigkeiten|join(' · ') if t.taetigkeiten else '' }}</td>
+          <td class="text-end fw-semibold">{{ '%.2f'|format(t.summe) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot class="table-light">
+        <tr>
+          <td colspan="2" class="text-end fw-semibold">Summe {{ (e.mitarbeiter|mitarbeiter_name) or '—' }}</td>
+          <td class="text-end fw-bold">{{ '%.2f'|format(e.summe) }}</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+{% endfor %}
+
+<div class="card card-body mb-3">
+  <div class="d-flex justify-content-between align-items-center">
+    <strong>Gesamttotal</strong>
+    <span class="badge bg-dark fs-6">{{ '%.2f'|format(gesamtsumme) }} h</span>
+  </div>
+</div>
+{% else %}
+<div class="alert alert-info">Keine Zeitbuchungen auf diesem Auftrag erfasst.</div>
+{% endif %}
+
+{% endblock %}

@@ -20,6 +20,7 @@
   </div>
   <div class="d-flex gap-2 flex-wrap">
     <a class="btn btn-outline-secondary" href="{{ url_for('auftraege.edit_auftrag', auftrag_id=auftrag.id) }}">Bearbeiten</a>
+    <a class="btn btn-outline-dark" href="{{ url_for('auftraege.rapport', auftrag_id=auftrag.id) }}" target="_blank">📄 Rapport-Übersicht</a>
     {% if auftrag_anlagen %}
       {% if auftrag_anlagen|length == 1 %}
         <a class="btn btn-primary" href="{{ url_for('protocols.new_protocol', auftrag_id=auftrag.id, anlage_id=auftrag_anlagen[0].id) }}">+ Messprotokoll erstellen</a>
