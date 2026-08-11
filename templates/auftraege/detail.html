@@ -302,7 +302,10 @@
       <tbody>
         {% for z in zeitbuchungen %}
         <tr>
-          <td>{{ z.datum }}</td>
+          <td>
+            {{ z.datum }}
+            {% if z.abgerechnet %}<div><span class="badge bg-dark" title="{% if z.abgerechnet_am %}abgerechnet am {{ z.abgerechnet_am }}{% else %}abgerechnet{% endif %}">abgerechnet</span></div>{% endif %}
+          </td>
           <td>
             {% if current_user.sieht_alle_auftraege %}
               <form method="post" action="{{ url_for('auftraege.set_zeitbuchung_mitarbeiter', zeitbuchung_id=z.id) }}"

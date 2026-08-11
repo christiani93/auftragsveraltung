@@ -614,6 +614,39 @@ def zeitsumme_h(eintraege: List[Dict[str, Any]]) -> float:
     return round(total, 2)
 
 
+def auftrag_zeit_abrechnen(auftrag_id: str, bis_datum: Optional[str] = None,
+                           abgerechnet_am: Optional[str] = None) -> int:
+    """Markiert (noch nicht abgerechnete) Zeitbuchungen eines Auftrags als abgerechnet.
+
+    bis_datum (ISO) = nur Buchungen mit datum <= bis_datum (Teilabrechnung);
+    None = alle offenen Buchungen. Liefert die Anzahl neu markierter Buchungen."""
+    n = 0
+    for z in zeitbuchungen_fuer_auftrag(auftrag_id):
+        if z.get("abgerechnet"):
+            continue
+        if bis_datum and (z.get("datum") or "") > bis_datum:
+            continue
+        zeitbuchungen.update(z["id"], {"abgerechnet": True, "abgerechnet_am": abgerechnet_am})
+        n += 1
+    return n
+
+
+def auftrag_tag_abrechnung_setzen(auftrag_id: str, datum: str, abgerechnet: bool,
+                                  abgerechnet_am: Optional[str] = None) -> int:
+    """Setzt/entfernt das Abgerechnet-Flag fuer alle Buchungen eines bestimmten
+    Tages eines Auftrags (Toggle / Undo). Liefert die Anzahl geaenderter Buchungen."""
+    n = 0
+    for z in zeitbuchungen_fuer_auftrag(auftrag_id):
+        if (z.get("datum") or "") != datum:
+            continue
+        zeitbuchungen.update(z["id"], {
+            "abgerechnet": bool(abgerechnet),
+            "abgerechnet_am": abgerechnet_am if abgerechnet else None,
+        })
+        n += 1
+    return n
+
+
 def auftrag_bei_zeitbuchung_aktualisieren(auftrag_id: str, mitarbeiter: str) -> None:
     """Auto-Hook nach einer Zeitbuchung: Auftrag in Arbeit setzen + zuteilen.
 

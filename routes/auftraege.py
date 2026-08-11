@@ -23,6 +23,8 @@ from models.repos import (
     anlagenteile_fuer_anlage,
     auftrag_bei_zeitbuchung_aktualisieren,
     auftrag_sichtbar_fuer,
+    auftrag_tag_abrechnung_setzen,
+    auftrag_zeit_abrechnen,
     auftraege,
     auftraege_fuer_kunde,
     benachrichtigung_erstellen,
@@ -352,10 +354,14 @@ def detail(auftrag_id: str):
     )
 
 
+_RAPPORT_WOCHENTAGE = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
+
+
 @bp.route("/<auftrag_id>/rapport")
 def rapport(auftrag_id: str):
     """Druckbare Übersicht für den externen Rapport: wann der Auftrag erfasst
-    wurde und wer an welchem Tag wie viele Stunden gearbeitet hat."""
+    wurde und wer an welchem Tag wie viele Stunden gearbeitet hat — gruppiert
+    pro Tag. Mit Abrechnungs-Status (offen/teilweise/abgerechnet) je Tag."""
     auftrag = auftraege.get(auftrag_id)
     if not auftrag:
         abort(404)
@@ -364,44 +370,127 @@ def rapport(auftrag_id: str):
     kunde = kunden.get(auftrag.get("kunde_id"))
     eintraege = zeitbuchungen_fuer_auftrag(auftrag_id)
 
-    pro_mitarbeiter: dict[str, dict] = {}
+    pro_tag: dict[str, dict] = {}
     for z in eintraege:
-        mit = z.get("mitarbeiter") or ""
-        if mit not in pro_mitarbeiter:
-            pro_mitarbeiter[mit] = {"mitarbeiter": mit, "tage": {}, "summe": 0.0}
+        datum = z.get("datum") or "—"
+        if datum not in pro_tag:
+            pro_tag[datum] = {
+                "datum": datum, "mitarbeiter": {}, "summe": 0.0,
+                "anzahl": 0, "abgerechnet_anzahl": 0, "abgerechnet_am": None,
+            }
         try:
             dauer = float(z.get("dauer_h") or 0)
         except (TypeError, ValueError):
             dauer = 0.0
-        eintrag = pro_mitarbeiter[mit]
-        eintrag["summe"] += dauer
-        datum = z.get("datum") or "—"
-        tag = eintrag["tage"].setdefault(datum, {"datum": datum, "summe": 0.0, "taetigkeiten": []})
+        tag = pro_tag[datum]
         tag["summe"] += dauer
+        tag["anzahl"] += 1
+        if z.get("abgerechnet"):
+            tag["abgerechnet_anzahl"] += 1
+            if z.get("abgerechnet_am"):
+                tag["abgerechnet_am"] = z.get("abgerechnet_am")
+        mit = z.get("mitarbeiter") or ""
+        mb = tag["mitarbeiter"].setdefault(mit, {"mitarbeiter": mit, "summe": 0.0, "taetigkeiten": []})
+        mb["summe"] += dauer
         taetigkeit = (z.get("taetigkeit") or "").strip()
-        if taetigkeit and taetigkeit not in tag["taetigkeiten"]:
-            tag["taetigkeiten"].append(taetigkeit)
+        if taetigkeit and taetigkeit not in mb["taetigkeiten"]:
+            mb["taetigkeiten"].append(taetigkeit)
 
-    rapport_zeilen = []
-    for eintrag in pro_mitarbeiter.values():
-        tage = sorted(eintrag["tage"].values(), key=lambda t: t["datum"])
-        for t in tage:
-            t["summe"] = round(t["summe"], 2)
-        rapport_zeilen.append({
-            "mitarbeiter": eintrag["mitarbeiter"],
-            "tage": tage,
-            "summe": round(eintrag["summe"], 2),
+    rapport_tage = []
+    for tag in pro_tag.values():
+        mits = sorted(tag["mitarbeiter"].values(), key=lambda m: (m["mitarbeiter"] or "").lower())
+        for m in mits:
+            m["summe"] = round(m["summe"], 2)
+        if tag["anzahl"] and tag["abgerechnet_anzahl"] == tag["anzahl"]:
+            status = "abgerechnet"
+        elif tag["abgerechnet_anzahl"]:
+            status = "teilweise"
+        else:
+            status = "offen"
+        try:
+            wochentag = _RAPPORT_WOCHENTAGE[date.fromisoformat(tag["datum"]).weekday()]
+        except ValueError:
+            wochentag = ""
+        rapport_tage.append({
+            "datum": tag["datum"],
+            "wochentag": wochentag,
+            "mitarbeiter": mits,
+            "summe": round(tag["summe"], 2),
+            "status": status,
+            "abgerechnet_am": tag["abgerechnet_am"],
         })
-    rapport_zeilen.sort(key=lambda e: (e["mitarbeiter"] or "").lower())
-    gesamtsumme = round(sum(e["summe"] for e in rapport_zeilen), 2)
+    rapport_tage.sort(key=lambda t: t["datum"])
+
+    gesamtsumme = round(sum(t["summe"] for t in rapport_tage), 2)
+    abgerechnet_summe = round(
+        sum(float(z.get("dauer_h") or 0) for z in eintraege if z.get("abgerechnet")), 2)
+    offen_summe = round(gesamtsumme - abgerechnet_summe, 2)
+    # Tage fuer die Teilabrechnungs-Auswahl (nur solche mit offenen Buchungen)
+    offene_tage = [t["datum"] for t in rapport_tage if t["status"] != "abgerechnet" and t["datum"] != "—"]
 
     return render_template(
         "auftraege/rapport.html",
         auftrag=auftrag, kunde=kunde,
-        rapport_zeilen=rapport_zeilen,
+        rapport_tage=rapport_tage,
         gesamtsumme=gesamtsumme,
+        abgerechnet_summe=abgerechnet_summe,
+        offen_summe=offen_summe,
+        offene_tage=offene_tage,
+        darf_abrechnen=current_user.sieht_alle_auftraege,
         status_label=AUFTRAG_STATUS_LABEL,
     )
+
+
+@bp.route("/<auftrag_id>/abrechnen", methods=["POST"])
+def abrechnen(auftrag_id: str):
+    """Teil- oder Komplettabrechnung. Teil: markiert Buchungen bis zu einem Datum
+    als abgerechnet, Auftrag bleibt offen. Komplett: markiert alle Buchungen +
+    setzt den Auftragsstatus auf 'abgerechnet'. Nur Admin/Projektleiter."""
+    auftrag = auftraege.get(auftrag_id)
+    if not auftrag:
+        abort(404)
+    if not _darf_auftrag_sehen(auftrag) or not current_user.sieht_alle_auftraege:
+        abort(403)
+    heute = date.today().isoformat()
+    modus = request.form.get("modus", "")
+    if modus == "komplett":
+        n = auftrag_zeit_abrechnen(auftrag_id, bis_datum=None, abgerechnet_am=heute)
+        auftraege.update(auftrag_id, {"status": "abgerechnet"})
+        flash(f"Auftrag komplett abgerechnet — {n} Buchung(en) markiert, Status: Abgerechnet.", "success")
+    else:  # Teilabrechnung
+        bis = request.form.get("bis_datum", "").strip()
+        if not bis:
+            flash("Bitte ein Datum für die Teilabrechnung wählen.", "warning")
+            return redirect(url_for("auftraege.rapport", auftrag_id=auftrag_id))
+        n = auftrag_zeit_abrechnen(auftrag_id, bis_datum=bis, abgerechnet_am=heute)
+        if n:
+            flash(f"Teilabrechnung: {n} Buchung(en) bis und mit {bis} als abgerechnet markiert.", "success")
+        else:
+            flash("Keine offenen Buchungen bis zu diesem Datum gefunden.", "info")
+    return redirect(url_for("auftraege.rapport", auftrag_id=auftrag_id))
+
+
+@bp.route("/<auftrag_id>/rapport/tag-abrechnung", methods=["POST"])
+def tag_abrechnung(auftrag_id: str):
+    """Markiert/entfernt die Abrechnung fuer einen einzelnen Tag (Toggle/Undo).
+    Nur Admin/Projektleiter."""
+    auftrag = auftraege.get(auftrag_id)
+    if not auftrag:
+        abort(404)
+    if not _darf_auftrag_sehen(auftrag) or not current_user.sieht_alle_auftraege:
+        abort(403)
+    datum = request.form.get("datum", "").strip()
+    abgerechnet = request.form.get("abgerechnet") == "1"
+    if datum:
+        n = auftrag_tag_abrechnung_setzen(
+            auftrag_id, datum, abgerechnet,
+            abgerechnet_am=date.today().isoformat() if abgerechnet else None,
+        )
+        if abgerechnet:
+            flash(f"{datum}: {n} Buchung(en) als abgerechnet markiert.", "success")
+        else:
+            flash(f"{datum}: Abrechnung zurückgesetzt ({n} Buchung(en)).", "info")
+    return redirect(url_for("auftraege.rapport", auftrag_id=auftrag_id))
 
 
 @bp.route("/<auftrag_id>/bearbeiten", methods=["GET", "POST"])
