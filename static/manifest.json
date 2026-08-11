@@ -37,7 +37,7 @@
     {
       "name": "Kontroll-Übersicht",
       "short_name": "Kontrolle",
-      "description": "Stammkunden-Übersicht für den Elektrokontrolleur",
+      "description": "Übersicht offener Kontrollen für den Elektrokontrolleur",
       "url": "/kontrolle",
       "icons": [{ "src": "/static/icon.svg", "sizes": "any" }]
     },

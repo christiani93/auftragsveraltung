@@ -3,8 +3,8 @@
 Datenmodell-Übersicht
 ---------------------
 Kunde
-    id, name, adresse, plz, ort, telefon, email, ist_stammkunde,
-    kontroll_intervall_monate, notizen
+    id, name, adresse, plz, ort, telefon, email, notizen, teams,
+    kontaktpersonen, todos
 
 Anlage (gehört zu einem Kunden)
     id, kunde_id, bezeichnung, standort, baujahr,
@@ -926,10 +926,10 @@ def kontroll_uebersicht_fuer_kunde(kunde_id: str) -> Dict[str, Any]:
 def dashboard_data() -> Dict[str, Any]:
     """Übersicht der offenen Kontrollen (offen + Mängel), nach Kunden gruppiert.
 
-    Nicht mehr auf Stammkunden beschränkt — gelistet wird jeder Kunde, bei dem
-    tatsächlich noch etwas zu prüfen ist (mindestens ein Anlagenteil offen oder
-    mit Mängel). Pro Kunde werden die konkreten Anlagenteile mitgeliefert, damit
-    die Übersicht die offenen Punkte direkt gruppiert anzeigen kann.
+    Gelistet wird jeder Kunde, bei dem tatsächlich noch etwas zu prüfen ist
+    (mindestens ein Anlagenteil offen oder mit Mängel). Pro Kunde werden die
+    konkreten Anlagenteile mitgeliefert, damit die Übersicht die offenen Punkte
+    direkt gruppiert anzeigen kann.
     """
     rows: List[Dict[str, Any]] = []
     summe_offen = 0

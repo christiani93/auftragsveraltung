@@ -15,7 +15,6 @@
           <th>Name</th>
           <th>Ort</th>
           <th>Telefon</th>
-          <th>Stammkunde</th>
           <th class="text-end">Aktion</th>
         </tr>
       </thead>
@@ -25,7 +24,6 @@
           <td><a href="{{ url_for('customers.detail', kunde_id=k.id) }}" class="fw-semibold text-decoration-none">{{ k.name }}</a></td>
           <td>{{ k.plz }} {{ k.ort }}</td>
           <td>{% if k.telefon %}<a href="tel:{{ k.telefon|replace(' ', '') }}" class="text-decoration-none">{{ k.telefon }}</a>{% endif %}</td>
-          <td>{% if k.ist_stammkunde %}<span class="badge bg-info">Stammkunde</span>{% endif %}</td>
           <td class="text-end">
             <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('customers.detail', kunde_id=k.id) }}">Details</a>
           </td>
@@ -41,7 +39,6 @@
   <a class="mobile-list-item" href="{{ url_for('customers.detail', kunde_id=k.id) }}">
     <div class="mobile-list-row">
       <div class="mobile-list-title flex-grow-1">{{ k.name }}</div>
-      {% if k.ist_stammkunde %}<span class="badge bg-info">Stammkunde</span>{% endif %}
     </div>
     <div class="mobile-list-meta">
       {% if k.plz or k.ort %}{{ k.plz }} {{ k.ort }}{% endif %}

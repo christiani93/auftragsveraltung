@@ -3,9 +3,7 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
   <div>
-    <h1 class="h3 m-0">{{ kunde.name }}
-      {% if kunde.ist_stammkunde %}<span class="badge bg-info align-middle ms-2">Stammkunde</span>{% endif %}
-    </h1>
+    <h1 class="h3 m-0">{{ kunde.name }}</h1>
     <div class="text-muted">{{ kunde.adresse }}{% if kunde.adresse %}, {% endif %}{{ kunde.plz }} {{ kunde.ort }}</div>
     {% if current_user.sieht_alle_auftraege %}
     {% set k_teams = kunde.teams or ((kunde.freigegeben_an_teams or []) + ([kunde.projektleiter] if kunde.projektleiter else [])) %}
@@ -21,9 +19,7 @@
   <div class="d-flex gap-2 flex-wrap">
     <a class="btn btn-outline-secondary" href="{{ url_for('customers.edit_customer', kunde_id=kunde.id) }}">Bearbeiten</a>
     <a class="btn btn-primary" href="{{ url_for('auftraege.new_auftrag', kunde_id=kunde.id) }}">+ Neuer Auftrag</a>
-    {% if kunde.ist_stammkunde %}
     <a class="btn btn-outline-primary" href="{{ url_for('kontrolle.kunde_uebersicht', kunde_id=kunde.id) }}">Kontroll-Übersicht</a>
-    {% endif %}
     <a class="btn btn-outline-dark" href="{{ url_for('auftraege.kunde_liste', kunde_id=kunde.id) }}" target="_blank">📄 Auftragsliste (Druck/PDF)</a>
     <a class="btn btn-outline-dark" href="{{ url_for('protocols.messpunkte_kunde_ansicht', kunde_id=kunde.id) }}" target="_blank">📄 Messpunkte (Druck/PDF)</a>
   </div>
@@ -35,9 +31,6 @@
       <h6 class="text-muted">Kontakt</h6>
       <div>📞 {{ kunde.telefon or '—' }}</div>
       <div>✉️ {{ kunde.email or '—' }}</div>
-      {% if kunde.kontroll_intervall_monate %}
-      <div class="mt-2"><span class="text-muted">Kontroll-Intervall:</span> alle {{ kunde.kontroll_intervall_monate }} Monate</div>
-      {% endif %}
     </div>
   </div>
   <div class="col-md-6">

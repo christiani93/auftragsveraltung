@@ -72,8 +72,6 @@ def _form_to_kunde(form) -> dict:
         "ort": form.get("ort", "").strip(),
         "telefon": form.get("telefon", "").strip(),
         "email": form.get("email", "").strip(),
-        "ist_stammkunde": form.get("ist_stammkunde") == "on",
-        "kontroll_intervall_monate": int(form.get("kontroll_intervall_monate") or 6),
         "notizen": form.get("notizen", "").strip(),
         "kontaktpersonen": _form_to_kontaktpersonen(form),
     }
