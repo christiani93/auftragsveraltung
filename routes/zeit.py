@@ -29,7 +29,7 @@ from models.repos import (
     zeitbuchungen_am_tag,
     zeitbuchungen_im_zeitraum,
 )
-from models.users import find_user, list_users
+from models.users import find_user, list_mitarbeiter
 
 bp = Blueprint("zeit", __name__)
 
@@ -496,11 +496,16 @@ def heute():
     # einen anderen Mitarbeiter waehlen; default = self.
     stempel_fuer = current_user.username
     if current_user.is_admin:
+        # Admin stempelt nie fuer sich selbst (kein operativer Account) — Default
+        # ist der erste echte Mitarbeiter, per ?stempel_fuer waehlbar.
         gewuenscht = request.args.get("stempel_fuer", "").strip()
-        if gewuenscht:
-            u = find_user(gewuenscht)
-            if u:
-                stempel_fuer = u.username
+        u = find_user(gewuenscht) if gewuenscht else None
+        if u and not u.is_admin:
+            stempel_fuer = u.username
+        else:
+            mitarbeiter = list_mitarbeiter()
+            if mitarbeiter:
+                stempel_fuer = mitarbeiter[0].username
     stempel_fuer_user = find_user(stempel_fuer)
     stempel_fuer_name = stempel_fuer_user.name if stempel_fuer_user else stempel_fuer
 
@@ -642,8 +647,8 @@ def heute():
             "dauer_h_live": round((jetzt - start).total_seconds() / 3600.0, 2),
         }
 
-    # Mitarbeiter-Liste fuer Admin-Auswahl (nur Admin)
-    alle_user = list_users() if current_user.is_admin else []
+    # Mitarbeiter-Liste fuer Admin-Auswahl (nur Admin; ohne Admin selbst)
+    alle_user = list_mitarbeiter() if current_user.is_admin else []
 
     gesamtsumme = round(sum(d["summe"] for d in pro_mitarbeiter.values()), 2)
     prev_tag = (d - timedelta(days=1)).isoformat()

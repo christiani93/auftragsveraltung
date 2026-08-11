@@ -42,7 +42,7 @@ from models.repos import (
     zeitbuchungen_fuer_auftrag,
     zeitsumme_h,
 )
-from models.users import find_user, list_monteure, list_projektleiter, list_users
+from models.users import find_user, list_mitarbeiter, list_monteure, list_projektleiter
 
 bp = Blueprint("auftraege", __name__)
 
@@ -338,7 +338,7 @@ def detail(auftrag_id: str):
     eintraege = zeitbuchungen_fuer_auftrag(auftrag_id)
     aktive_stempelung = aktive_stempelung_von(current_user.username) if current_user.is_authenticated else None
     # Mitarbeiter-Auswahl-Liste — nur fuer Admin/Projektleiter; Monteur stempelt nur fuer sich.
-    moegliche_mitarbeiter = list_users() if current_user.sieht_alle_auftraege else []
+    moegliche_mitarbeiter = list_mitarbeiter() if current_user.sieht_alle_auftraege else []
     zugeordnete_revision = revisionen.get(auftrag.get("revision_id")) if auftrag.get("revision_id") else None
     return render_template(
         "auftraege/detail.html",
@@ -742,7 +742,7 @@ def edit_zeitbuchung(zeitbuchung_id: str):
             return redirect(url_for("auftraege.detail", auftrag_id=neuer_auftrag_id))
         return redirect(url_for("zeit.heute"))
 
-    moegliche_mitarbeiter = list_users() if current_user.sieht_alle_auftraege else []
+    moegliche_mitarbeiter = list_mitarbeiter() if current_user.sieht_alle_auftraege else []
     # Auswahl sichtbarer Auftraege (Kunde: Titel) zum Umzuordnen
     kunden_idx = {k["id"]: k for k in kunden.list()}
     auftrag_optionen = []

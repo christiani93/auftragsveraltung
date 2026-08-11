@@ -29,7 +29,7 @@ from models.repos import (
     revisionen,
     revisionen_fuer_kunde,
 )
-from models.users import list_users
+from models.users import list_mitarbeiter, list_users
 
 bp = Blueprint("revisionen", __name__)
 
@@ -98,7 +98,7 @@ def new_revision(kunde_id: str):
                 "revisionen/edit.html",
                 revision=data, neu=True, kunde=kunde,
                 status_optionen=REVISION_STATUS, status_label=REVISION_STATUS_LABEL,
-                alle_user=list_users(),
+                alle_user=list_mitarbeiter(),
             )
         data["todos"] = []
         record = revisionen.create(data)
@@ -113,7 +113,7 @@ def new_revision(kunde_id: str):
         "revisionen/edit.html",
         revision=default, neu=True, kunde=kunde,
         status_optionen=REVISION_STATUS, status_label=REVISION_STATUS_LABEL,
-        alle_user=list_users(),
+        alle_user=list_mitarbeiter(),
     )
 
 
@@ -138,7 +138,7 @@ def detail(revision_id: str):
         status_optionen=REVISION_STATUS,
         auftrag_status_label=AUFTRAG_STATUS_LABEL,
         darf_aendern=True,
-        alle_user=list_users(),
+        alle_user=list_mitarbeiter(),
     )
 
 
@@ -157,7 +157,7 @@ def edit_revision(revision_id: str):
                 "revisionen/edit.html",
                 revision={**rev, **data}, neu=False, kunde=kunde,
                 status_optionen=REVISION_STATUS, status_label=REVISION_STATUS_LABEL,
-                alle_user=list_users(),
+                alle_user=list_mitarbeiter(),
             )
         revisionen.update(revision_id, data)
         flash("Revision gespeichert.", "success")
@@ -166,7 +166,7 @@ def edit_revision(revision_id: str):
         "revisionen/edit.html",
         revision=rev, neu=False, kunde=kunde,
         status_optionen=REVISION_STATUS, status_label=REVISION_STATUS_LABEL,
-        alle_user=list_users(),
+        alle_user=list_mitarbeiter(),
     )
 
 

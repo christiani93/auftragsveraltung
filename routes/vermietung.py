@@ -21,7 +21,7 @@ from models.repos import (
     mietreservationen,
     reservation_konflikt,
 )
-from models.users import list_users
+from models.users import list_mitarbeiter
 
 
 def _als_int(wert, default=1):
@@ -191,7 +191,7 @@ def delete_maschine(maschine_id: str):
 @login_required
 def mitarbeiter_liste():
     _require_verwalter()
-    return render_template("vermietung/mieter.html", alle_mieter=mieter_sortiert(), alle_user=list_users())
+    return render_template("vermietung/mieter.html", alle_mieter=mieter_sortiert(), alle_user=list_mitarbeiter())
 
 
 @bp.route("/mitarbeiter/<mieter_id>/account", methods=["POST"])

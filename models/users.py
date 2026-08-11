@@ -226,8 +226,16 @@ def set_projektleiter(username: str, pl_username: str) -> bool:
 
 
 def list_monteure() -> list[User]:
-    """Alle User die als Monteur arbeiten können — fuer Auftrag-Zuweisung."""
-    return [u for u in list_users() if u.role in ("monteur", "projektleiter", "admin")]
+    """Alle User die als Monteur arbeiten können — fuer Auftrag-Zuweisung.
+    Ohne Admin: der sieht ohnehin alles und wird operativ nicht zugeteilt."""
+    return [u for u in list_users() if u.role in ("monteur", "projektleiter")]
+
+
+def list_mitarbeiter() -> list[User]:
+    """Alle User ausser Admin — fuer operative Zuordnungen (Zeitbuchung,
+    Messgeraete, Revisionen, Verleih, 'Stempeln fuer'). Der Admin sieht ohnehin
+    alles und wird bei solchen Mitarbeiter-Zuordnungen nicht gebraucht."""
+    return [u for u in list_users() if not u.is_admin]
 
 
 def ensure_initial_admin() -> Optional[str]:

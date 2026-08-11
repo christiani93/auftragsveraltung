@@ -8,7 +8,7 @@ from flask import Blueprint, abort, flash, redirect, render_template, request, u
 from flask_login import current_user
 
 from models.repos import messgeraete, messgeraete_fuer_user
-from models.users import list_users
+from models.users import list_mitarbeiter
 
 bp = Blueprint("messgeraete", __name__)
 
@@ -75,7 +75,7 @@ def edit_device(geraet_id: str):
             return render_template(
                 "messgeraete/edit.html",
                 geraet={**geraet, **data}, neu=False, is_admin=current_user.is_admin,
-                alle_user=list_users(),
+                alle_user=list_mitarbeiter(),
             )
         # Admin darf owner umtragen (auch auf leer = ohne Besitzer), normale User nicht
         if current_user.is_admin:
@@ -86,7 +86,7 @@ def edit_device(geraet_id: str):
     return render_template(
         "messgeraete/edit.html",
         geraet=geraet, neu=False, is_admin=current_user.is_admin,
-        alle_user=list_users(),
+        alle_user=list_mitarbeiter(),
     )
 
 
