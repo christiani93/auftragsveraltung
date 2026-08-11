@@ -422,6 +422,13 @@ def rapport(auftrag_id: str):
             "abgerechnet_am": tag["abgerechnet_am"],
         })
     rapport_tage.sort(key=lambda t: t["datum"])
+    # Optische Unterteilung: ein physisches Rapport-Formular fasst max. 7 Tage
+    # (gemeint sind Tage MIT Zeiterfassung, nicht Kalendertage). Deshalb jeden
+    # 7. erfassten Tag einen Block-Wechsel markieren.
+    for idx, t in enumerate(rapport_tage):
+        t["tag_nr"] = idx + 1
+        t["block"] = idx // 7 + 1
+    anzahl_bloecke = (len(rapport_tage) + 6) // 7
 
     gesamtsumme = round(sum(t["summe"] for t in rapport_tage), 2)
     abgerechnet_summe = round(
@@ -434,6 +441,7 @@ def rapport(auftrag_id: str):
         "auftraege/rapport.html",
         auftrag=auftrag, kunde=kunde,
         rapport_tage=rapport_tage,
+        anzahl_bloecke=anzahl_bloecke,
         gesamtsumme=gesamtsumme,
         abgerechnet_summe=abgerechnet_summe,
         offen_summe=offen_summe,

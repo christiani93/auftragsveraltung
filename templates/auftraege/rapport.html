@@ -76,10 +76,19 @@
 {% endif %}
 
 {% if rapport_tage %}
+{% set ns = namespace(block=0) %}
 {% for tag in rapport_tage %}
+{% if tag.block != ns.block %}
+{% set ns.block = tag.block %}
+<div class="d-flex align-items-center my-3">
+  <span class="badge bg-primary me-2">Rapport {{ tag.block }}{% if anzahl_bloecke > 1 %} / {{ anzahl_bloecke }}{% endif %}</span>
+  <span class="text-muted small me-2">max. 7 erfasste Tage pro Rapport-Formular</span>
+  <hr class="flex-grow-1 my-0">
+</div>
+{% endif %}
 <div class="card mb-3">
   <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-    <strong>{{ tag.datum }}{% if tag.wochentag %} <span class="text-muted fw-normal">· {{ tag.wochentag }}</span>{% endif %}</strong>
+    <strong><span class="text-muted small me-1">Tag {{ tag.tag_nr }}</span>{{ tag.datum }}{% if tag.wochentag %} <span class="text-muted fw-normal">· {{ tag.wochentag }}</span>{% endif %}</strong>
     <div class="d-flex align-items-center gap-2">
       {% if tag.status == 'abgerechnet' %}
         <span class="badge bg-dark">abgerechnet{% if tag.abgerechnet_am %} am {{ tag.abgerechnet_am }}{% endif %}</span>
