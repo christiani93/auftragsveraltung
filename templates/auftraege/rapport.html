@@ -211,7 +211,7 @@
       <tbody>
         {% for m in g.positionen %}
         <tr>
-          <td><code>{{ m.e_nummer|replace(' ', '') if m.e_nummer else '—' }}</code></td>
+          <td><code>{{ m.e_nummer|replace(' ', '') if m.e_nummer else (m.em_artikel_nr or '—') }}</code></td>
           <td>{{ m.artikeltext or '—' }}{% if m.ruckstand %}<span class="text-danger small"> · Rückstand {{ m.ruckstand }}</span>{% endif %}</td>
           <td class="text-end">{{ m.menge_verbaut if m.menge_verbaut is not none else '—' }} {{ m.einheit or '' }}</td>
           <td>
