@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Lieferschein-Import – {{ auftrag.titel }}{% endblock %}
+{% block content %}
+<div class="text-muted small mb-2">
+  <a href="{{ url_for('auftraege.detail', auftrag_id=auftrag.id) }}">{{ auftrag.titel }}</a> › Lieferschein-Import
+</div>
+<h1 class="h3 mb-1">Lieferschein-Vorschau</h1>
+<p class="text-muted">
+  Lieferschein <strong>{{ lieferschein_nr or '—' }}</strong>{% if lieferschein_datum %} vom {{ lieferschein_datum }}{% endif %}
+  · {{ positionen|length }} Position(en) erkannt. Prüfe/korrigiere die Angaben und wähle, was übernommen werden soll.
+</p>
+
+<form method="post" action="{{ url_for('auftraege.material_import_uebernehmen', auftrag_id=auftrag.id) }}">
+  <input type="hidden" name="lieferschein_nr" value="{{ lieferschein_nr }}">
+  <input type="hidden" name="lieferschein_datum" value="{{ lieferschein_datum }}">
+
+  <div class="d-flex gap-2 mb-2">
+    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.querySelectorAll('.chk-uebernehmen').forEach(c=>c.checked=true)">Alle</button>
+    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.querySelectorAll('.chk-uebernehmen').forEach(c=>c.checked=false)">Keine</button>
+  </div>
+
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-sm table-bordered align-middle m-0">
+        <thead class="table-light">
+          <tr>
+            <th style="width:38px;">✓</th>
+            <th style="width:60px;">Pos</th>
+            <th style="width:110px;">E-Nummer</th>
+            <th>Artikel</th>
+            <th style="width:150px;">EM-Artikel-Nr</th>
+            <th style="width:70px;">Best.</th>
+            <th style="width:70px;">Gel.</th>
+            <th style="width:80px;">Verbaut</th>
+            <th style="width:80px;">Einheit</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in positionen %}
+          <tr {% if p.menge_geliefert == 0 %}class="table-warning"{% endif %}>
+            <td class="text-center">
+              <input type="checkbox" class="form-check-input chk-uebernehmen" name="uebernehmen" value="{{ loop.index0 }}" {% if p.menge_geliefert and p.menge_geliefert > 0 %}checked{% endif %}>
+            </td>
+            <td><input type="text" name="position[]" value="{{ p.position or '' }}" class="form-control form-control-sm" style="width:55px;"></td>
+            <td><input type="text" name="e_nummer[]" value="{{ p.e_nummer or '' }}" class="form-control form-control-sm"></td>
+            <td>
+              <input type="text" name="artikeltext[]" value="{{ p.artikeltext or '' }}" class="form-control form-control-sm">
+              {% if p.ruckstand %}<div class="small text-danger">Rückstand {{ p.ruckstand }} · Termin {{ p.ruckstand_termin or '—' }}</div>{% endif %}
+              <input type="hidden" name="gebinde[]" value="{{ p.gebinde or '' }}">
+              <input type="hidden" name="ruckstand[]" value="{{ p.ruckstand or '' }}">
+              <input type="hidden" name="ruckstand_termin[]" value="{{ p.ruckstand_termin or '' }}">
+            </td>
+            <td><input type="text" name="em_artikel_nr[]" value="{{ p.em_artikel_nr or '' }}" class="form-control form-control-sm"></td>
+            <td><input type="text" name="menge_bestellt[]" value="{{ p.menge_bestellt if p.menge_bestellt is not none else '' }}" class="form-control form-control-sm text-end"></td>
+            <td><input type="text" name="menge_geliefert[]" value="{{ p.menge_geliefert if p.menge_geliefert is not none else '' }}" class="form-control form-control-sm text-end"></td>
+            <td><input type="text" name="menge_verbaut[]" value="{{ p.menge_verbaut if p.menge_verbaut is not none else '' }}" class="form-control form-control-sm text-end"></td>
+            <td><input type="text" name="einheit[]" value="{{ p.einheit or '' }}" class="form-control form-control-sm"></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <p class="text-muted small mt-2">Gelb = nicht geliefert (Rückstand). Standardmässig nur gelieferte Positionen angehakt.</p>
+
+  <div class="mt-3 d-flex gap-2">
+    <button type="submit" class="btn btn-primary">Angehakte übernehmen</button>
+    <a class="btn btn-outline-secondary" href="{{ url_for('auftraege.detail', auftrag_id=auftrag.id) }}">Abbrechen</a>
+  </div>
+</form>
+{% endblock %}

@@ -56,6 +56,7 @@ push_subscriptions = JsonStore("push_subscriptions.json")
 mietmaschinen = JsonStore("mietmaschinen.json")
 mieter = JsonStore("mieter.json")
 mietreservationen = JsonStore("mietreservationen.json")
+material = JsonStore("material.json")
 
 VERMIET_STATUS = ["verfuegbar", "ausgeliehen", "wartung"]
 VERMIET_STATUS_LABEL = {
@@ -631,6 +632,46 @@ def auftrag_zeit_abrechnen(auftrag_id: str, bis_datum: Optional[str] = None,
         zeitbuchungen.update(z["id"], {"abgerechnet": True, "abgerechnet_am": abgerechnet_am})
         n += 1
     return n
+
+
+def material_fuer_auftrag(auftrag_id: str) -> List[Dict[str, Any]]:
+    """Alle Material-Positionen eines Auftrags, sortiert nach Lieferschein-Datum,
+    dann Position, dann Erfassungszeit (manuell erfasste ans Ende)."""
+    items = [m for m in material.list() if m.get("auftrag_id") == auftrag_id]
+    items.sort(key=lambda m: (
+        m.get("lieferschein_datum") or "9999-12-31",
+        m.get("position") if m.get("position") is not None else 10**9,
+        m.get("erstellt_am") or "",
+    ))
+    return items
+
+
+def material_abrechnen(auftrag_id: str, bis_datum: Optional[str] = None,
+                       abgerechnet_am: Optional[str] = None) -> int:
+    """Markiert (noch offene) Material-Positionen eines Auftrags als abgerechnet.
+    bis_datum (ISO) = nur Positionen mit lieferschein_datum <= bis_datum; None =
+    alle offenen. Manuell erfasste ohne Datum zaehlen nur bei bis_datum=None mit.
+    Liefert die Anzahl neu markierter Positionen."""
+    n = 0
+    for m in material_fuer_auftrag(auftrag_id):
+        if m.get("abgerechnet"):
+            continue
+        if bis_datum:
+            ld = m.get("lieferschein_datum") or ""
+            if not ld or ld > bis_datum:
+                continue
+        material.update(m["id"], {"abgerechnet": True, "abgerechnet_am": abgerechnet_am})
+        n += 1
+    return n
+
+
+def material_item_abrechnung_setzen(material_id: str, abgerechnet: bool,
+                                    abgerechnet_am: Optional[str] = None):
+    """Setzt/entfernt das Abgerechnet-Flag einer einzelnen Material-Position (Toggle)."""
+    return material.update(material_id, {
+        "abgerechnet": bool(abgerechnet),
+        "abgerechnet_am": abgerechnet_am if abgerechnet else None,
+    })
 
 
 def auftrag_tag_abrechnung_setzen(auftrag_id: str, datum: str, abgerechnet: bool,

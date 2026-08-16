@@ -154,4 +154,90 @@
 <div class="alert alert-info">Keine Zeitbuchungen auf diesem Auftrag erfasst.</div>
 {% endif %}
 
+{# ============ Material ============ #}
+<h2 class="h5 mt-4 mb-2" id="material">Material
+  <small class="text-muted">— {{ material_anzahl }} Position(en), {{ material_offen }} offen</small>
+</h2>
+
+{% if material_gruppen %}
+<div class="card card-body mb-3 no-print">
+  <div class="text-muted small mb-2">
+    Beim Rapport-Erstellen abhaken, welches Material du verrechnet hast. Material wird unabhängig von der Zeit abgerechnet — es kann auch nur Zeit ODER nur Material verrechnet werden.
+  </div>
+  <div class="row g-3 align-items-end">
+    <div class="col-md-7">
+      <label class="form-label mb-1">Material bis und mit einem Lieferdatum als verrechnet abhaken</label>
+      <form method="post" action="{{ url_for('auftraege.material_bulk_abrechnen', auftrag_id=auftrag.id) }}" class="d-flex gap-2">
+        <select name="bis_datum" class="form-select" {% if not material_offene_daten %}disabled{% endif %} required>
+          {% for d in material_offene_daten %}
+          <option value="{{ d }}" {% if loop.last %}selected{% endif %}>{{ d }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-outline-primary text-nowrap" {% if not material_offene_daten %}disabled{% endif %}>bis Datum abhaken</button>
+      </form>
+    </div>
+    <div class="col-md-5">
+      <label class="form-label mb-1">Alles offene Material verrechnen</label>
+      <form method="post" action="{{ url_for('auftraege.material_bulk_abrechnen', auftrag_id=auftrag.id) }}">
+        <button type="submit" class="btn btn-dark w-100" {% if not material_offen %}disabled{% endif %}>Alles Material verrechnet</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% for g in material_gruppen %}
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <strong>
+      {% if g.lieferschein_nr %}Lieferschein {{ g.lieferschein_nr }}{% if g.lieferschein_datum %} <span class="text-muted fw-normal">· {{ g.lieferschein_datum }}</span>{% endif %}
+      {% else %}Manuell erfasst{% endif %}
+    </strong>
+    <span>
+      {% if g.offen %}<span class="badge bg-secondary">{{ g.offen }} offen</span>{% endif %}
+      {% if g.abgerechnet %}<span class="badge bg-dark">{{ g.abgerechnet }} verrechnet</span>{% endif %}
+    </span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm table-bordered protokoll-tabelle m-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th style="width:110px;">E-Nummer</th>
+          <th>Artikel</th>
+          <th class="text-end" style="width:90px;">Verbaut</th>
+          <th style="width:150px;">Status</th>
+          <th class="no-print" style="width:120px;"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in g.positionen %}
+        <tr>
+          <td><code>{{ m.e_nummer or '—' }}</code></td>
+          <td>{{ m.artikeltext or '—' }}{% if m.ruckstand %}<span class="text-danger small"> · Rückstand {{ m.ruckstand }}</span>{% endif %}</td>
+          <td class="text-end">{{ m.menge_verbaut if m.menge_verbaut is not none else '—' }} {{ m.einheit or '' }}</td>
+          <td>
+            {% if m.abgerechnet %}<span class="badge bg-dark" title="{% if m.abgerechnet_am %}am {{ m.abgerechnet_am }}{% endif %}">verrechnet</span>
+            {% else %}<span class="badge bg-secondary">offen</span>{% endif %}
+          </td>
+          <td class="no-print">
+            <form method="post" action="{{ url_for('auftraege.material_item_abrechnen', material_id=m.id) }}" class="d-inline">
+              {% if m.abgerechnet %}
+                <input type="hidden" name="abgerechnet" value="0">
+                <button type="submit" class="btn btn-sm btn-outline-secondary py-0">zurücksetzen</button>
+              {% else %}
+                <input type="hidden" name="abgerechnet" value="1">
+                <button type="submit" class="btn btn-sm btn-outline-dark py-0">abhaken</button>
+              {% endif %}
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endfor %}
+{% else %}
+<div class="alert alert-light border">Kein Material erfasst. Material importierst/erfasst du in der <a href="{{ url_for('auftraege.detail', auftrag_id=auftrag.id) }}#material">Auftrags-Detailansicht</a>.</div>
+{% endif %}
+
 {% endblock %}

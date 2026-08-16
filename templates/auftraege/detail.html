@@ -484,6 +484,92 @@
   </div>
 </form>
 
+{# ============ Material ============ #}
+<div id="material" class="d-flex justify-content-between align-items-center mt-5 mb-2">
+  <h2 class="h5 m-0">Material ({{ material_liste|length }})</h2>
+  <form method="post" action="{{ url_for('auftraege.material_import', auftrag_id=auftrag.id) }}"
+        enctype="multipart/form-data" class="d-flex gap-2 align-items-center">
+    <input type="file" name="lieferschein" accept="application/pdf" class="form-control form-control-sm" style="max-width: 260px;" required>
+    <button type="submit" class="btn btn-sm btn-outline-primary text-nowrap">📄 Lieferschein importieren</button>
+  </form>
+</div>
+<div class="text-muted small mb-2">Lieferschein-PDF von Elektro-Material AG importieren, oder Position manuell erfassen. Verrechnet wird später in der <a href="{{ url_for('auftraege.rapport', auftrag_id=auftrag.id) }}">Rapport-Übersicht</a>.</div>
+
+{% if material_liste %}
+<div class="card mb-2">
+  <div class="table-responsive">
+    <table class="table table-kompakt table-sm m-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th style="width:110px;">E-Nummer</th>
+          <th>Artikel</th>
+          <th class="text-end" style="width:70px;">Best.</th>
+          <th class="text-end" style="width:70px;">Gel.</th>
+          <th style="width:150px;">Verbaut</th>
+          <th style="width:120px;">Lieferschein</th>
+          <th style="width:130px;"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in material_liste %}
+        <tr>
+          <td><code>{{ m.e_nummer or '—' }}</code></td>
+          <td>
+            {{ m.artikeltext or '—' }}
+            {% if m.em_artikel_nr %}<div class="text-muted small">{{ m.em_artikel_nr }}</div>{% endif %}
+            {% if m.ruckstand %}<div class="small text-danger">Rückstand {{ m.ruckstand }}{% if m.ruckstand_termin %} · {{ m.ruckstand_termin }}{% endif %}</div>{% endif %}
+            {% if m.abgerechnet %}<span class="badge bg-dark" title="{% if m.abgerechnet_am %}verrechnet am {{ m.abgerechnet_am }}{% endif %}">verrechnet</span>{% endif %}
+          </td>
+          <td class="text-end">{{ m.menge_bestellt if m.menge_bestellt is not none else '—' }}</td>
+          <td class="text-end">{{ m.menge_geliefert if m.menge_geliefert is not none else '—' }}</td>
+          <td>
+            <form method="post" action="{{ url_for('auftraege.material_menge', material_id=m.id) }}" class="d-flex gap-1">
+              <input type="text" inputmode="decimal" name="menge_verbaut" value="{{ m.menge_verbaut if m.menge_verbaut is not none else '' }}" class="form-control form-control-sm text-end" style="width:70px;">
+              <span class="small text-muted align-self-center">{{ m.einheit or '' }}</span>
+              <button type="submit" class="btn btn-sm btn-outline-secondary py-0" title="Menge speichern">✓</button>
+            </form>
+          </td>
+          <td class="small">{{ m.lieferschein_nr or '—' }}{% if m.lieferschein_datum %}<div class="text-muted">{{ m.lieferschein_datum }}</div>{% endif %}</td>
+          <td class="text-end">
+            <form method="post" action="{{ url_for('auftraege.material_loeschen', material_id=m.id) }}" class="d-inline" onsubmit="return confirm('Materialposition löschen?');">
+              <button type="submit" class="btn btn-sm btn-outline-danger py-0">×</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="alert alert-light border mb-2">Noch kein Material erfasst.</div>
+{% endif %}
+
+<form method="post" action="{{ url_for('auftraege.material_neu', auftrag_id=auftrag.id) }}" class="card card-body mb-3">
+  <h6 class="text-muted small">Position manuell hinzufügen</h6>
+  <div class="row g-2">
+    <div class="col-6 col-md-2">
+      <label class="form-label small">E-Nummer</label>
+      <input type="text" name="e_nummer" class="form-control form-control-sm" placeholder="optional">
+    </div>
+    <div class="col-md-5">
+      <label class="form-label small">Artikel *</label>
+      <input type="text" name="artikeltext" class="form-control form-control-sm" required>
+    </div>
+    <div class="col-4 col-md-2">
+      <label class="form-label small">Menge</label>
+      <input type="text" inputmode="decimal" name="menge_verbaut" class="form-control form-control-sm">
+    </div>
+    <div class="col-4 col-md-2">
+      <label class="form-label small">Einheit</label>
+      <input type="text" name="einheit" class="form-control form-control-sm" placeholder="Stück">
+    </div>
+    <div class="col-4 col-md-1 d-flex align-items-end">
+      <button type="submit" class="btn btn-primary btn-sm w-100">+</button>
+    </div>
+  </div>
+</form>
+
 {% if current_user.darf_auftrag_loeschen %}
 <form method="post" action="{{ url_for('auftraege.delete_auftrag', auftrag_id=auftrag.id) }}"
       class="mt-5 mb-3"

@@ -32,6 +32,10 @@ from models.repos import (
     eintrag_teams,
     ist_mitarbeiter_in_revision,
     kunden,
+    material,
+    material_abrechnen,
+    material_fuer_auftrag,
+    material_item_abrechnung_setzen,
     sichtbare_kunden,
     revisionen,
     revisionen_fuer_kunde,
@@ -42,6 +46,7 @@ from models.repos import (
     zeitbuchungen_fuer_auftrag,
     zeitsumme_h,
 )
+from models.lieferschein import parse_em_lieferschein
 from models.users import find_user, list_mitarbeiter, list_monteure, list_projektleiter
 
 bp = Blueprint("auftraege", __name__)
@@ -351,6 +356,7 @@ def detail(auftrag_id: str):
         aktive_stempelung=aktive_stempelung,
         moegliche_mitarbeiter=moegliche_mitarbeiter,
         zugeordnete_revision=zugeordnete_revision,
+        material_liste=material_fuer_auftrag(auftrag_id),
     )
 
 
@@ -437,6 +443,35 @@ def rapport(auftrag_id: str):
     # Tage fuer die Teilabrechnungs-Auswahl (nur solche mit offenen Buchungen)
     offene_tage = [t["datum"] for t in rapport_tage if t["status"] != "abgerechnet" and t["datum"] != "—"]
 
+    # Material — nach Lieferschein gruppiert (Nr + Datum), sonst 'Manuell erfasst'
+    material_liste = material_fuer_auftrag(auftrag_id)
+    material_gruppen_map: dict[str, dict] = {}
+    for m in material_liste:
+        key = (m.get("lieferschein_nr") or "").strip() or "_manuell"
+        g = material_gruppen_map.get(key)
+        if not g:
+            g = material_gruppen_map[key] = {
+                "lieferschein_nr": m.get("lieferschein_nr") or "",
+                "lieferschein_datum": m.get("lieferschein_datum"),
+                "positionen": [], "offen": 0, "abgerechnet": 0,
+            }
+        g["positionen"].append(m)
+        if m.get("abgerechnet"):
+            g["abgerechnet"] += 1
+        else:
+            g["offen"] += 1
+    material_gruppen = sorted(
+        material_gruppen_map.values(),
+        key=lambda g: (g["lieferschein_datum"] or "9999-12-31", g["lieferschein_nr"]),
+    )
+    material_anzahl = len(material_liste)
+    material_offen = sum(1 for m in material_liste if not m.get("abgerechnet"))
+    # Lieferdaten mit noch offenen Positionen — fuer "Material bis Datum abrechnen"
+    material_offene_daten = sorted({
+        m.get("lieferschein_datum") for m in material_liste
+        if not m.get("abgerechnet") and m.get("lieferschein_datum")
+    })
+
     return render_template(
         "auftraege/rapport.html",
         auftrag=auftrag, kunde=kunde,
@@ -446,6 +481,10 @@ def rapport(auftrag_id: str):
         abgerechnet_summe=abgerechnet_summe,
         offen_summe=offen_summe,
         offene_tage=offene_tage,
+        material_gruppen=material_gruppen,
+        material_anzahl=material_anzahl,
+        material_offen=material_offen,
+        material_offene_daten=material_offene_daten,
         status_label=AUFTRAG_STATUS_LABEL,
     )
 
@@ -466,8 +505,9 @@ def abrechnen(auftrag_id: str):
     modus = request.form.get("modus", "")
     if modus == "komplett":
         n = auftrag_zeit_abrechnen(auftrag_id, bis_datum=None, abgerechnet_am=heute)
+        nm = material_abrechnen(auftrag_id, bis_datum=None, abgerechnet_am=heute)
         auftraege.update(auftrag_id, {"status": "abgerechnet"})
-        flash(f"Auftrag komplett abgerechnet — {n} Buchung(en) markiert, Status: Abgerechnet.", "success")
+        flash(f"Auftrag komplett abgerechnet — {n} Buchung(en) + {nm} Materialposition(en) markiert, Status: Abgerechnet.", "success")
     else:  # Teilabrechnung
         bis = request.form.get("bis_datum", "").strip()
         if not bis:
@@ -502,6 +542,205 @@ def tag_abrechnung(auftrag_id: str):
         else:
             flash(f"{datum}: Abrechnung zurückgesetzt ({n} Buchung(en)).", "info")
     return redirect(url_for("auftraege.rapport", auftrag_id=auftrag_id))
+
+
+# ---- Material / Lieferschein ------------------------------------------------
+
+def _parse_menge(text: str):
+    """'1', '1.5', '2,0' -> float; leer/ungueltig -> None."""
+    text = (text or "").strip().replace(",", ".")
+    if not text:
+        return None
+    try:
+        return round(float(text), 3)
+    except ValueError:
+        return None
+
+
+@bp.route("/<auftrag_id>/material/import", methods=["POST"])
+def material_import(auftrag_id: str):
+    """Lieferschein-PDF (Elektro-Material AG) hochladen und parsen. Zeigt eine
+    editierbare Vorschau; gespeichert wird erst nach Bestaetigung."""
+    auftrag = auftraege.get(auftrag_id)
+    if not auftrag:
+        abort(404)
+    if not _darf_auftrag_sehen(auftrag):
+        abort(403)
+    datei = request.files.get("lieferschein")
+    if not datei or not datei.filename:
+        flash("Keine Datei gewählt.", "warning")
+        return redirect(url_for("auftraege.detail", auftrag_id=auftrag_id))
+    if not datei.filename.lower().endswith(".pdf"):
+        flash("Bitte ein PDF hochladen.", "warning")
+        return redirect(url_for("auftraege.detail", auftrag_id=auftrag_id))
+    try:
+        import io
+        daten = io.BytesIO(datei.read())
+        parsed = parse_em_lieferschein(daten)
+    except Exception as e:  # pragma: no cover — defensiv gegen kaputte PDFs
+        flash(f"Lieferschein konnte nicht gelesen werden: {e}", "warning")
+        return redirect(url_for("auftraege.detail", auftrag_id=auftrag_id))
+    positionen = parsed.get("positionen") or []
+    if not positionen:
+        flash("Keine Artikelpositionen erkannt. Ist es ein Elektro-Material-Lieferschein?", "warning")
+        return redirect(url_for("auftraege.detail", auftrag_id=auftrag_id))
+    # Vorbelegung: verbaute Menge = gelieferte Menge
+    for p in positionen:
+        p["menge_verbaut"] = p.get("menge_geliefert")
+    return render_template(
+        "auftraege/material_import.html",
+        auftrag=auftrag,
+        lieferschein_nr=parsed.get("lieferschein_nr") or "",
+        lieferschein_datum=parsed.get("lieferschein_datum") or "",
+        positionen=positionen,
+    )
+
+
+@bp.route("/<auftrag_id>/material/import/uebernehmen", methods=["POST"])
+def material_import_uebernehmen(auftrag_id: str):
+    """Speichert die in der Vorschau bestaetigten (angehakten) Positionen."""
+    auftrag = auftraege.get(auftrag_id)
+    if not auftrag:
+        abort(404)
+    if not _darf_auftrag_sehen(auftrag):
+        abort(403)
+    ls_nr = request.form.get("lieferschein_nr", "").strip()
+    ls_datum = request.form.get("lieferschein_datum", "").strip() or None
+    felder = {k: request.form.getlist(k + "[]") for k in (
+        "position", "e_nummer", "em_artikel_nr", "artikeltext", "einheit",
+        "menge_bestellt", "menge_geliefert", "menge_verbaut", "gebinde",
+        "ruckstand", "ruckstand_termin",
+    )}
+    uebernehmen = set(request.form.getlist("uebernehmen"))
+    anzahl = len(felder["e_nummer"])
+    gespeichert = 0
+    for i in range(anzahl):
+        if str(i) not in uebernehmen:
+            continue
+        try:
+            pos = int(felder["position"][i]) if felder["position"][i].strip() else None
+        except ValueError:
+            pos = None
+        material.create({
+            "auftrag_id": auftrag_id,
+            "quelle": "lieferschein",
+            "lieferschein_nr": ls_nr,
+            "lieferschein_datum": ls_datum,
+            "position": pos,
+            "e_nummer": felder["e_nummer"][i].strip(),
+            "em_artikel_nr": felder["em_artikel_nr"][i].strip(),
+            "artikeltext": felder["artikeltext"][i].strip(),
+            "einheit": felder["einheit"][i].strip(),
+            "menge_bestellt": _parse_menge(felder["menge_bestellt"][i]),
+            "menge_geliefert": _parse_menge(felder["menge_geliefert"][i]),
+            "menge_verbaut": _parse_menge(felder["menge_verbaut"][i]),
+            "gebinde": felder["gebinde"][i].strip(),
+            "ruckstand": _parse_menge(felder["ruckstand"][i]),
+            "ruckstand_termin": (felder["ruckstand_termin"][i].strip() or None),
+            "abgerechnet": False,
+        })
+        gespeichert += 1
+    flash(f"{gespeichert} Materialposition(en) übernommen ({ls_nr}).", "success")
+    return redirect(url_for("auftraege.detail", auftrag_id=auftrag_id) + "#material")
+
+
+@bp.route("/<auftrag_id>/material/neu", methods=["POST"])
+def material_neu(auftrag_id: str):
+    """Manuelle Einzelposition (ohne Lieferschein)."""
+    auftrag = auftraege.get(auftrag_id)
+    if not auftrag:
+        abort(404)
+    if not _darf_auftrag_sehen(auftrag):
+        abort(403)
+    text = request.form.get("artikeltext", "").strip()
+    if not text:
+        flash("Artikeltext ist erforderlich.", "warning")
+        return redirect(url_for("auftraege.detail", auftrag_id=auftrag_id) + "#material")
+    menge = _parse_menge(request.form.get("menge_verbaut", ""))
+    material.create({
+        "auftrag_id": auftrag_id,
+        "quelle": "manuell",
+        "lieferschein_nr": "",
+        "lieferschein_datum": None,
+        "position": None,
+        "e_nummer": request.form.get("e_nummer", "").strip(),
+        "em_artikel_nr": "",
+        "artikeltext": text,
+        "einheit": request.form.get("einheit", "").strip() or "Stück",
+        "menge_bestellt": menge,
+        "menge_geliefert": menge,
+        "menge_verbaut": menge,
+        "gebinde": "",
+        "ruckstand": None,
+        "ruckstand_termin": None,
+        "abgerechnet": False,
+    })
+    flash("Materialposition hinzugefügt.", "success")
+    return redirect(url_for("auftraege.detail", auftrag_id=auftrag_id) + "#material")
+
+
+@bp.route("/material/<material_id>/menge", methods=["POST"])
+def material_menge(material_id: str):
+    """Aktualisiert die verbaute Menge einer Position."""
+    m = material.get(material_id)
+    if not m:
+        abort(404)
+    auftrag = auftraege.get(m.get("auftrag_id") or "")
+    if not auftrag or not _darf_auftrag_sehen(auftrag):
+        abort(403)
+    material.update(material_id, {"menge_verbaut": _parse_menge(request.form.get("menge_verbaut", ""))})
+    flash("Verbaute Menge aktualisiert.", "success")
+    return redirect(url_for("auftraege.detail", auftrag_id=m.get("auftrag_id")) + "#material")
+
+
+@bp.route("/material/<material_id>/loeschen", methods=["POST"])
+def material_loeschen(material_id: str):
+    m = material.get(material_id)
+    if not m:
+        abort(404)
+    auftrag = auftraege.get(m.get("auftrag_id") or "")
+    if not auftrag or not _darf_auftrag_sehen(auftrag):
+        abort(403)
+    material.delete(material_id)
+    flash("Materialposition gelöscht.", "info")
+    return redirect(url_for("auftraege.detail", auftrag_id=m.get("auftrag_id")) + "#material")
+
+
+@bp.route("/material/<material_id>/abrechnen", methods=["POST"])
+def material_item_abrechnen(material_id: str):
+    """Hakt eine einzelne Materialposition als verrechnet ab (Toggle) — aus der
+    Rapportübersicht heraus."""
+    m = material.get(material_id)
+    if not m:
+        abort(404)
+    auftrag = auftraege.get(m.get("auftrag_id") or "")
+    if not auftrag or not _darf_auftrag_sehen(auftrag):
+        abort(403)
+    abgerechnet = request.form.get("abgerechnet") == "1"
+    material_item_abrechnung_setzen(
+        material_id, abgerechnet,
+        abgerechnet_am=date.today().isoformat() if abgerechnet else None,
+    )
+    return redirect(url_for("auftraege.rapport", auftrag_id=m.get("auftrag_id")) + "#material")
+
+
+@bp.route("/<auftrag_id>/material/abrechnen", methods=["POST"])
+def material_bulk_abrechnen(auftrag_id: str):
+    """Hakt Material gesammelt ab: alle offenen oder bis zu einem Lieferdatum."""
+    auftrag = auftraege.get(auftrag_id)
+    if not auftrag:
+        abort(404)
+    if not _darf_auftrag_sehen(auftrag):
+        abort(403)
+    heute = date.today().isoformat()
+    bis = request.form.get("bis_datum", "").strip() or None
+    n = material_abrechnen(auftrag_id, bis_datum=bis, abgerechnet_am=heute)
+    if n:
+        wie = f"bis Lieferdatum {bis}" if bis else "alle offenen"
+        flash(f"{n} Materialposition(en) als verrechnet markiert ({wie}).", "success")
+    else:
+        flash("Keine offenen Materialpositionen gefunden.", "info")
+    return redirect(url_for("auftraege.rapport", auftrag_id=auftrag_id) + "#material")
 
 
 @bp.route("/<auftrag_id>/bearbeiten", methods=["GET", "POST"])
