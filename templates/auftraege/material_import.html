@@ -2,7 +2,7 @@
 {% block title %}Lieferschein-Import – {{ auftrag.titel }}{% endblock %}
 {% block content %}
 <div class="text-muted small mb-2">
-  <a href="{{ url_for('auftraege.detail', auftrag_id=auftrag.id) }}">{{ auftrag.titel }}</a> › Lieferschein-Import
+  <a href="{{ url_for('auftraege.material_uebersicht', auftrag_id=auftrag.id) }}">{{ auftrag.titel }}</a> › Lieferschein-Import
 </div>
 <h1 class="h3 mb-1">Lieferschein-Vorschau</h1>
 <p class="text-muted">
@@ -65,7 +65,7 @@
 
   <div class="mt-3 d-flex gap-2">
     <button type="submit" class="btn btn-primary">Angehakte übernehmen</button>
-    <a class="btn btn-outline-secondary" href="{{ url_for('auftraege.detail', auftrag_id=auftrag.id) }}">Abbrechen</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('auftraege.material_uebersicht', auftrag_id=auftrag.id) }}">Abbrechen</a>
   </div>
 </form>
 {% endblock %}

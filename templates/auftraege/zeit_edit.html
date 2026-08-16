@@ -2,7 +2,7 @@
 {% block title %}Zeitbuchung bearbeiten{% endblock %}
 {% block content %}
 <div class="text-muted small mb-2">
-  {% if auftrag %}<a href="{{ url_for('auftraege.detail', auftrag_id=auftrag.id) }}">{{ auftrag.titel }}</a> › {% endif %}Zeitbuchung bearbeiten
+  {% if auftrag %}<a href="{{ url_for('auftraege.zeit_uebersicht', auftrag_id=auftrag.id) }}">{{ auftrag.titel }}</a> › {% endif %}Zeitbuchung bearbeiten
 </div>
 <h1 class="h3 mb-3">Zeitbuchung bearbeiten</h1>
 
@@ -110,7 +110,7 @@
   <div class="mt-4 d-flex gap-2">
     <button type="submit" class="btn btn-primary">Speichern</button>
     {% if auftrag %}
-    <a class="btn btn-outline-secondary" href="{{ url_for('auftraege.detail', auftrag_id=auftrag.id) }}">Abbrechen</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('auftraege.zeit_uebersicht', auftrag_id=auftrag.id) }}">Abbrechen</a>
     {% else %}
     <a class="btn btn-outline-secondary" href="{{ url_for('zeit.heute', datum=z.datum) }}">Abbrechen</a>
     {% endif %}

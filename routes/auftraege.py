@@ -342,20 +342,61 @@ def detail(auftrag_id: str):
     auftrag_anlagen = [anlagen_idx[aid] for aid in anlage_ids if aid in anlagen_idx]
     eintraege = zeitbuchungen_fuer_auftrag(auftrag_id)
     aktive_stempelung = aktive_stempelung_von(current_user.username) if current_user.is_authenticated else None
-    # Mitarbeiter-Auswahl-Liste — nur fuer Admin/Projektleiter; Monteur stempelt nur fuer sich.
-    moegliche_mitarbeiter = list_mitarbeiter() if current_user.sieht_alle_auftraege else []
     zugeordnete_revision = revisionen.get(auftrag.get("revision_id")) if auftrag.get("revision_id") else None
+    material_liste = material_fuer_auftrag(auftrag_id)
     return render_template(
         "auftraege/detail.html",
         auftrag=auftrag, kunde=kunde, betroffene=betroffene,
         auftrag_anlagen=auftrag_anlagen,
-        zeitbuchungen=eintraege,
+        zeitbuchungen_anzahl=len(eintraege),
         zeitsumme=zeitsumme_h(eintraege),
         today_iso=date.today().isoformat(),
         status_label=AUFTRAG_STATUS_LABEL,
         aktive_stempelung=aktive_stempelung,
-        moegliche_mitarbeiter=moegliche_mitarbeiter,
         zugeordnete_revision=zugeordnete_revision,
+        material_anzahl=len(material_liste),
+        material_offen=sum(1 for m in material_liste if not m.get("abgerechnet")),
+    )
+
+
+@bp.route("/<auftrag_id>/zeit")
+def zeit_uebersicht(auftrag_id: str):
+    """Eigene Seite fuer die Zeiterfassung eines Auftrags (Buchungen, Stempeln,
+    manuelle Erfassung) — ausgelagert aus der Detailansicht, die sonst mit
+    Material + Zeit zu unuebersichtlich wird."""
+    auftrag = auftraege.get(auftrag_id)
+    if not auftrag:
+        abort(404)
+    if not _darf_auftrag_sehen(auftrag):
+        abort(403)
+    kunde = kunden.get(auftrag.get("kunde_id"))
+    eintraege = zeitbuchungen_fuer_auftrag(auftrag_id)
+    aktive_stempelung = aktive_stempelung_von(current_user.username) if current_user.is_authenticated else None
+    moegliche_mitarbeiter = list_mitarbeiter() if current_user.sieht_alle_auftraege else []
+    return render_template(
+        "auftraege/zeit.html",
+        auftrag=auftrag, kunde=kunde,
+        zeitbuchungen=eintraege,
+        zeitsumme=zeitsumme_h(eintraege),
+        today_iso=date.today().isoformat(),
+        aktive_stempelung=aktive_stempelung,
+        moegliche_mitarbeiter=moegliche_mitarbeiter,
+    )
+
+
+@bp.route("/<auftrag_id>/material")
+def material_uebersicht(auftrag_id: str):
+    """Eigene Seite fuer die Materialverwaltung eines Auftrags (Lieferschein-
+    Import, Liste, manuelle Erfassung) — ausgelagert aus der Detailansicht."""
+    auftrag = auftraege.get(auftrag_id)
+    if not auftrag:
+        abort(404)
+    if not _darf_auftrag_sehen(auftrag):
+        abort(403)
+    kunde = kunden.get(auftrag.get("kunde_id"))
+    return render_template(
+        "auftraege/material.html",
+        auftrag=auftrag, kunde=kunde,
         material_liste=material_fuer_auftrag(auftrag_id),
     )
 
@@ -569,21 +610,21 @@ def material_import(auftrag_id: str):
     datei = request.files.get("lieferschein")
     if not datei or not datei.filename:
         flash("Keine Datei gewählt.", "warning")
-        return redirect(url_for("auftraege.detail", auftrag_id=auftrag_id))
+        return redirect(url_for("auftraege.material_uebersicht", auftrag_id=auftrag_id))
     if not datei.filename.lower().endswith(".pdf"):
         flash("Bitte ein PDF hochladen.", "warning")
-        return redirect(url_for("auftraege.detail", auftrag_id=auftrag_id))
+        return redirect(url_for("auftraege.material_uebersicht", auftrag_id=auftrag_id))
     try:
         import io
         daten = io.BytesIO(datei.read())
         parsed = parse_em_lieferschein(daten)
     except Exception as e:  # pragma: no cover — defensiv gegen kaputte PDFs
         flash(f"Lieferschein konnte nicht gelesen werden: {e}", "warning")
-        return redirect(url_for("auftraege.detail", auftrag_id=auftrag_id))
+        return redirect(url_for("auftraege.material_uebersicht", auftrag_id=auftrag_id))
     positionen = parsed.get("positionen") or []
     if not positionen:
         flash("Keine Artikelpositionen erkannt. Ist es ein Elektro-Material-Lieferschein?", "warning")
-        return redirect(url_for("auftraege.detail", auftrag_id=auftrag_id))
+        return redirect(url_for("auftraege.material_uebersicht", auftrag_id=auftrag_id))
     # Vorbelegung: verbaute Menge = gelieferte Menge
     for p in positionen:
         p["menge_verbaut"] = p.get("menge_geliefert")
@@ -641,7 +682,7 @@ def material_import_uebernehmen(auftrag_id: str):
         })
         gespeichert += 1
     flash(f"{gespeichert} Materialposition(en) übernommen ({ls_nr}).", "success")
-    return redirect(url_for("auftraege.detail", auftrag_id=auftrag_id) + "#material")
+    return redirect(url_for("auftraege.material_uebersicht", auftrag_id=auftrag_id))
 
 
 @bp.route("/<auftrag_id>/material/neu", methods=["POST"])
@@ -655,7 +696,7 @@ def material_neu(auftrag_id: str):
     text = request.form.get("artikeltext", "").strip()
     if not text:
         flash("Artikeltext ist erforderlich.", "warning")
-        return redirect(url_for("auftraege.detail", auftrag_id=auftrag_id) + "#material")
+        return redirect(url_for("auftraege.material_uebersicht", auftrag_id=auftrag_id))
     menge = _parse_menge(request.form.get("menge_verbaut", ""))
     material.create({
         "auftrag_id": auftrag_id,
@@ -676,7 +717,7 @@ def material_neu(auftrag_id: str):
         "abgerechnet": False,
     })
     flash("Materialposition hinzugefügt.", "success")
-    return redirect(url_for("auftraege.detail", auftrag_id=auftrag_id) + "#material")
+    return redirect(url_for("auftraege.material_uebersicht", auftrag_id=auftrag_id))
 
 
 @bp.route("/material/<material_id>/menge", methods=["POST"])
@@ -690,7 +731,7 @@ def material_menge(material_id: str):
         abort(403)
     material.update(material_id, {"menge_verbaut": _parse_menge(request.form.get("menge_verbaut", ""))})
     flash("Verbaute Menge aktualisiert.", "success")
-    return redirect(url_for("auftraege.detail", auftrag_id=m.get("auftrag_id")) + "#material")
+    return redirect(url_for("auftraege.material_uebersicht", auftrag_id=m.get("auftrag_id")))
 
 
 @bp.route("/material/<material_id>/loeschen", methods=["POST"])
@@ -703,7 +744,7 @@ def material_loeschen(material_id: str):
         abort(403)
     material.delete(material_id)
     flash("Materialposition gelöscht.", "info")
-    return redirect(url_for("auftraege.detail", auftrag_id=m.get("auftrag_id")) + "#material")
+    return redirect(url_for("auftraege.material_uebersicht", auftrag_id=m.get("auftrag_id")))
 
 
 @bp.route("/material/<material_id>/abrechnen", methods=["POST"])
@@ -821,7 +862,7 @@ def add_zeitbuchung(auftrag_id: str):
 
     if not dauer or dauer <= 0:
         flash("Bitte Stunden direkt eintragen oder gültige Von/Bis-Zeiten angeben.", "warning")
-        return redirect(url_for("auftraege.detail", auftrag_id=auftrag_id))
+        return redirect(url_for("auftraege.zeit_uebersicht", auftrag_id=auftrag_id))
 
     # Mitarbeiter: Admin/Projektleiter darf beliebig waehlen. Monteur darf sich
     # selbst oder eine am Auftrag erfasste "weitere Person" (nicht im System)
@@ -845,7 +886,7 @@ def add_zeitbuchung(auftrag_id: str):
     })
     auftrag_bei_zeitbuchung_aktualisieren(auftrag_id, mitarbeiter)
     flash(f"{dauer} h erfasst.", "success")
-    return redirect(url_for("auftraege.detail", auftrag_id=auftrag_id))
+    return redirect(url_for("auftraege.zeit_uebersicht", auftrag_id=auftrag_id))
 
 
 @bp.route("/zeit/<zeitbuchung_id>/mitarbeiter", methods=["POST"])
@@ -863,10 +904,10 @@ def set_zeitbuchung_mitarbeiter(zeitbuchung_id: str):
     # existieren ODER eine am Auftrag erfasste "weitere Person" (nicht im System) sein.
     if neuer and not find_user(neuer) and neuer not in weitere_personen:
         flash(f"Mitarbeiter „{neuer}“ nicht gefunden.", "warning")
-        return redirect(url_for("auftraege.detail", auftrag_id=z.get("auftrag_id")) if z.get("auftrag_id") else url_for("auftraege.list_auftraege"))
+        return redirect(url_for("auftraege.zeit_uebersicht", auftrag_id=z.get("auftrag_id")) if z.get("auftrag_id") else url_for("auftraege.list_auftraege"))
     zeitbuchungen.update(zeitbuchung_id, {"mitarbeiter": neuer})
     flash("Mitarbeiter zugewiesen." if neuer else "Mitarbeiter entfernt.", "success")
-    return redirect(url_for("auftraege.detail", auftrag_id=z.get("auftrag_id")) if z.get("auftrag_id") else url_for("auftraege.list_auftraege"))
+    return redirect(url_for("auftraege.zeit_uebersicht", auftrag_id=z.get("auftrag_id")) if z.get("auftrag_id") else url_for("auftraege.list_auftraege"))
 
 
 @bp.route("/zeit/<zeitbuchung_id>/bearbeiten", methods=["GET", "POST"])
@@ -978,7 +1019,7 @@ def edit_zeitbuchung(zeitbuchung_id: str):
         zeitbuchungen.update(zeitbuchung_id, updates)
         flash("Zeitbuchung gespeichert.", "success")
         if neuer_auftrag_id:
-            return redirect(url_for("auftraege.detail", auftrag_id=neuer_auftrag_id))
+            return redirect(url_for("auftraege.zeit_uebersicht", auftrag_id=neuer_auftrag_id))
         return redirect(url_for("zeit.heute"))
 
     moegliche_mitarbeiter = list_mitarbeiter() if current_user.sieht_alle_auftraege else []
@@ -1027,7 +1068,7 @@ def set_pause(zeitbuchung_id: str):
     bis_zeit = z.get("bis_zeit")
     if not von_zeit or not bis_zeit:
         flash("Pause nur bei Buchungen mit Von/Bis-Zeit moeglich.", "warning")
-        return redirect(url_for("auftraege.detail", auftrag_id=z.get("auftrag_id")) if z.get("auftrag_id") else url_for("auftraege.list_auftraege"))
+        return redirect(url_for("auftraege.zeit_uebersicht", auftrag_id=z.get("auftrag_id")) if z.get("auftrag_id") else url_for("auftraege.list_auftraege"))
 
     p_von = request.form.get("pause_von", "").strip()
     p_bis = request.form.get("pause_bis", "").strip()
@@ -1037,13 +1078,13 @@ def set_pause(zeitbuchung_id: str):
     bb_min = _hhmm_to_minutes(bis_zeit)
     if pv_min is None or pb_min is None:
         flash("Pause-Zeit ungueltig (HH:MM erwartet).", "warning")
-        return redirect(url_for("auftraege.detail", auftrag_id=z.get("auftrag_id")))
+        return redirect(url_for("auftraege.zeit_uebersicht", auftrag_id=z.get("auftrag_id")))
     if pb_min <= pv_min:
         flash("Pause-Ende muss nach dem Pause-Beginn liegen.", "warning")
-        return redirect(url_for("auftraege.detail", auftrag_id=z.get("auftrag_id")))
+        return redirect(url_for("auftraege.zeit_uebersicht", auftrag_id=z.get("auftrag_id")))
     if bv_min is None or bb_min is None or pv_min < bv_min or pb_min > bb_min:
         flash(f"Pause muss innerhalb der Buchungs-Zeit ({von_zeit}–{bis_zeit}) liegen.", "warning")
-        return redirect(url_for("auftraege.detail", auftrag_id=z.get("auftrag_id")))
+        return redirect(url_for("auftraege.zeit_uebersicht", auftrag_id=z.get("auftrag_id")))
 
     pause_h = round((pb_min - pv_min) / 60.0, 2)
     # Brutto = was VOR diesem Pause-Eingriff galt; falls schon eine Pause war,
@@ -1058,7 +1099,7 @@ def set_pause(zeitbuchung_id: str):
         "dauer_h": netto_h,
     })
     flash(f"Pause {p_von}–{p_bis} ({pause_h} h) abgezogen — Buchung jetzt {netto_h} h netto.", "success")
-    return redirect(url_for("auftraege.detail", auftrag_id=z.get("auftrag_id")))
+    return redirect(url_for("auftraege.zeit_uebersicht", auftrag_id=z.get("auftrag_id")))
 
 
 @bp.route("/zeit/<zeitbuchung_id>/pause/loeschen", methods=["POST"])
@@ -1072,7 +1113,7 @@ def delete_pause(zeitbuchung_id: str):
         abort(403)
     if z.get("pause_von") is None and z.get("pause_h_abgezogen") is None:
         flash("Keine Pause gesetzt.", "warning")
-        return redirect(url_for("auftraege.detail", auftrag_id=z.get("auftrag_id")))
+        return redirect(url_for("auftraege.zeit_uebersicht", auftrag_id=z.get("auftrag_id")))
     brutto_h = z.get("brutto_h")
     if brutto_h is None:
         # Fallback: dauer + abgezogene Pause
@@ -1085,7 +1126,7 @@ def delete_pause(zeitbuchung_id: str):
         "dauer_h": round(float(brutto_h), 2),
     })
     flash("Pause entfernt.", "info")
-    return redirect(url_for("auftraege.detail", auftrag_id=z.get("auftrag_id")))
+    return redirect(url_for("auftraege.zeit_uebersicht", auftrag_id=z.get("auftrag_id")))
 
 
 @bp.route("/zeit/<zeitbuchung_id>/loeschen", methods=["POST"])
@@ -1098,7 +1139,7 @@ def delete_zeitbuchung(zeitbuchung_id: str):
     zeitbuchungen.delete(zeitbuchung_id)
     flash("Zeitbuchung gelöscht.", "info")
     if auftrag_id:
-        return redirect(url_for("auftraege.detail", auftrag_id=auftrag_id))
+        return redirect(url_for("auftraege.zeit_uebersicht", auftrag_id=auftrag_id))
     return redirect(url_for("zeit.heute", datum=datum) if datum else url_for("zeit.heute"))
 
 

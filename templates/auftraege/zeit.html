@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+{% block title %}Zeiterfassung – {{ auftrag.titel }}{% endblock %}
+{% block content %}
+{% set personen = auftrag.weitere_personen or [] %}
+<div class="text-muted small mb-2">
+  {% if kunde %}<a href="{{ url_for('customers.detail', kunde_id=kunde.id) }}">{{ kunde.name }}</a> ›{% endif %}
+  <a href="{{ url_for('auftraege.detail', auftrag_id=auftrag.id) }}">{{ auftrag.titel }}</a> › Zeiterfassung
+</div>
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <h1 class="h3 m-0">
+    Zeiterfassung
+    <span class="text-muted fs-6">— Summe: <strong>{{ '%.2f'|format(zeitsumme) }} h</strong></span>
+  </h1>
+  <a class="btn btn-outline-secondary" href="{{ url_for('auftraege.detail', auftrag_id=auftrag.id) }}">← Zum Auftrag</a>
+</div>
+<div class="text-muted small mb-2">
+  Stunden hier erfassen, Rapport wird in der Buchhaltungssoftware extern erstellt.
+</div>
+
+{% if zeitbuchungen %}
+<div class="card mb-3">
+  <div class="table-responsive">
+    <table class="table table-kompakt table-sm m-0">
+      <thead class="table-light">
+        <tr>
+          <th>Datum</th>
+          <th>Mitarbeiter</th>
+          <th>Von</th>
+          <th>Bis</th>
+          <th class="text-end">Stunden</th>
+          <th>Tätigkeit</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for z in zeitbuchungen %}
+        <tr>
+          <td>
+            {{ z.datum }}
+            {% if z.abgerechnet %}<div><span class="badge bg-dark" title="{% if z.abgerechnet_am %}abgerechnet am {{ z.abgerechnet_am }}{% else %}abgerechnet{% endif %}">abgerechnet</span></div>{% endif %}
+          </td>
+          <td>
+            {% if current_user.sieht_alle_auftraege %}
+              <form method="post" action="{{ url_for('auftraege.set_zeitbuchung_mitarbeiter', zeitbuchung_id=z.id) }}"
+                    class="d-flex gap-1 align-items-center">
+                <select name="mitarbeiter" class="form-select form-select-sm" style="min-width: 140px;"
+                        onchange="this.form.submit();">
+                  <option value="">— nicht zugeordnet —</option>
+                  {% for u in moegliche_mitarbeiter %}
+                  <option value="{{ u.username }}" {% if z.mitarbeiter == u.username %}selected{% endif %}>{{ u.name }}</option>
+                  {% endfor %}
+                  {% if personen %}
+                  <optgroup label="Weitere Personen">
+                    {% for p in personen %}
+                    <option value="{{ p }}" {% if z.mitarbeiter == p %}selected{% endif %}>{{ p }}</option>
+                    {% endfor %}
+                  </optgroup>
+                  {% endif %}
+                </select>
+              </form>
+            {% else %}
+              {{ z.mitarbeiter|mitarbeiter_name or '—' }}
+            {% endif %}
+          </td>
+          <td>{{ z.von_zeit or '—' }}</td>
+          <td>{{ z.bis_zeit or '—' }}</td>
+          <td class="text-end">
+            <div class="fw-semibold">{{ '%.2f'|format(z.dauer_h) }}</div>
+            {% if z.pause_h_abgezogen %}
+            <div class="text-muted small">
+              brutto {{ '%.2f'|format(z.brutto_h) }} · −{{ '%.2f'|format(z.pause_h_abgezogen) }} Pause
+            </div>
+            {% endif %}
+          </td>
+          <td>
+            {{ z.taetigkeit or '' }}
+            {% if z.notizen %}<div class="text-muted small">{{ z.notizen }}</div>{% endif %}
+            {% if z.pause_von %}
+            <div class="small mt-1">
+              <span class="badge bg-light text-muted">☕ Pause {{ z.pause_von }}–{{ z.pause_bis }}</span>
+              <form method="post" action="{{ url_for('auftraege.delete_pause', zeitbuchung_id=z.id) }}"
+                    class="d-inline ms-1" onsubmit="return confirm('Pause entfernen? Buchung wird wieder Brutto-Dauer haben.');">
+                <button type="submit" class="btn btn-sm btn-link p-0 text-danger" style="font-size: 0.75rem;">entfernen</button>
+              </form>
+            </div>
+            {% elif z.von_zeit and z.bis_zeit %}
+            <form method="post" action="{{ url_for('auftraege.set_pause', zeitbuchung_id=z.id) }}"
+                  class="d-flex gap-1 align-items-center mt-1" style="font-size: 0.8rem;">
+              <span class="text-muted">+ Pause:</span>
+              <input type="time" name="pause_von" class="form-control form-control-sm" style="width: 90px;" required>
+              <span class="text-muted">–</span>
+              <input type="time" name="pause_bis" class="form-control form-control-sm" style="width: 90px;" required>
+              <button type="submit" class="btn btn-sm btn-outline-secondary">setzen</button>
+            </form>
+            {% endif %}
+          </td>
+          <td class="text-end">
+            <a href="{{ url_for('auftraege.edit_zeitbuchung', zeitbuchung_id=z.id) }}"
+               class="btn btn-sm btn-outline-secondary" title="Bearbeiten">✎</a>
+            <form method="post" action="{{ url_for('auftraege.delete_zeitbuchung', zeitbuchung_id=z.id) }}"
+                  class="d-inline ms-1" onsubmit="return confirm('Zeitbuchung löschen?');">
+              <button type="submit" class="btn btn-sm btn-outline-danger">×</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot class="table-light">
+        <tr>
+          <td colspan="4" class="text-end fw-semibold">Total</td>
+          <td class="text-end fw-bold">{{ '%.2f'|format(zeitsumme) }} h</td>
+          <td colspan="2"></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="alert alert-light border">Noch keine Zeitbuchungen erfasst.</div>
+{% endif %}
+
+<div class="card card-body mb-3 border-primary">
+  <h6 class="text-muted small mb-2">⏱ Zeit auf diesem Auftrag erfassen</h6>
+  {% if aktive_stempelung and aktive_stempelung.auftrag_id == auftrag.id %}
+    <div class="alert alert-success mb-2">
+      <strong>Du arbeitest gerade an diesem Auftrag</strong> — seit {{ aktive_stempelung.start[11:16] }}.
+      <a href="{{ url_for('zeit.heute') }}" class="alert-link">Zur Zeiterfassung →</a>
+    </div>
+  {% elif aktive_stempelung %}
+    <form method="post" action="{{ url_for('zeit.stempel_wechsel') }}" class="d-flex flex-wrap gap-2 align-items-end">
+      <input type="hidden" name="auftrag_id" value="{{ auftrag.id }}">
+      <div class="flex-grow-1" style="min-width: 200px;">
+        <div class="small text-muted">
+          Du bist seit {{ aktive_stempelung.start[11:16] }} auf
+          {% if aktive_stempelung.auftrag_id %}
+            <a href="{{ url_for('auftraege.detail', auftrag_id=aktive_stempelung.auftrag_id) }}">einem anderen Auftrag</a>
+          {% else %}<em>(noch ohne Auftrag)</em>{% endif %}
+          eingestempelt. Wechseln schliesst den vorigen Block ab.
+        </div>
+        <label class="form-label small mb-0 mt-1">Neue Tätigkeit (optional)</label>
+        <input type="text" name="taetigkeit" class="form-control form-control-sm" placeholder="z.B. Montage UV">
+      </div>
+      <button type="submit" class="btn btn-warning">→ Hier weiterarbeiten</button>
+    </form>
+  {% else %}
+    <form method="post" action="{{ url_for('zeit.stempel_start') }}" class="d-flex flex-wrap gap-2 align-items-end">
+      <input type="hidden" name="auftrag_id" value="{{ auftrag.id }}">
+      <div class="flex-grow-1" style="min-width: 200px;">
+        <label class="form-label small mb-0">Tätigkeit (optional)</label>
+        <input type="text" name="taetigkeit" class="form-control form-control-sm" placeholder="z.B. Verdrahtung Verteiler">
+      </div>
+      <button type="submit" class="btn btn-primary">▶ Einstempeln</button>
+    </form>
+  {% endif %}
+  <div class="text-muted small mt-2">
+    Tagesbeginn/Tagesende, Ausstempeln und Übersicht: <a href="{{ url_for('zeit.heute') }}">Zeiterfassung →</a>
+  </div>
+</div>
+
+<form method="post" action="{{ url_for('auftraege.add_zeitbuchung', auftrag_id=auftrag.id) }}" class="card card-body">
+  <h6 class="text-muted small">Neue Zeitbuchung (manuell)</h6>
+  <div class="row g-2">
+    <div class="col-6 col-md-2">
+      <label class="form-label small">Datum</label>
+      <input type="date" name="datum" class="form-control form-control-sm" value="{{ today_iso }}">
+    </div>
+    <div class="col-6 col-md-2">
+      <label class="form-label small">Mitarbeiter</label>
+      {% if current_user.sieht_alle_auftraege %}
+        <select name="mitarbeiter" class="form-select form-select-sm">
+          <option value="">— nicht zugeordnet —</option>
+          {% for u in moegliche_mitarbeiter %}
+          <option value="{{ u.username }}" {% if u.username == current_user.username %}selected{% endif %}>{{ u.name }}</option>
+          {% endfor %}
+          {% if personen %}
+          <optgroup label="Weitere Personen">
+            {% for p in personen %}
+            <option value="{{ p }}">{{ p }}</option>
+            {% endfor %}
+          </optgroup>
+          {% endif %}
+        </select>
+      {% elif personen %}
+        <select name="mitarbeiter" class="form-select form-select-sm">
+          <option value="{{ current_user.username }}">{{ current_user.name }} (ich)</option>
+          <optgroup label="Weitere Personen">
+            {% for p in personen %}
+            <option value="{{ p }}">{{ p }}</option>
+            {% endfor %}
+          </optgroup>
+        </select>
+      {% else %}
+        <input type="text" class="form-control form-control-sm" value="{{ current_user.name }}" readonly>
+        <input type="hidden" name="mitarbeiter" value="{{ current_user.username }}">
+      {% endif %}
+    </div>
+    <div class="col-4 col-md-1">
+      <label class="form-label small">Von</label>
+      <input type="time" name="von_zeit" class="form-control form-control-sm">
+    </div>
+    <div class="col-4 col-md-1">
+      <label class="form-label small">Bis</label>
+      <input type="time" name="bis_zeit" class="form-control form-control-sm">
+    </div>
+    <div class="col-4 col-md-1">
+      <label class="form-label small">Stunden</label>
+      <input type="text" inputmode="decimal" name="dauer_h" class="form-control form-control-sm" placeholder="oder">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label small">Tätigkeit</label>
+      <input type="text" name="taetigkeit" class="form-control form-control-sm" placeholder="kurz beschreiben">
+    </div>
+    <div class="col-md-1 d-flex align-items-end">
+      <button type="submit" class="btn btn-primary btn-sm w-100">+ Buchen</button>
+    </div>
+  </div>
+  <div class="text-muted small mt-1">
+    Stunden direkt eintragen <em>oder</em> Von/Bis ausfüllen — Dauer wird dann berechnet.
+  </div>
+</form>
+{% endblock %}

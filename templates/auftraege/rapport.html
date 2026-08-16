@@ -237,7 +237,7 @@
 </div>
 {% endfor %}
 {% else %}
-<div class="alert alert-light border">Kein Material erfasst. Material importierst/erfasst du in der <a href="{{ url_for('auftraege.detail', auftrag_id=auftrag.id) }}#material">Auftrags-Detailansicht</a>.</div>
+<div class="alert alert-light border">Kein Material erfasst. Material importierst/erfasst du in der <a href="{{ url_for('auftraege.material_uebersicht', auftrag_id=auftrag.id) }}">Materialverwaltung</a>.</div>
 {% endif %}
 
 {% endblock %}
