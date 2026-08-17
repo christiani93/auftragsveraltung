@@ -41,7 +41,7 @@
       <div class="fw-bold">{{ '%.2f'|format(gesamtsumme) }} h</div>
     </div>
     <div class="col-md-2">
-      <div class="text-muted small">Abgerechnet / Offen</div>
+      <div class="text-muted small">Rapportiert / Offen</div>
       <div><span class="fw-semibold">{{ '%.2f'|format(abgerechnet_summe) }}</span> / <span class="fw-semibold text-primary">{{ '%.2f'|format(offen_summe) }}</span> h</div>
     </div>
   </div>
@@ -51,7 +51,7 @@
 <div class="card card-body mb-3 no-print">
   <div class="row g-3 align-items-end">
     <div class="col-md-7">
-      <label class="form-label mb-1"><strong>Teilabrechnung</strong> — Buchungen bis und mit diesem Tag als abgerechnet markieren</label>
+      <label class="form-label mb-1"><strong>Teil-Rapport</strong> — Buchungen bis und mit diesem Tag als rapportiert markieren</label>
       <form method="post" action="{{ url_for('auftraege.abrechnen', auftrag_id=auftrag.id) }}" class="d-flex gap-2">
         <input type="hidden" name="modus" value="teil">
         <select name="bis_datum" class="form-select" {% if not offene_tage %}disabled{% endif %} required>
@@ -59,16 +59,16 @@
           <option value="{{ d }}" {% if loop.last %}selected{% endif %}>{{ d }}</option>
           {% endfor %}
         </select>
-        <button type="submit" class="btn btn-outline-primary text-nowrap" {% if not offene_tage %}disabled{% endif %}>Teil abrechnen</button>
+        <button type="submit" class="btn btn-outline-primary text-nowrap" {% if not offene_tage %}disabled{% endif %}>Teil rapportieren</button>
       </form>
       {% if not offene_tage %}<small class="text-muted">Keine offenen Tage mehr.</small>{% endif %}
     </div>
     <div class="col-md-5">
-      <label class="form-label mb-1"><strong>Komplettabrechnung</strong> — alles abrechnen + Auftrag schliessen</label>
+      <label class="form-label mb-1"><strong>Kompletter Rapport</strong> — alles rapportieren + Auftrag schliessen</label>
       <form method="post" action="{{ url_for('auftraege.abrechnen', auftrag_id=auftrag.id) }}"
-            onsubmit="return confirm('Gesamten Auftrag als abgerechnet markieren und den Status auf „Abgerechnet“ setzen?');">
+            onsubmit="return confirm('Gesamten Auftrag als rapportiert markieren und den Status auf „Abgerechnet“ setzen?');">
         <input type="hidden" name="modus" value="komplett">
-        <button type="submit" class="btn btn-dark w-100">Komplett abgerechnet</button>
+        <button type="submit" class="btn btn-dark w-100">Komplett rapportiert</button>
       </form>
     </div>
   </div>
@@ -91,9 +91,9 @@
     <strong><span class="text-muted small me-1">Tag {{ tag.tag_nr }}</span>{{ tag.datum }}{% if tag.wochentag %} <span class="text-muted fw-normal">· {{ tag.wochentag }}</span>{% endif %}</strong>
     <div class="d-flex align-items-center gap-2">
       {% if tag.status == 'abgerechnet' %}
-        <span class="badge bg-dark">abgerechnet{% if tag.abgerechnet_am %} am {{ tag.abgerechnet_am }}{% endif %}</span>
+        <span class="badge bg-dark">rapportiert{% if tag.abgerechnet_am %} am {{ tag.abgerechnet_am }}{% endif %}</span>
       {% elif tag.status == 'teilweise' %}
-        <span class="badge bg-warning text-dark">teilweise abgerechnet</span>
+        <span class="badge bg-warning text-dark">teilweise rapportiert</span>
       {% else %}
         <span class="badge bg-secondary">offen</span>
       {% endif %}
@@ -105,7 +105,7 @@
           <button type="submit" class="btn btn-sm btn-outline-secondary py-0">zurücksetzen</button>
         {% else %}
           <input type="hidden" name="abgerechnet" value="1">
-          <button type="submit" class="btn btn-sm btn-outline-dark py-0">Tag abrechnen</button>
+          <button type="submit" class="btn btn-sm btn-outline-dark py-0">Tag rapportieren</button>
         {% endif %}
       </form>
       {% endif %}
@@ -145,7 +145,7 @@
   <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
     <strong>Gesamttotal</strong>
     <div>
-      <span class="text-muted small me-2">abgerechnet {{ '%.2f'|format(abgerechnet_summe) }} h · offen {{ '%.2f'|format(offen_summe) }} h</span>
+      <span class="text-muted small me-2">rapportiert {{ '%.2f'|format(abgerechnet_summe) }} h · offen {{ '%.2f'|format(offen_summe) }} h</span>
       <span class="badge bg-dark fs-6">{{ '%.2f'|format(gesamtsumme) }} h</span>
     </div>
   </div>
@@ -162,11 +162,11 @@
 {% if material_gruppen %}
 <div class="card card-body mb-3 no-print">
   <div class="text-muted small mb-2">
-    Beim Rapport-Erstellen abhaken, welches Material du verrechnet hast. Material wird unabhängig von der Zeit abgerechnet — es kann auch nur Zeit ODER nur Material verrechnet werden.
+    Beim Rapport-Erstellen abhaken, welches Material du rapportiert hast. Material wird unabhängig von der Zeit rapportiert — es kann auch nur Zeit ODER nur Material rapportiert werden.
   </div>
   <div class="row g-3 align-items-end">
     <div class="col-md-7">
-      <label class="form-label mb-1">Material bis und mit einem Lieferdatum als verrechnet abhaken</label>
+      <label class="form-label mb-1">Material bis und mit einem Lieferdatum als rapportiert abhaken</label>
       <form method="post" action="{{ url_for('auftraege.material_bulk_abrechnen', auftrag_id=auftrag.id) }}" class="d-flex gap-2">
         <select name="bis_datum" class="form-select" {% if not material_offene_daten %}disabled{% endif %} required>
           {% for d in material_offene_daten %}
@@ -177,9 +177,9 @@
       </form>
     </div>
     <div class="col-md-5">
-      <label class="form-label mb-1">Alles offene Material verrechnen</label>
+      <label class="form-label mb-1">Alles offene Material rapportieren</label>
       <form method="post" action="{{ url_for('auftraege.material_bulk_abrechnen', auftrag_id=auftrag.id) }}">
-        <button type="submit" class="btn btn-dark w-100" {% if not material_offen %}disabled{% endif %}>Alles Material verrechnet</button>
+        <button type="submit" class="btn btn-dark w-100" {% if not material_offen %}disabled{% endif %}>Alles Material rapportiert</button>
       </form>
     </div>
   </div>
@@ -194,7 +194,7 @@
     </strong>
     <span>
       {% if g.offen %}<span class="badge bg-secondary">{{ g.offen }} offen</span>{% endif %}
-      {% if g.abgerechnet %}<span class="badge bg-dark">{{ g.abgerechnet }} verrechnet</span>{% endif %}
+      {% if g.abgerechnet %}<span class="badge bg-dark">{{ g.abgerechnet }} rapportiert</span>{% endif %}
     </span>
   </div>
   <div class="table-responsive">
@@ -215,7 +215,7 @@
           <td>{{ m.artikeltext or '—' }}{% if m.ruckstand %}<span class="text-danger small"> · Rückstand {{ m.ruckstand }}</span>{% endif %}</td>
           <td class="text-end">{{ m.menge_verbaut if m.menge_verbaut is not none else '—' }} {{ m.einheit or '' }}</td>
           <td>
-            {% if m.abgerechnet %}<span class="badge bg-dark" title="{% if m.abgerechnet_am %}am {{ m.abgerechnet_am }}{% endif %}">verrechnet</span>
+            {% if m.abgerechnet %}<span class="badge bg-dark" title="{% if m.abgerechnet_am %}am {{ m.abgerechnet_am }}{% endif %}">rapportiert</span>
             {% else %}<span class="badge bg-secondary">offen</span>{% endif %}
           </td>
           <td class="no-print">

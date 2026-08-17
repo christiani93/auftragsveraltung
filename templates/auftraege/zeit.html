@@ -37,7 +37,7 @@
         <tr>
           <td>
             {{ z.datum }}
-            {% if z.abgerechnet %}<div><span class="badge bg-dark" title="{% if z.abgerechnet_am %}abgerechnet am {{ z.abgerechnet_am }}{% else %}abgerechnet{% endif %}">abgerechnet</span></div>{% endif %}
+            {% if z.abgerechnet %}<div><span class="badge bg-dark" title="{% if z.abgerechnet_am %}rapportiert am {{ z.abgerechnet_am }}{% else %}rapportiert{% endif %}">rapportiert</span></div>{% endif %}
           </td>
           <td>
             {% if current_user.sieht_alle_auftraege %}

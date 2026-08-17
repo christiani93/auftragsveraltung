@@ -45,7 +45,7 @@
             {{ m.artikeltext or '—' }}
             {% if m.em_artikel_nr %}<div class="text-muted small">{{ m.em_artikel_nr }}</div>{% endif %}
             {% if m.ruckstand %}<div class="small text-danger">Rückstand {{ m.ruckstand }}{% if m.ruckstand_termin %} · {{ m.ruckstand_termin }}{% endif %}</div>{% endif %}
-            {% if m.abgerechnet %}<span class="badge bg-dark" title="{% if m.abgerechnet_am %}verrechnet am {{ m.abgerechnet_am }}{% endif %}">verrechnet</span>{% endif %}
+            {% if m.abgerechnet %}<span class="badge bg-dark" title="{% if m.abgerechnet_am %}rapportiert am {{ m.abgerechnet_am }}{% endif %}">rapportiert</span>{% endif %}
           </td>
           <td class="text-end">{{ m.menge_bestellt if m.menge_bestellt is not none else '—' }}</td>
           <td class="text-end">{{ m.menge_geliefert if m.menge_geliefert is not none else '—' }}</td>

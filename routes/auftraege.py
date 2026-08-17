@@ -548,7 +548,7 @@ def abrechnen(auftrag_id: str):
         n = auftrag_zeit_abrechnen(auftrag_id, bis_datum=None, abgerechnet_am=heute)
         nm = material_abrechnen(auftrag_id, bis_datum=None, abgerechnet_am=heute)
         auftraege.update(auftrag_id, {"status": "abgerechnet"})
-        flash(f"Auftrag komplett abgerechnet — {n} Buchung(en) + {nm} Materialposition(en) markiert, Status: Abgerechnet.", "success")
+        flash(f"Auftrag komplett rapportiert — {n} Buchung(en) + {nm} Materialposition(en) markiert, Status: Abgerechnet.", "success")
     else:  # Teilabrechnung
         bis = request.form.get("bis_datum", "").strip()
         if not bis:
@@ -556,7 +556,7 @@ def abrechnen(auftrag_id: str):
             return redirect(url_for("auftraege.rapport", auftrag_id=auftrag_id))
         n = auftrag_zeit_abrechnen(auftrag_id, bis_datum=bis, abgerechnet_am=heute)
         if n:
-            flash(f"Teilabrechnung: {n} Buchung(en) bis und mit {bis} als abgerechnet markiert.", "success")
+            flash(f"Teil-Rapport: {n} Buchung(en) bis und mit {bis} als rapportiert markiert.", "success")
         else:
             flash("Keine offenen Buchungen bis zu diesem Datum gefunden.", "info")
     return redirect(url_for("auftraege.rapport", auftrag_id=auftrag_id))
@@ -579,9 +579,9 @@ def tag_abrechnung(auftrag_id: str):
             abgerechnet_am=date.today().isoformat() if abgerechnet else None,
         )
         if abgerechnet:
-            flash(f"{datum}: {n} Buchung(en) als abgerechnet markiert.", "success")
+            flash(f"{datum}: {n} Buchung(en) als rapportiert markiert.", "success")
         else:
-            flash(f"{datum}: Abrechnung zurückgesetzt ({n} Buchung(en)).", "info")
+            flash(f"{datum}: Rapport-Markierung zurückgesetzt ({n} Buchung(en)).", "info")
     return redirect(url_for("auftraege.rapport", auftrag_id=auftrag_id))
 
 
@@ -778,7 +778,7 @@ def material_bulk_abrechnen(auftrag_id: str):
     n = material_abrechnen(auftrag_id, bis_datum=bis, abgerechnet_am=heute)
     if n:
         wie = f"bis Lieferdatum {bis}" if bis else "alle offenen"
-        flash(f"{n} Materialposition(en) als verrechnet markiert ({wie}).", "success")
+        flash(f"{n} Materialposition(en) als rapportiert markiert ({wie}).", "success")
     else:
         flash("Keine offenen Materialpositionen gefunden.", "info")
     return redirect(url_for("auftraege.rapport", auftrag_id=auftrag_id) + "#material")

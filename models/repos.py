@@ -1004,4 +1004,23 @@ def dashboard_data() -> Dict[str, Any]:
         "auftraege_offen": sum(1 for a in auftraege.list() if a.get("status") == "offen"),
         "auftraege_in_arbeit": sum(1 for a in auftraege.list() if a.get("status") == "in_arbeit"),
         "auftraege_erledigt": sum(1 for a in auftraege.list() if a.get("status") == "erledigt"),
+        "auftraege_rapport_voll": auftraege_rapport_voll_anzahl(),
     }
+
+
+def auftraege_rapport_voll_anzahl() -> int:
+    """Anzahl noch nicht erledigter Auftraege, die bereits ein volles 7-Tage-
+    Rapport-Formular an offenen (noch nicht rapportierten) Buchungstagen haben —
+    d.h. es sollte ein Rapport geschrieben/eingereicht werden, obwohl der
+    Auftrag selbst weiterlaeuft."""
+    n = 0
+    for a in auftraege.list():
+        if a.get("status") not in ("offen", "in_arbeit"):
+            continue
+        offene_tage = {
+            z.get("datum") for z in zeitbuchungen_fuer_auftrag(a["id"])
+            if z.get("datum") and not z.get("abgerechnet")
+        }
+        if len(offene_tage) >= 7:
+            n += 1
+    return n

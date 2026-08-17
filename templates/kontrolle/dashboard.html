@@ -13,7 +13,10 @@
   <div class="col-6 col-md-3">
     <a class="card card-body text-center text-decoration-none text-reset" href="{{ url_for('auftraege.list_auftraege', status='in_arbeit') }}">
       <div class="text-muted small">Aufträge in Arbeit</div>
-      <div class="fs-3 fw-bold">{{ auftraege_in_arbeit }}</div>
+      <div class="fs-3 fw-bold">
+        {{ auftraege_in_arbeit }}
+        {% if auftraege_rapport_voll %}<span class="text-warning" title="{{ auftraege_rapport_voll }} Auftrag/Aufträge mit vollem 7-Tage-Rapport (noch nicht rapportiert), aber noch nicht erledigt">({{ auftraege_rapport_voll }})</span>{% endif %}
+      </div>
     </a>
   </div>
   <div class="col-6 col-md-3">
