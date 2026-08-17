@@ -118,7 +118,7 @@
         </form>
         <form method="post" action="{{ url_for('auftraege.set_status', auftrag_id=auftrag.id) }}" class="d-inline ms-1">
           <input type="hidden" name="status" value="abgerechnet">
-          <button class="btn btn-outline-dark" {% if auftrag.status == 'abgerechnet' %}disabled{% endif %}>Abgerechnet</button>
+          <button class="btn btn-outline-dark" {% if auftrag.status == 'abgerechnet' %}disabled{% endif %}>Rapportiert</button>
         </form>
       </div>
     </div>

@@ -22,6 +22,7 @@ from models.repos import (
     anlagenteile,
     anlagenteile_fuer_anlage,
     auftrag_bei_zeitbuchung_aktualisieren,
+    auftrag_rapport_faellig,
     auftrag_sichtbar_fuer,
     auftrag_tag_abrechnung_setzen,
     auftrag_zeit_abrechnen,
@@ -256,6 +257,7 @@ def list_auftraege():
         "auftrag": a,
         "kunde": kunden_idx.get(a.get("kunde_id")),
         "revision": rev_idx.get(a.get("revision_id") or ""),
+        "rapport_faellig": auftrag_rapport_faellig(a),
     } for a in sichtbar]
     return render_template(
         "auftraege/list.html",
@@ -548,7 +550,7 @@ def abrechnen(auftrag_id: str):
         n = auftrag_zeit_abrechnen(auftrag_id, bis_datum=None, abgerechnet_am=heute)
         nm = material_abrechnen(auftrag_id, bis_datum=None, abgerechnet_am=heute)
         auftraege.update(auftrag_id, {"status": "abgerechnet"})
-        flash(f"Auftrag komplett rapportiert — {n} Buchung(en) + {nm} Materialposition(en) markiert, Status: Abgerechnet.", "success")
+        flash(f"Auftrag komplett rapportiert — {n} Buchung(en) + {nm} Materialposition(en) markiert, Status: Rapportiert.", "success")
     else:  # Teilabrechnung
         bis = request.form.get("bis_datum", "").strip()
         if not bis:

@@ -241,7 +241,7 @@ AUFTRAG_STATUS_LABEL = {
     "offen": "Offen",
     "in_arbeit": "In Arbeit",
     "erledigt": "Erledigt",
-    "abgerechnet": "Abgerechnet",
+    "abgerechnet": "Rapportiert",
 }
 # 'abgerechnet' = archiviert, standardmäßig in der Liste ausgeblendet
 AUFTRAG_STATUS_ARCHIVIERT = {"abgerechnet"}
@@ -1008,19 +1008,27 @@ def dashboard_data() -> Dict[str, Any]:
     }
 
 
+def offene_rapport_tage_anzahl(auftrag_id: str) -> int:
+    """Anzahl Tage mit noch nicht rapportierten (offenen) Zeitbuchungen eines
+    Auftrags. Ab 7 ist ein physisches Rapport-Formular voll und sollte
+    eingereicht werden (Teil-Rapport)."""
+    return len({
+        z.get("datum") for z in zeitbuchungen_fuer_auftrag(auftrag_id)
+        if z.get("datum") and not z.get("abgerechnet")
+    })
+
+
+def auftrag_rapport_faellig(auftrag: Dict[str, Any]) -> bool:
+    """Ob fuer diesen (noch nicht erledigten) Auftrag ein Teil-Rapport faellig
+    ist — 7 oder mehr offene Buchungstage."""
+    if auftrag.get("status") not in ("offen", "in_arbeit"):
+        return False
+    return offene_rapport_tage_anzahl(auftrag["id"]) >= 7
+
+
 def auftraege_rapport_voll_anzahl() -> int:
     """Anzahl noch nicht erledigter Auftraege, die bereits ein volles 7-Tage-
     Rapport-Formular an offenen (noch nicht rapportierten) Buchungstagen haben —
     d.h. es sollte ein Rapport geschrieben/eingereicht werden, obwohl der
     Auftrag selbst weiterlaeuft."""
-    n = 0
-    for a in auftraege.list():
-        if a.get("status") not in ("offen", "in_arbeit"):
-            continue
-        offene_tage = {
-            z.get("datum") for z in zeitbuchungen_fuer_auftrag(a["id"])
-            if z.get("datum") and not z.get("abgerechnet")
-        }
-        if len(offene_tage) >= 7:
-            n += 1
-    return n
+    return sum(1 for a in auftraege.list() if auftrag_rapport_faellig(a))

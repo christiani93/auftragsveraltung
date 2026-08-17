@@ -87,6 +87,9 @@
             {% elif r.auftrag.status == 'erledigt' %}<span class="badge bg-success">{{ status_label[r.auftrag.status] }}</span>
             {% elif r.auftrag.status == 'abgerechnet' %}<span class="badge bg-dark">{{ status_label[r.auftrag.status] }}</span>
             {% endif %}
+            {% if r.rapport_faellig %}
+            <a href="{{ url_for('auftraege.rapport', auftrag_id=r.auftrag.id) }}" class="badge bg-warning text-dark text-decoration-none ms-1" title="7 Tage noch nicht rapportiert — Teil-Rapport fällig">📋 Teil-Rapport</a>
+            {% endif %}
           </td>
           <td class="text-end">
             <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('auftraege.detail', auftrag_id=r.auftrag.id) }}">Öffnen</a>
@@ -108,6 +111,7 @@
       {% elif r.auftrag.status == 'erledigt' %}<span class="badge bg-success">{{ status_label[r.auftrag.status] }}</span>
       {% elif r.auftrag.status == 'abgerechnet' %}<span class="badge bg-dark">{{ status_label[r.auftrag.status] }}</span>
       {% endif %}
+      {% if r.rapport_faellig %}<span class="badge bg-warning text-dark ms-1" title="7 Tage noch nicht rapportiert">📋 Teil-Rapport</span>{% endif %}
     </div>
     <div class="mobile-list-meta">
       {{ r.auftrag.erteilungsdatum }}
