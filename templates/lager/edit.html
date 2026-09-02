@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}{{ "Neuer Lagerartikel" if neu else "Artikel bearbeiten" }}{% endblock %}
+{% block content %}
+<h1 class="h3 mb-3">{{ "Neuer Lagerartikel" if neu else "Artikel bearbeiten" }}</h1>
+
+<form method="post" class="card card-body">
+  <div class="row g-3">
+    <div class="col-md-8">
+      <label class="form-label">Bezeichnung *</label>
+      <input type="text" name="bezeichnung" id="f-bezeichnung" class="form-control" value="{{ artikel.bezeichnung or '' }}" required autofocus>
+      <small id="produkt-status" class="text-muted"></small>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Einheit</label>
+      <input type="text" name="einheit" class="form-control" value="{{ artikel.einheit or 'Stk' }}" placeholder="Stk, m, Rolle…">
+    </div>
+
+    <div class="col-md-6">
+      <label class="form-label">Barcode (gescannter EAN)</label>
+      <div class="input-group">
+        <input type="text" name="barcode" id="f-barcode" class="form-control" value="{{ artikel.barcode or '' }}" placeholder="Am Regal einscannen…">
+        <button type="button" class="btn btn-outline-secondary" id="btn-produktsuche" title="Produktdaten zum EAN suchen">🔎 Suchen</button>
+      </div>
+      <small class="text-muted">Strichcode der Verpackung. Wird auf die Listen gedruckt zum Wiederfinden.</small>
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">Lagerort</label>
+      <input type="text" name="lagerort" class="form-control" value="{{ artikel.lagerort or '' }}" list="lagerorte" placeholder="z.B. Regal A / Fach 3, Auto, Keller…">
+      <datalist id="lagerorte">
+        {% for o in lagerorte %}<option value="{{ o }}">{% endfor %}
+      </datalist>
+    </div>
+
+    <div class="col-md-6">
+      <label class="form-label">Lieferant</label>
+      <input type="text" name="lieferant" class="form-control" value="{{ artikel.lieferant or '' }}" list="lieferanten" placeholder="Würth / Elektro-Material AG">
+      <datalist id="lieferanten">
+        {% for l in lieferanten %}<option value="{{ l }}">{% endfor %}
+      </datalist>
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">Bestellnummer beim Lieferanten</label>
+      <input type="text" name="bestellnummer" class="form-control" value="{{ artikel.bestellnummer or '' }}" placeholder="E-Nr (Elektro-Material) bzw. Würth-Artikel-Nr">
+      <small class="text-muted">Womit du beim Lieferanten bestellst. Steht auf der Bestellliste.</small>
+    </div>
+
+    <div class="col-md-3">
+      <label class="form-label">Bestand</label>
+      <input type="number" name="bestand" class="form-control" step="1" value="{{ artikel.bestand if artikel.bestand is not none else '' }}">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Mindestbestand</label>
+      <input type="number" name="mindestbestand" class="form-control" min="0" step="1" value="{{ artikel.mindestbestand or 0 }}">
+      <small class="text-muted">0 = keine Warnung</small>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Bestellmenge</label>
+      <input type="number" name="bestellmenge" class="form-control" min="0" step="1" value="{{ artikel.bestellmenge if artikel.bestellmenge is not none else '' }}">
+      <small class="text-muted">Standard-Menge pro Bestellung</small>
+    </div>
+    <div class="col-md-3 d-flex align-items-end">
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" name="nachbestellen" id="nachbestellen" {% if artikel.nachbestellen %}checked{% endif %}>
+        <label class="form-check-label" for="nachbestellen">🛒 Jetzt nachbestellen</label>
+      </div>
+    </div>
+
+    <div class="col-12">
+      <label class="form-label">Notizen</label>
+      <textarea name="notizen" class="form-control" rows="2">{{ artikel.notizen or '' }}</textarea>
+    </div>
+  </div>
+
+  <div class="mt-4 d-flex gap-2 justify-content-between">
+    <div class="d-flex gap-2">
+      <button type="submit" class="btn btn-primary">Speichern</button>
+      <a class="btn btn-outline-secondary" href="{{ url_for('lager.liste') }}">Abbrechen</a>
+    </div>
+    {% if not neu %}
+    <button type="button" class="btn btn-outline-danger"
+            onclick="if(confirm('Artikel löschen?')) document.getElementById('delete-form').submit();">Löschen</button>
+    {% endif %}
+  </div>
+</form>
+
+{% if not neu %}
+<form id="delete-form" method="post" action="{{ url_for('lager.loeschen', artikel_id=artikel.id) }}" class="d-none"></form>
+{% endif %}
+
+<script>
+(function () {
+  const barcode = document.getElementById("f-barcode");
+  const bezeichnung = document.getElementById("f-bezeichnung");
+  const status = document.getElementById("produkt-status");
+  const btn = document.getElementById("btn-produktsuche");
+
+  async function suche(auto) {
+    const code = (barcode.value || "").trim();
+    if (!code) { if (!auto) status.textContent = "Bitte zuerst einen Barcode eingeben."; return; }
+    status.className = "text-muted";
+    status.textContent = "Suche Produktdaten…";
+    btn.disabled = true;
+    try {
+      const r = await fetch("{{ url_for('lager.produktdaten') }}?code=" + encodeURIComponent(code));
+      const d = await r.json();
+      if (d.found) {
+        // Bezeichnung nur setzen wenn leer (bei Auto) bzw. immer bei Klick
+        if (!auto || !bezeichnung.value.trim()) {
+          bezeichnung.value = d.marke ? (d.marke + " " + d.bezeichnung) : d.bezeichnung;
+        }
+        status.className = "text-success";
+        status.textContent = "Vorschlag aus " + (d.quelle || "DB") + " – bitte prüfen/anpassen.";
+      } else {
+        status.className = "text-muted";
+        status.textContent = "Kein Treffer (bei Fachhandelsartikeln normal) – bitte manuell erfassen.";
+      }
+    } catch (e) {
+      status.className = "text-muted";
+      status.textContent = "Produktsuche nicht erreichbar – bitte manuell erfassen.";
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  btn.addEventListener("click", () => suche(false));
+  // Beim Anlegen mit vorbefülltem Barcode und leerer Bezeichnung: automatisch versuchen.
+  {% if neu %}
+  if (barcode.value.trim() && !bezeichnung.value.trim()) { suche(true); }
+  {% endif %}
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Lagerbestand{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <h1 class="h3 mb-0">Lagerbestand</h1>
+  <div class="d-flex gap-2 flex-wrap">
+    <a class="btn btn-primary" href="{{ url_for('lager.scan') }}">📷 Scannen</a>
+    <a class="btn btn-outline-primary" href="{{ url_for('lager.neu') }}">+ Neuer Artikel</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('lager.bestellliste') }}">🖨️ Bestellliste{% if anzahl_bestellen %} ({{ anzahl_bestellen }}){% endif %}</a>
+  </div>
+</div>
+
+<form method="get" class="row g-2 align-items-center mb-3">
+  <div class="col-auto flex-grow-1">
+    <input type="text" name="q" class="form-control" value="{{ suche }}" placeholder="Suche: Bezeichnung, Barcode, E-Nr, Lagerort, Lieferant…">
+  </div>
+  <div class="col-auto">
+    <div class="form-check">
+      <input class="form-check-input" type="checkbox" name="bestellen" value="1" id="f-best" {% if nur_bestellen %}checked{% endif %} onchange="this.form.submit()">
+      <label class="form-check-label" for="f-best">Nur nachzubestellen</label>
+    </div>
+  </div>
+  <div class="col-auto">
+    <button class="btn btn-outline-secondary" type="submit">Filtern</button>
+    {% if suche or nur_bestellen %}<a class="btn btn-link" href="{{ url_for('lager.liste') }}">Zurücksetzen</a>{% endif %}
+  </div>
+</form>
+
+{% if not gruppen %}
+  <div class="alert alert-info">Noch keine Artikel im Lager. Lege den ersten per <a href="{{ url_for('lager.scan') }}">Scannen</a> oder <a href="{{ url_for('lager.neu') }}">manuell</a> an.</div>
+{% else %}
+  <p class="text-muted small">{{ anzahl }} Artikel</p>
+  {% for ort, artikel in gruppen %}
+  <div class="card mb-3">
+    <div class="card-header fw-semibold">📍 {{ ort }} <span class="text-muted fw-normal">({{ artikel|length }})</span></div>
+    <div class="table-responsive">
+      <table class="table table-sm table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Bezeichnung</th>
+            <th>Barcode / Bestell-Nr</th>
+            <th>Lieferant</th>
+            <th class="text-center">Bestand</th>
+            <th class="text-end">Aktionen</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for a in artikel %}
+          <tr class="{% if a.id in bestell_ids %}table-warning{% endif %}">
+            <td>
+              <a href="{{ url_for('lager.bearbeiten', artikel_id=a.id) }}">{{ a.bezeichnung }}</a>
+              {% if a.id in bestell_ids %}<span class="badge bg-warning text-dark ms-1">nachbestellen</span>{% endif %}
+              {% if a.notizen %}<div class="small text-muted">{{ a.notizen }}</div>{% endif %}
+            </td>
+            <td class="small">
+              {% if a.barcode %}<code>{{ a.barcode }}</code>{% endif %}
+              {% if a.bestellnummer %}<div class="text-muted">Best-Nr {{ a.bestellnummer }}</div>{% endif %}
+            </td>
+            <td class="small">{{ a.lieferant or '' }}</td>
+            <td class="text-center" style="white-space:nowrap;">
+              <form method="post" action="{{ url_for('lager.bestand_aendern', artikel_id=a.id) }}" class="d-inline-flex align-items-center gap-1">
+                <button name="delta" value="-1" class="btn btn-sm btn-outline-secondary py-0 px-2" title="minus 1">−</button>
+                <span class="fw-semibold" style="min-width:2.5em; display:inline-block;">{{ a.bestand if a.bestand is not none else '–' }}</span>
+                <button name="delta" value="1" class="btn btn-sm btn-outline-secondary py-0 px-2" title="plus 1">+</button>
+              </form>
+              {% if a.mindestbestand %}<div class="small text-muted">min. {{ a.mindestbestand }}</div>{% endif %}
+            </td>
+            <td class="text-end" style="white-space:nowrap;">
+              <form method="post" action="{{ url_for('lager.nachbestellen_toggle', artikel_id=a.id) }}" class="d-inline">
+                <button class="btn btn-sm {{ 'btn-warning' if a.nachbestellen else 'btn-outline-warning' }} py-0" title="Nachbestellen-Flag umschalten">🛒</button>
+              </form>
+              <a class="btn btn-sm btn-outline-secondary py-0" href="{{ url_for('lager.bearbeiten', artikel_id=a.id) }}">✎</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endfor %}
+{% endif %}
+{% endblock %}

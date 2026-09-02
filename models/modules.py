@@ -12,6 +12,7 @@ MODULE = {
     "kunden":     {"label": "Kunden & Anlagen", "blueprints": ("customers", "revisionen", "installations", "leistungsschalter")},
     "pruefung":   {"label": "Kontrolle (Messprotokolle & Messgeräte)", "blueprints": ("protocols", "messgeraete")},
     "vermietung": {"label": "Verleih",          "blueprints": ("vermietung",)},
+    "lager":      {"label": "Lagermaterial",    "blueprints": ("lager",)},
 }
 
 # Diese Module sind default aktiv (bestehende User ohne explizite Konfiguration

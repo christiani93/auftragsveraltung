@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Lagerliste{% endblock %}
+{% block content %}
+<style>
+  @media print {
+    nav.navbar, .no-print { display: none !important; }
+    .card { border: none !important; page-break-inside: auto; }
+    .card-header { background: none !important; border-bottom: 2px solid #000 !important; }
+    tr { page-break-inside: avoid; }
+    body { background: #fff !important; }
+  }
+  .barcode-cell svg { max-height: 48px; }
+</style>
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2 no-print">
+  <div>
+    <h1 class="h3 mb-0">Lagerliste (Katalog)</h1>
+    <small class="text-muted">Kompletter Lagerbestand mit Barcode – zum Aushängen im Lager und Abscannen beim Bestellen.</small>
+  </div>
+  <div class="d-flex gap-2">
+    <button class="btn btn-primary" onclick="window.print()">🖨️ Drucken</button>
+    <a class="btn btn-outline-secondary" href="{{ url_for('lager.liste') }}">Zum Lagerbestand</a>
+  </div>
+</div>
+
+<h1 class="h4 mb-3 d-none d-print-block">Lagerliste</h1>
+
+{% if not gruppen %}
+  <div class="alert alert-info no-print">Noch keine Artikel im Lager.</div>
+{% else %}
+  <p class="text-muted small no-print">{{ anzahl }} Artikel</p>
+  {% for ort, artikel in gruppen %}
+  <div class="card mb-3">
+    <div class="card-header fw-semibold">📍 {{ ort }} <span class="text-muted fw-normal">({{ artikel|length }})</span></div>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Bezeichnung</th>
+            <th>Lieferant / Bestell-Nr</th>
+            <th class="text-center">Bestand</th>
+            <th class="barcode-cell">Barcode</th>
+            <th style="width:6rem;">Bestellen</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for a in artikel %}
+          <tr>
+            <td>{{ a.bezeichnung }}{% if a.notizen %}<div class="small text-muted">{{ a.notizen }}</div>{% endif %}</td>
+            <td class="small">{% if a.lieferant %}{{ a.lieferant }}{% endif %}{% if a.bestellnummer %}<div class="text-muted">{{ a.bestellnummer }}</div>{% endif %}</td>
+            <td class="text-center">{{ a.bestand if a.bestand is not none else '–' }}{% if a.einheit %} {{ a.einheit }}{% endif %}{% if a.mindestbestand %}<div class="small text-muted">min {{ a.mindestbestand }}</div>{% endif %}</td>
+            <td class="barcode-cell">
+              {# Gedruckter Barcode = gescannter EAN -> eigene Liste wieder abscannbar. Fallback Bestellnummer. #}
+              {% set code = a.barcode or a.bestellnummer %}
+              {% if code %}<svg class="lager-barcode" data-code="{{ code|replace(' ', '') }}"></svg>{% endif %}
+            </td>
+            <td style="border-bottom:1px solid #999;">&nbsp;</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endfor %}
+
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+  <script>
+    document.querySelectorAll("svg.lager-barcode").forEach(function (el) {
+      var code = el.getAttribute("data-code");
+      if (!code) return;
+      try {
+        JsBarcode(el, code, { format: "CODE128", height: 40, width: 1.4, fontSize: 12, margin: 2 });
+      } catch (e) {
+        el.outerHTML = '<span class="small text-muted">' + code + '</span>';
+      }
+    });
+  </script>
+{% endif %}
+{% endblock %}

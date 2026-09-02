@@ -57,6 +57,7 @@ mietmaschinen = JsonStore("mietmaschinen.json")
 mieter = JsonStore("mieter.json")
 mietreservationen = JsonStore("mietreservationen.json")
 material = JsonStore("material.json")
+lagerartikel = JsonStore("lagerartikel.json")
 
 VERMIET_STATUS = ["verfuegbar", "ausgeliehen", "wartung"]
 VERMIET_STATUS_LABEL = {
@@ -663,6 +664,84 @@ def material_abrechnen(auftrag_id: str, bis_datum: Optional[str] = None,
         material.update(m["id"], {"abgerechnet": True, "abgerechnet_am": abgerechnet_am})
         n += 1
     return n
+
+
+# ----- Lagermaterial (Lagerbestand, unabhaengig von Auftraegen) --------------
+#
+# Ein Lagerartikel ist ein Stammartikel im eigenen Lager (nicht auftragsbezogen).
+# Er wird per Barcode/E-Nummer eingescannt, einem Lagerort zugeordnet und kann
+# fuer eine Bestellliste (mit gedruckten Barcodes) markiert werden.
+#
+# Felder:
+#   id, bezeichnung, barcode (Scan-Schluessel, meist EAN), e_nummer,
+#   em_artikel_nr, lagerort, lieferant, einheit, bestand (int),
+#   mindestbestand (int, 0 = keine Schwelle), bestellmenge (Standard-Menge),
+#   nachbestellen (bool, manuelles Flag), notizen, erstellt_am, geaendert_am
+
+def lagerartikel_sortiert() -> List[Dict[str, Any]]:
+    """Alle Lagerartikel, sortiert nach Lagerort, dann Bezeichnung."""
+    items = lagerartikel.list()
+    items.sort(key=lambda a: (
+        (a.get("lagerort") or "￿").lower(),  # ohne Lagerort ans Ende
+        (a.get("bezeichnung") or "").lower(),
+    ))
+    return items
+
+
+def lagerartikel_by_barcode(code: str) -> Optional[Dict[str, Any]]:
+    """Ersten Lagerartikel finden, dessen gescannter Barcode (EAN) ODER
+    Bestellnummer (Leerzeichen-unabhaengig) dem Scan-Code entspricht. Der
+    Handscanner liest am Regal den EAN der Verpackung -> Treffer ueber 'barcode'.
+    None wenn nicht gefunden."""
+    if not code:
+        return None
+    ziel = code.strip().replace(" ", "").lower()
+    if not ziel:
+        return None
+    for a in lagerartikel.list():
+        for feld in ("barcode", "bestellnummer"):
+            wert = (a.get(feld) or "").strip().replace(" ", "").lower()
+            if wert and wert == ziel:
+                return a
+    return None
+
+
+def lagerorte_liste() -> List[str]:
+    """Alle vergebenen Lagerorte (distinct, alphabetisch) fuer Autocomplete."""
+    orte = {(a.get("lagerort") or "").strip() for a in lagerartikel.list()}
+    return sorted((o for o in orte if o), key=str.lower)
+
+
+# Haupt-Lieferanten des Betriebs (Vorschlaege im Autocomplete, auch wenn noch
+# kein Artikel damit erfasst ist).
+LAGER_STANDARD_LIEFERANTEN = ("Würth", "Elektro-Material AG")
+
+
+def lager_lieferanten_liste() -> List[str]:
+    """Alle Lieferanten (distinct, alphabetisch) fuer Autocomplete — Standard-
+    Lieferanten immer dabei, plus alle bereits vergebenen."""
+    lief = {(a.get("lieferant") or "").strip() for a in lagerartikel.list()}
+    lief.update(LAGER_STANDARD_LIEFERANTEN)
+    return sorted((l for l in lief if l), key=str.lower)
+
+
+def lagerartikel_nachzubestellen() -> List[Dict[str, Any]]:
+    """Artikel, die bestellt werden sollten: entweder manuell mit 'nachbestellen'
+    markiert, oder deren Bestand die Mindestschwelle (>0) erreicht/unterschreitet.
+    Sortiert nach Lieferant, dann Bezeichnung (bestell-lieferantenweise)."""
+    out = []
+    for a in lagerartikel.list():
+        manuell = bool(a.get("nachbestellen"))
+        mind = a.get("mindestbestand") or 0
+        bestand = a.get("bestand")
+        schwelle = bool(mind) and bestand is not None and bestand <= mind
+        if manuell or schwelle:
+            out.append(a)
+    out.sort(key=lambda a: (
+        (a.get("lieferant") or "￿").lower(),
+        (a.get("bezeichnung") or "").lower(),
+    ))
+    return out
 
 
 def material_item_abrechnung_setzen(material_id: str, abgerechnet: bool,
