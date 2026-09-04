@@ -10,7 +10,14 @@
     </div>
     <h1 class="h3 m-0">Auftragsliste</h1>
   </div>
-  <button class="btn btn-primary" onclick="window.print()">🖨 Drucken / als PDF speichern</button>
+  <div class="d-flex gap-2 align-items-center">
+    {% if alle_anzeigen %}
+    <a class="btn btn-outline-secondary" href="{{ url_for('auftraege.kunde_liste', kunde_id=kunde.id) }}">nur offene &amp; in Arbeit</a>
+    {% elif anzahl_abgeschlossen %}
+    <a class="btn btn-outline-secondary" href="{{ url_for('auftraege.kunde_liste', kunde_id=kunde.id, alle=1) }}">+ {{ anzahl_abgeschlossen }} erledigte/abgerechnete</a>
+    {% endif %}
+    <button class="btn btn-primary" onclick="window.print()">🖨 Drucken / als PDF speichern</button>
+  </div>
 </div>
 
 <div class="print-header d-none d-print-block mb-2">
@@ -22,7 +29,7 @@
   </div>
 </div>
 
-<p class="text-muted small mb-2"><span class="label">Anzahl Aufträge:</span> {{ auftraege|length }}</p>
+<p class="text-muted small mb-2"><span class="label">Anzahl Aufträge:</span> {{ auftraege|length }}{% if not alle_anzeigen %} <span class="d-print-none">(offen &amp; in Arbeit)</span>{% endif %}</p>
 
 {% if auftraege %}
 <div class="table-responsive">

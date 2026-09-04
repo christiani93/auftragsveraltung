@@ -199,15 +199,26 @@ def kunde_liste(kunde_id: str):
     kunde = kunden.get(kunde_id)
     if not kunde:
         abort(404)
-    auftraege_liste = sorted(
+    # Standardmaessig nur aktive Auftraege (offen + in Arbeit); erledigte/
+    # abgerechnete erst auf Wunsch (?alle=1).
+    aktive_status = ("offen", "in_arbeit")
+    alle_anzeigen = request.args.get("alle") == "1"
+    alle_auftraege = sorted(
         auftraege_fuer_kunde(kunde_id),
         key=lambda a: a.get("erteilungsdatum", ""),
         reverse=True,
     )
+    anzahl_abgeschlossen = sum(1 for a in alle_auftraege if a.get("status") not in aktive_status)
+    if alle_anzeigen:
+        auftraege_liste = alle_auftraege
+    else:
+        auftraege_liste = [a for a in alle_auftraege if a.get("status") in aktive_status]
     return render_template(
         "auftraege/kunde_liste.html",
         kunde=kunde, auftraege=auftraege_liste,
         status_label=AUFTRAG_STATUS_LABEL,
+        alle_anzeigen=alle_anzeigen,
+        anzahl_abgeschlossen=anzahl_abgeschlossen,
     )
 
 
