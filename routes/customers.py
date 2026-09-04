@@ -4,7 +4,6 @@ from flask import Blueprint, abort, flash, redirect, render_template, request, u
 from flask_login import current_user
 
 from models.repos import (
-    AUFTRAG_STATUS_ARCHIVIERT,
     AUFTRAG_STATUS_LABEL,
     REVISION_STATUS_LABEL,
     anlagen_fuer_kunde,
@@ -109,14 +108,17 @@ def detail(kunde_id: str):
         abort(404)
     if not kunde_sichtbar_fuer(kunde, current_user):
         abort(403)
-    archiv_anzeigen = request.args.get("archiv") == "1"
+    # Browseransicht standardmaessig nur aktive Auftraege (offen + in Arbeit);
+    # erledigte/abgerechnete erst auf Wunsch (?alle=1).
+    aktive_status = ("offen", "in_arbeit")
+    alle_anzeigen = request.args.get("alle") == "1"
     auftraege_kunde_alle = [
         a for a in auftraege_fuer_kunde(kunde_id)
         if _darf_auftrag_sehen(a) and not a.get("revision_id")
     ]
-    anzahl_archiviert = sum(1 for a in auftraege_kunde_alle if a.get("status") in AUFTRAG_STATUS_ARCHIVIERT)
-    if not archiv_anzeigen:
-        auftraege_kunde_alle = [a for a in auftraege_kunde_alle if a.get("status") not in AUFTRAG_STATUS_ARCHIVIERT]
+    anzahl_abgeschlossen = sum(1 for a in auftraege_kunde_alle if a.get("status") not in aktive_status)
+    if not alle_anzeigen:
+        auftraege_kunde_alle = [a for a in auftraege_kunde_alle if a.get("status") in aktive_status]
     auftraege_dieses_kunden = sorted(
         auftraege_kunde_alle,
         key=lambda a: (a.get("status") != "offen", a.get("status") != "in_arbeit", a.get("erteilungsdatum", "")),
@@ -139,8 +141,8 @@ def detail(kunde_id: str):
         revisionen=rev_rows,
         revision_status_label=REVISION_STATUS_LABEL,
         darf_revision_anlegen=current_user.is_authenticated,
-        archiv_anzeigen=archiv_anzeigen,
-        anzahl_archiviert=anzahl_archiviert,
+        alle_anzeigen=alle_anzeigen,
+        anzahl_abgeschlossen=anzahl_abgeschlossen,
     )
 
 
