@@ -927,31 +927,61 @@ def baue_aufbau_baum(anlage_id: str) -> List[Dict[str, Any]]:
         else:
             roots.append(knoten[t["id"]])
 
-    def _summe_nachgelagert(node: Dict[str, Any]) -> Optional[float]:
-        """Summe der Lasten ALLER Nachfahren in kW — ohne diesen Knoten selbst.
+    def _last_und_beitrag(node: Dict[str, Any]) -> Optional[float]:
+        """Nachgelagerte Last eines Knotens (kW) UND der Beitrag, den er an sein
+        Elternteil weitergibt.
+
+        Physik/NIN: Eine Verteilung bzw. Verteilleitung kann an die vorgelagerte
+        Verteilung nie mehr weitergeben, als ihre eigene Vorsicherung (Bemessung)
+        zulässt. Ist die nachgelagerte Summe grösser als die eigene Bemessung
+        (= Überlast, >100 %), wird nach oben nur die Vorsicherung ("Eigene Last")
+        weitergegeben. Am Knoten selbst wird die reale nachgelagerte Summe (und
+        damit die Überlast) aber weiterhin angezeigt.
 
         Nur Anlagen- und Endstromkreise zählen mit ihrer eigenen Eingabe als
         Last; Verteilungen/Verteilstromkreise (und Erzeugerstromkreise) werden
-        durchlaufen, aber ihre eigene Eingabe nicht aufsummiert.
+        durchlaufen, aber ihre eigene Eingabe nicht als Last aufsummiert.
+
+        Setzt am Knoten: summe_nachgelagert_kw, gleichzeitigkeit,
+        belastung_prozent, ueberlastet. Rückgabe: Beitrag nach oben (kW) / None.
         """
-        total_kw = 0.0
+        # Beiträge aller Kinder aufsummieren (jeder Beitrag ist ggf. schon
+        # auf die Vorsicherung des Kindes gedeckelt).
+        kinder_summe = 0.0
         any_value = False
         for child in node["children"]:
-            if child["teil"].get("typ") in ANLAGENTEIL_TYP_IST_LAST:
-                eigene = teil_last_kw(child["teil"])
-                if eigene is not None:
-                    total_kw += eigene
-                    any_value = True
-            sub = _summe_nachgelagert(child)
-            if sub is not None:
-                total_kw += sub
+            beitrag = _last_und_beitrag(child)
+            if beitrag is not None:
+                kinder_summe += beitrag
                 any_value = True
-        result = total_kw if any_value else None
-        node["summe_nachgelagert_kw"] = result
-        # Gleichzeitigkeitsfaktor = eigene Last / Summe nachgelagert (beide in kW)
+
+        summe = kinder_summe if any_value else None
+        node["summe_nachgelagert_kw"] = summe
+
+        # Eigene Bemessung/Vorsicherung in kW (aus kW- oder A-Eingabe)
         eigen_kw = node["anzeige"]["kw"]
-        node["gleichzeitigkeit"] = (eigen_kw / result) if (eigen_kw and result) else None
-        return result
+        node["gleichzeitigkeit"] = (eigen_kw / summe) if (eigen_kw and summe) else None
+        # Belastung = nachgelagerte Summe / eigene Vorsicherung (nur Verteiler-Knoten)
+        typ = node["teil"].get("typ")
+        ist_verteiler = typ in ANLAGENTEIL_TYP_VERTEILER
+        node["belastung_prozent"] = (
+            (summe / eigen_kw * 100.0) if (ist_verteiler and eigen_kw and summe) else None
+        )
+        node["ueberlastet"] = False
+
+        if typ in ANLAGENTEIL_TYP_IST_LAST:
+            # Endverbraucher: eigene erfasste Last zählt (plus evtl. Kinder).
+            eigen_last = teil_last_kw(node["teil"])
+            if eigen_last is None and not any_value:
+                return None
+            return (eigen_last or 0.0) + kinder_summe
+
+        # Verteiler/Pass-Through: nur die nachgelagerte Last fliesst nach oben —
+        # bei Überlast gedeckelt auf die eigene Vorsicherung.
+        if ist_verteiler and eigen_kw and any_value and kinder_summe > eigen_kw:
+            node["ueberlastet"] = True
+            return eigen_kw
+        return summe
 
     def _ikmax(node: Dict[str, Any], geerbt: Optional[Dict[str, Any]]) -> None:
         eigen_ik = _to_float(node["teil"].get("gemessen_ik_a"))
@@ -971,7 +1001,7 @@ def baue_aufbau_baum(anlage_id: str) -> List[Dict[str, Any]]:
             _ikmax(child, quelle_fuer_kinder)
 
     for root in roots:
-        _summe_nachgelagert(root)
+        _last_und_beitrag(root)
         _ikmax(root, None)
 
     return roots

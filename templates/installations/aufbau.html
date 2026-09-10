@@ -21,7 +21,12 @@
         Als Last zählen nur <strong>Anlagen- und Endstromkreise</strong> — Verteilungen/Verteilstromkreise (und Erzeugerstromkreise)
         werden durchlaufen, aber ihre eigene Eingabe nicht mitgezählt.
         Eingaben in A werden anhand der Spannung des jeweiligen Teils auf kW umgerechnet (cos φ = 1).
-        Der eigene Wert dieses Knotens wird <em>nicht</em> dazugezählt.</li>
+        Der eigene Wert dieses Knotens wird <em>nicht</em> dazugezählt.
+        <br><strong>Deckelung bei Überlast:</strong> Ist eine Verteilung/Verteilleitung mit
+        <strong>mehr als 100 %</strong> belastet (nachgelagerte Summe &gt; eigene Vorsicherung),
+        wird an die davorliegende Verteilung nur die <strong>Vorsicherung</strong> (eigene Bemessung)
+        weitergegeben — mehr kann physikalisch nicht durch die Vorsicherung fliessen. Die reale
+        Überlast wird am Knoten selbst trotzdem angezeigt.</li>
     <li><strong>Gleichzeitigkeit</strong>: Eigene Last ÷ Summe nachgelagert — Verhältnis der erfassten eigenen Last (z.B. Vorsicherung) zur Summe der nachgelagerten Lasten. Nur wenn beide Werte vorhanden.</li>
     <li><strong>IKmax</strong>: Eigener gemessener Kurzschlussstrom, oder geerbt von der nächsten gemessenen Verteilung weiter oben.</li>
   </ul>
@@ -80,6 +85,16 @@
       {% if node.children or teil.typ in verteiler_typen %}
         {% if node.summe_nachgelagert_kw is not none %}
           {{ '%.2f'|format(node.summe_nachgelagert_kw) }} kW
+          {% if node.belastung_prozent is not none %}
+            <div class="small {% if node.ueberlastet %}text-danger fw-bold{% else %}text-muted fw-normal{% endif %}">
+              {{ '%.0f'|format(node.belastung_prozent) }} % belastet
+            </div>
+            {% if node.ueberlastet %}
+            <div class="small text-danger fw-normal">
+              ⚠ Überlast – nach oben zählt nur die Vorsicherung ({{ '%.2f'|format(node.anzeige.kw) }} kW)
+            </div>
+            {% endif %}
+          {% endif %}
         {% else %}
           <span class="text-muted">— nichts erfasst —</span>
         {% endif %}
