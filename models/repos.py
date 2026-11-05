@@ -726,6 +726,18 @@ def lager_lieferanten_liste() -> List[str]:
     return sorted((l for l in lief if l), key=str.lower)
 
 
+def lagerartikel_ohne_ean() -> List[Dict[str, Any]]:
+    """Lagerartikel ohne erfassten Barcode/EAN — diese muessen noch am Regal
+    eingescannt werden (betrifft v.a. per Wareneingang automatisch angelegte
+    Artikel). Sortiert nach Lagerort, dann Bezeichnung."""
+    items = [a for a in lagerartikel.list() if not (a.get("barcode") or "").strip()]
+    items.sort(key=lambda a: (
+        (a.get("lagerort") or "￿").lower(),
+        (a.get("bezeichnung") or "").lower(),
+    ))
+    return items
+
+
 def lagerartikel_nachzubestellen() -> List[Dict[str, Any]]:
     """Artikel, die bestellt werden sollten: entweder manuell mit 'nachbestellen'
     markiert, oder deren Bestand die Mindestschwelle (>0) erreicht/unterschreitet.

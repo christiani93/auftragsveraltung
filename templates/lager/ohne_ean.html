@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Artikel ohne EAN{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <h1 class="h3 mb-0">Artikel ohne EAN</h1>
+  <div class="d-flex gap-2 flex-wrap">
+    <a class="btn btn-outline-secondary" href="{{ url_for('lager.liste') }}">Lagerbestand</a>
+    <a class="btn btn-outline-primary" href="{{ url_for('lager.verbrauch') }}">📈 Verbrauch</a>
+  </div>
+</div>
+
+<p class="text-muted">
+  Diese Artikel haben noch keinen Barcode/EAN hinterlegt – typisch für automatisch über den
+  <a href="{{ url_for('lager.lieferscheine') }}">Wareneingang</a> angelegte Artikel. Ohne EAN lassen sie sich auf
+  den gedruckten Listen nicht abscannen. Geh die Liste am Regal durch und scanne je Zeile den Strichcode
+  der Verpackung ein (Scanner tippt Code + Enter → speichert direkt).
+</p>
+
+{% if not gruppen %}
+  <div class="alert alert-success">Alle Artikel haben einen EAN. 🎉</div>
+{% else %}
+  <p class="text-muted small">{{ anzahl }} Artikel ohne EAN</p>
+  {% for ort, artikel in gruppen %}
+  <div class="card mb-3">
+    <div class="card-header fw-semibold">📍 {{ ort }} <span class="text-muted fw-normal">({{ artikel|length }})</span></div>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Bezeichnung</th>
+            <th>Lieferant</th>
+            <th style="width:120px;">Best-Nr</th>
+            <th style="width:280px;">EAN einscannen</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for a in artikel %}
+          <tr>
+            <td>
+              <a href="{{ url_for('lager.bearbeiten', artikel_id=a.id) }}">{{ a.bezeichnung }}</a>
+              {% if a.notizen %}<div class="small text-muted">{{ a.notizen }}</div>{% endif %}
+            </td>
+            <td class="small">{{ a.lieferant or '' }}</td>
+            <td class="small text-muted">{{ a.bestellnummer or '—' }}</td>
+            <td>
+              <form method="post" action="{{ url_for('lager.ean_setzen', artikel_id=a.id) }}" class="input-group input-group-sm">
+                <input type="text" name="barcode" class="form-control" placeholder="EAN scannen…" autocomplete="off" inputmode="numeric">
+                <button class="btn btn-outline-primary" type="submit">Speichern</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endfor %}
+{% endif %}
+{% endblock %}

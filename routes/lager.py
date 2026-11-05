@@ -23,6 +23,7 @@ from models.repos import (
     lagerartikel,
     lagerartikel_by_barcode,
     lagerartikel_nachzubestellen,
+    lagerartikel_ohne_ean,
     lagerartikel_sortiert,
     lagerlieferschein_speichern,
     lagerlieferscheine,
@@ -258,6 +259,47 @@ def nachbestellen_toggle(artikel_id: str):
         abort(404)
     lagerartikel.update(artikel_id, {"nachbestellen": not artikel.get("nachbestellen")})
     return redirect(request.referrer or url_for("lager.liste"))
+
+
+# ----- Fehlende EANs (Barcode nachtragen) -------------------------------------
+
+@bp.route("/ohne-ean")
+@login_required
+def ohne_ean():
+    """Liste der Artikel ohne erfassten EAN/Barcode — am Regal einzuscannen.
+    Nach Lagerort gruppiert; per Zeile direkt einscannbar."""
+    artikel = lagerartikel_ohne_ean()
+    gruppen: list[tuple[str, list]] = []
+    idx: dict[str, int] = {}
+    for a in artikel:
+        ort = (a.get("lagerort") or "").strip() or "Ohne Lagerort"
+        if ort not in idx:
+            idx[ort] = len(gruppen)
+            gruppen.append((ort, []))
+        gruppen[idx[ort]][1].append(a)
+    return render_template("lager/ohne_ean.html", gruppen=gruppen, anzahl=len(artikel))
+
+
+@bp.route("/<artikel_id>/ean", methods=["POST"])
+@login_required
+def ean_setzen(artikel_id: str):
+    """Setzt den gescannten EAN/Barcode eines Artikels (aus der 'ohne EAN'-Liste
+    oder dem Bestellvorschlag). Scanner tippt Code + Enter -> speichert."""
+    artikel = lagerartikel.get(artikel_id)
+    if not artikel:
+        abort(404)
+    code = (request.form.get("barcode") or "").strip()
+    if not code:
+        flash("Kein Code eingescannt.", "warning")
+    else:
+        dublette = lagerartikel_by_barcode(code)
+        if dublette and dublette["id"] != artikel_id:
+            flash(f"Code «{code}» ist bereits bei «{dublette.get('bezeichnung')}» "
+                  "hinterlegt — bitte prüfen.", "warning")
+        else:
+            lagerartikel.update(artikel_id, {"barcode": code})
+            flash(f"EAN für «{artikel.get('bezeichnung')}» gespeichert.", "success")
+    return redirect(request.referrer or url_for("lager.ohne_ean"))
 
 
 # ----- Bestellliste (Druck) ---------------------------------------------------
@@ -496,6 +538,7 @@ def verbrauch():
         reichweite=reichweite,
         fenster=fenster,
         anzahl_lieferscheine=len(lagerlieferscheine.list()),
+        anzahl_ohne_ean=len(lagerartikel_ohne_ean()),
         **daten,
     )
 

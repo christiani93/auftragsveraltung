@@ -13,6 +13,13 @@
   </div>
 </div>
 
+{% if anzahl_ohne_ean %}
+<div class="alert alert-warning d-flex justify-content-between align-items-center flex-wrap gap-2">
+  <span>🏷️ <strong>{{ anzahl_ohne_ean }}</strong> Artikel ohne EAN – noch einzuscannen, damit sie auf den Listen abscannbar sind.</span>
+  <a class="btn btn-sm btn-warning" href="{{ url_for('lager.ohne_ean') }}">EANs nachtragen</a>
+</div>
+{% endif %}
+
 <p class="text-muted">
   Geschätzter Ø-Verbrauch aus {{ anzahl_lieferscheine }} importierten Lieferschein(en): Einkauf über die Zeit
   ≈ Verbrauch. Der <strong>voraussichtliche Bestand</strong> rechnet vom letzten Wareneingang/der letzten Inventur
@@ -51,6 +58,7 @@
       <thead class="table-light">
         <tr>
           <th>Artikel</th>
+          <th>EAN / Best-Nr</th>
           <th>Lieferant</th>
           <th class="text-end" title="Rechnerischer Bestand heute = letzter Stand − geschätzter Verbrauch seitdem">Voraussichtl. Bestand</th>
           <th class="text-end">reicht noch</th>
@@ -63,6 +71,11 @@
           <td>
             <a href="{{ url_for('lager.bearbeiten', artikel_id=z.artikel.id) }}">{{ z.artikel.bezeichnung }}</a>
             {% if z.artikel.lagerort %}<span class="small text-muted ms-1">📍 {{ z.artikel.lagerort }}</span>{% endif %}
+          </td>
+          <td class="small">
+            {% if z.artikel.barcode %}<code>{{ z.artikel.barcode }}</code>
+            {% else %}<a class="badge bg-danger-subtle text-danger-emphasis text-decoration-none" href="{{ url_for('lager.ohne_ean') }}" title="EAN noch nicht erfasst – zum Nachtragen">EAN fehlt</a>{% endif %}
+            {% if z.artikel.bestellnummer %}<div class="text-muted">Best-Nr {{ z.artikel.bestellnummer }}</div>{% endif %}
           </td>
           <td class="small">{{ z.artikel.lieferant or '' }}</td>
           <td class="text-end">{{ zahl(z.voraussichtlich) }} <span class="small text-muted">{{ z.einheit }}</span></td>
