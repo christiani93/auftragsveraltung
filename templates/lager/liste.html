@@ -64,6 +64,10 @@
                 <span class="fw-semibold" style="min-width:2.5em; display:inline-block;">{{ a.bestand if a.bestand is not none else '–' }}</span>
                 <button name="delta" value="1" class="btn btn-sm btn-outline-secondary py-0 px-2" title="plus 1">+</button>
               </form>
+              <form method="post" action="{{ url_for('lager.bestand_aendern', artikel_id=a.id) }}" class="d-inline-flex align-items-center gap-1 mt-1 justify-content-center">
+                <input type="number" name="entnehmen" min="1" step="1" class="form-control form-control-sm text-end py-0" style="width:56px;" placeholder="Anz." title="Menge aus dem Bestand streichen (Entnahme)">
+                <button class="btn btn-sm btn-outline-danger py-0" type="submit" title="Aus dem Bestand streichen (Entnahme)">− entnehmen</button>
+              </form>
               {% if a.mindestbestand %}<div class="small text-muted">min. {{ a.mindestbestand }}</div>{% endif %}
             </td>
             <td class="text-end" style="white-space:nowrap;">

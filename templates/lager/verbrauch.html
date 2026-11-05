@@ -61,6 +61,7 @@
           <th>Artikel</th>
           <th>EAN / Best-Nr</th>
           <th>Lieferant</th>
+          <th class="text-end" title="Tatsächlichen Bestand eintragen, falls real mehr vorhanden ist als berechnet">Bestand ✎</th>
           <th class="text-end" title="Rechnerischer Bestand heute = letzter Stand − geschätzter Verbrauch seitdem">Voraussichtl. Bestand</th>
           <th class="text-end">reicht noch</th>
           <th class="text-end">Bestellen</th>
@@ -76,10 +77,21 @@
           <td class="small">
             {% if z.artikel.barcode %}<code>{{ z.artikel.barcode }}</code>
             {% elif z.artikel.kein_ean %}<span class="text-muted">kein EAN</span>
-            {% else %}<a class="badge bg-danger-subtle text-danger-emphasis text-decoration-none" href="{{ url_for('lager.ohne_ean') }}" title="EAN noch nicht erfasst – zum Nachtragen">EAN fehlt</a>{% endif %}
+            {% else %}
+              <form method="post" action="{{ url_for('lager.ean_setzen', artikel_id=z.artikel.id) }}" class="input-group input-group-sm" style="width:auto;">
+                <input type="text" name="barcode" id="eanbv-{{ z.artikel.id }}" class="form-control" placeholder="EAN scannen…" autocomplete="off" inputmode="numeric" style="max-width:120px;">
+                <button type="button" class="btn btn-outline-secondary cam-btn" data-target="eanbv-{{ z.artikel.id }}" data-label="{{ z.artikel.bezeichnung }}" title="Mit Kamera scannen">📷</button>
+              </form>
+            {% endif %}
             {% if z.artikel.bestellnummer %}<div class="text-muted">Best-Nr {{ z.artikel.bestellnummer }}</div>{% endif %}
           </td>
           <td class="small">{{ z.artikel.lieferant or '' }}</td>
+          <td class="text-end">
+            <form method="post" action="{{ url_for('lager.bestand_aendern', artikel_id=z.artikel.id) }}" class="d-inline-flex gap-1 justify-content-end">
+              <input type="number" name="setzen" value="{{ z.artikel.bestand if z.artikel.bestand is not none else '' }}" min="0" step="1" class="form-control form-control-sm text-end py-0" style="width:70px;" title="Tatsächlichen Bestand eintragen (Inventur, Stichtag heute) – rechnet neu">
+              <button class="btn btn-sm btn-outline-secondary py-0" type="submit" title="Bestand übernehmen – rechnet neu">✓</button>
+            </form>
+          </td>
           <td class="text-end">{{ zahl(z.voraussichtlich) }} <span class="small text-muted">{{ z.einheit }}</span></td>
           <td class="text-end {% if z.tage_rest is not none and z.tage_rest < reichweite %}text-danger fw-semibold{% endif %}">{{ tage(z.tage_rest) }}</td>
           <td class="text-end"><strong>{{ zahl(z.menge_vorschlag) }}</strong> <span class="small text-muted">{{ z.einheit }}</span></td>
@@ -99,6 +111,7 @@
       </button>
       <span class="small text-muted ms-2">→ erscheinen dann mit Barcode auf der druckbaren Bestellliste.</span>
     </form>
+    <div class="small text-muted mt-1">Tipp: Stimmt der Bestand nicht? Trage in der Spalte <strong>Bestand&nbsp;✎</strong> den tatsächlichen Wert ein – ist real mehr da, fällt der Artikel evtl. aus dem Vorschlag.</div>
   </div>
 </div>
 {% endif %}

@@ -238,9 +238,14 @@ def bestand_aendern(artikel_id: str):
         abort(404)
     aktuell = artikel.get("bestand") or 0
     delta = request.form.get("delta")
+    entnehmen = request.form.get("entnehmen")
     setzen = request.form.get("setzen")
     if delta is not None:
         neu_wert = aktuell + _als_int(delta, 0)
+    elif entnehmen is not None:
+        # Entnahme/Abgang: angegebene Menge vom Bestand abbuchen ("aus dem
+        # Bestand streichen"). Vorzeichen egal -> immer abziehen.
+        neu_wert = aktuell - abs(_als_int(entnehmen, 0))
     elif setzen is not None:
         neu_wert = _als_int(setzen, aktuell)
     else:
