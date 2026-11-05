@@ -75,6 +75,7 @@ def _form_zu_artikel() -> dict:
         "bestand": _als_int_oder_none(request.form.get("bestand")),
         "mindestbestand": _als_int(request.form.get("mindestbestand"), 0),
         "bestellmenge": _als_int_oder_none(request.form.get("bestellmenge")),
+        "verpackungsmenge": _als_int_oder_none(request.form.get("verpackungsmenge")),
         "nachbestellen": request.form.get("nachbestellen") == "on",
         "kein_ean": request.form.get("kein_ean") == "on",
         "ausgelaufen": request.form.get("ausgelaufen") == "on",
@@ -250,7 +251,12 @@ def bestand_aendern(artikel_id: str):
     aktuell = artikel.get("bestand") or 0
     delta = request.form.get("delta")
     setzen = request.form.get("setzen")
-    if delta is not None:
+    pakete = request.form.get("pakete")
+    ve = artikel.get("verpackungsmenge") or 0
+    if pakete is not None and pakete != "" and ve > 0:
+        # Ist-Bestand in Paketen gezaehlt -> Stueck = Pakete * Verpackungsmenge
+        neu_wert = _als_int(pakete, 0) * ve
+    elif delta is not None:
         neu_wert = aktuell + _als_int(delta, 0)
     elif setzen is not None:
         neu_wert = _als_int(setzen, aktuell)

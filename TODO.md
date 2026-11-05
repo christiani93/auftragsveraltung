@@ -89,6 +89,12 @@ Grosse Erweiterung in dieser Session (Commits bis `c61af5e`):
   zählt NICHT als Verbrauch; die gerade gelieferte letzte Menge bläht den Schnitt
   nicht mehr auf. Braucht automatisch ≥2 Lieferungen. `lagerlieferschein_verbrauch`
   liefert dafür `erste_menge`. Wirkt überall (Bestellvorschlag, Übersicht, Statistik).
+- **Verpackungsmenge / Paket-Zählung**: Feld `verpackungsmenge` (VE = Stück pro
+  Paket/Bestelleinheit) pro Artikel, **manuell** gepflegt (NICHT das letzte Token der
+  Würth-Artikelnummer-Zeile – das ist NICHT die Packungsgröße!). Ist-Bestand kann in
+  Paketen gezählt werden (Edit-Formular JS + Bestandskontrolle `pakete`→×VE via
+  `bestand_aendern`); Bestand & Bestellmenge werden zusätzlich in Paketen angezeigt.
+  Verbrauchsrate bleibt stückbasiert aus Lieferscheinen → Paket-Zählung verfälscht sie nicht.
 - **Statistik** `/lager/statistik` (`lager_top_verbrauch_pro_lagerort`): Top-Verbrauch
   (Ø/Monat) je Lagerort, Zeitfenster + Top-N wählbar, Balken je Artikel. Lagerort je
   Gruppe direkt umbenennen/zusammenführen (`lagerort_umbenennen`, setzt alle Artikel

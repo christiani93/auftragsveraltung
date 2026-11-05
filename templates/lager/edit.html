@@ -49,9 +49,19 @@
     </div>
 
     <div class="col-md-3">
+      <label class="form-label">Verpackungsmenge (VE)</label>
+      <input type="number" name="verpackungsmenge" id="f-ve" class="form-control" min="1" step="1" value="{{ artikel.verpackungsmenge if artikel.get('verpackungsmenge') is not none else '' }}" placeholder="z.B. 100">
+      <small class="text-muted">Stück pro Paket/Bestelleinheit (manuell, z.B. 100). Für Paket-Zählung & Bestellmenge.</small>
+    </div>
+    <div class="col-md-3">
       <label class="form-label">Bestand</label>
-      <input type="number" name="bestand" class="form-control" step="1" value="{{ artikel.bestand if artikel.bestand is not none else '' }}">
-      <small class="text-muted">Ist-Bestand (Inventur). Normal führt der <a href="{{ url_for('lager.lieferscheine') }}">Wareneingang</a> den Bestand.</small>
+      <input type="number" name="bestand" id="f-bestand-input" class="form-control" step="1" value="{{ artikel.bestand if artikel.bestand is not none else '' }}">
+      <small class="text-muted"><span id="bestand-pakete-info"></span><span id="bestand-pakete-hint">Ist-Bestand (Inventur).</span></small>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">…oder Pakete zählen</label>
+      <input type="number" id="f-pakete" class="form-control" min="0" step="1" placeholder="Anzahl Pakete">
+      <small class="text-muted">Pakete × VE → füllt den Bestand.</small>
     </div>
     <div class="col-md-3">
       <label class="form-label">Mindestbestand</label>
@@ -172,6 +182,30 @@
   {% if neu %}
   if (barcode.value.trim() && !bezeichnung.value.trim()) { suche(true); }
   {% endif %}
+
+  // Paket-Zählung: Bestand = Pakete × Verpackungsmenge (VE); Anzeige in Paketen.
+  const ve = document.getElementById("f-ve");
+  const bestandInput = document.getElementById("f-bestand-input");
+  const pakete = document.getElementById("f-pakete");
+  const info = document.getElementById("bestand-pakete-info");
+  function veVal() { return parseInt(ve.value, 10) || 0; }
+  function refreshInfo() {
+    const v = veVal(); const b = parseInt(bestandInput.value, 10);
+    if (v > 0 && !isNaN(b)) {
+      const p = b / v;
+      info.textContent = "≈ " + (Math.round(p * 100) / 100) + " Pakete à " + v + " · ";
+    } else { info.textContent = ""; }
+  }
+  if (ve && bestandInput && pakete && info) {
+    pakete.addEventListener("input", function () {
+      const v = veVal();
+      if (v > 0 && pakete.value !== "") { bestandInput.value = (parseInt(pakete.value, 10) || 0) * v; }
+      refreshInfo();
+    });
+    bestandInput.addEventListener("input", refreshInfo);
+    ve.addEventListener("input", refreshInfo);
+    refreshInfo();
+  }
 })();
 </script>
 {% endblock %}

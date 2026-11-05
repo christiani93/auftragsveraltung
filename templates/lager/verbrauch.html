@@ -70,6 +70,7 @@
           </td>
           <td class="text-end" style="white-space:nowrap;">
             <strong>{{ zahl(z.menge_vorschlag) }}</strong> <span class="small text-muted">{{ z.einheit }}</span>
+            {% if z.artikel.verpackungsmenge and z.menge_vorschlag %}<div class="small text-muted">≈ {{ ((z.menge_vorschlag + z.artikel.verpackungsmenge - 1) // z.artikel.verpackungsmenge) }} Pk. à {{ z.artikel.verpackungsmenge }}</div>{% endif %}
             <input type="hidden" form="{{ fid }}" name="menge_{{ z.artikel.id }}" value="{{ z.menge_vorschlag }}">
             <form method="post" action="{{ url_for('lager.auslaufen_toggle', artikel_id=z.artikel.id) }}" class="d-inline"
                   onsubmit="return confirm('«{{ z.artikel.bezeichnung }}» auslaufen lassen? Verschwindet aus dem Bestellvorschlag.');">
@@ -206,12 +207,22 @@
               </div>
             {% endif %}
           </td>
-          <td class="text-end">{{ z.artikel.bestand if z.artikel.bestand is not none else '–' }}</td>
+          <td class="text-end">
+            {{ z.artikel.bestand if z.artikel.bestand is not none else '–' }}
+            {% if z.artikel.verpackungsmenge and z.artikel.bestand is not none %}<div class="small text-muted">{{ (z.artikel.bestand / z.artikel.verpackungsmenge)|round(1) }} Pk.</div>{% endif %}
+          </td>
           <td>
-            <form method="post" action="{{ url_for('lager.bestand_aendern', artikel_id=z.artikel.id) }}" class="input-group input-group-sm">
-              <input type="number" name="setzen" min="0" step="1" class="form-control text-end" placeholder="Stk" title="Gezählten Ist-Bestand eintragen (Stichtag heute)">
+            <form method="post" action="{{ url_for('lager.bestand_aendern', artikel_id=z.artikel.id) }}" class="input-group input-group-sm {% if z.artikel.verpackungsmenge %}mb-1{% endif %}">
+              <input type="number" name="setzen" min="0" step="1" class="form-control text-end" placeholder="Stk" title="Gezählten Ist-Bestand in Stück eintragen (Stichtag heute)">
               <button class="btn btn-outline-info" type="submit" title="Bestand übernehmen">✓</button>
             </form>
+            {% if z.artikel.verpackungsmenge %}
+            <form method="post" action="{{ url_for('lager.bestand_aendern', artikel_id=z.artikel.id) }}" class="input-group input-group-sm">
+              <input type="number" name="pakete" min="0" step="1" class="form-control text-end" placeholder="Pakete" title="Gezählte Pakete eintragen – wird × VE ({{ z.artikel.verpackungsmenge }}) gerechnet">
+              <span class="input-group-text">×{{ z.artikel.verpackungsmenge }}</span>
+              <button class="btn btn-outline-info" type="submit" title="Pakete × VE übernehmen">✓</button>
+            </form>
+            {% endif %}
           </td>
           <td class="small text-muted">
             {% if z.anzahl_lieferungen < 2 %}nur 1 Lieferung{% elif z.span_tage is not none and z.span_tage < 30 %}kurze Historie{% else %}unsicher{% endif %}
