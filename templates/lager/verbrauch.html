@@ -2,6 +2,7 @@
 {% block title %}Verbrauchs-Übersicht{% endblock %}
 
 {% macro zahl(v) %}{% if v is none %}–{% else %}{{ v|round(0, 'common')|int }}{% endif %}{% endmacro %}
+{% macro tage(v) %}{% if v is none %}–{% else %}{{ v|round(0, 'common')|int }} Tg.{% endif %}{% endmacro %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
@@ -14,8 +15,9 @@
 
 <p class="text-muted">
   Geschätzter Ø-Verbrauch aus {{ anzahl_lieferscheine }} importierten Lieferschein(en): Einkauf über die Zeit
-  ≈ Verbrauch. <strong>Bedarf {{ reichweite }}&nbsp;Tage</strong> = was du pro Bestellung ordern solltest, um auf
-  einen {{ reichweite }}-Tage-Rhythmus zu kommen.
+  ≈ Verbrauch. Der <strong>voraussichtliche Bestand</strong> rechnet vom letzten Wareneingang/der letzten Inventur
+  den geschätzten Verbrauch ab (der gespeicherte Bestand bleibt unverändert). Fällt er unter {{ reichweite }}&nbsp;Tage
+  Reichweite, kommt der Artikel in den <strong>Bestellvorschlag</strong>.
 </p>
 
 <form method="get" class="row g-2 align-items-end mb-3">
@@ -37,6 +39,53 @@
     Noch keine Lieferscheine importiert. <a href="{{ url_for('lager.lieferscheine') }}">Jetzt importieren</a>,
     dann wird hier der Verbrauch geschätzt.
   </div>
+{% endif %}
+
+{% if bestellvorschlag %}
+<div class="card border-warning mb-4">
+  <div class="card-header bg-warning-subtle fw-semibold">
+    🛒 Bestellvorschlag <span class="text-muted fw-normal">({{ bestellvorschlag|length }} Artikel reichen weniger als {{ reichweite }}&nbsp;Tage)</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Artikel</th>
+          <th>Lieferant</th>
+          <th class="text-end" title="Rechnerischer Bestand heute = letzter Stand − geschätzter Verbrauch seitdem">Voraussichtl. Bestand</th>
+          <th class="text-end">reicht noch</th>
+          <th class="text-end">Bestellen</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for z in bestellvorschlag %}
+        <tr>
+          <td>
+            <a href="{{ url_for('lager.bearbeiten', artikel_id=z.artikel.id) }}">{{ z.artikel.bezeichnung }}</a>
+            {% if z.artikel.lagerort %}<span class="small text-muted ms-1">📍 {{ z.artikel.lagerort }}</span>{% endif %}
+          </td>
+          <td class="small">{{ z.artikel.lieferant or '' }}</td>
+          <td class="text-end">{{ zahl(z.voraussichtlich) }} <span class="small text-muted">{{ z.einheit }}</span></td>
+          <td class="text-end {% if z.tage_rest is not none and z.tage_rest < reichweite %}text-danger fw-semibold{% endif %}">{{ tage(z.tage_rest) }}</td>
+          <td class="text-end"><strong>{{ zahl(z.menge_vorschlag) }}</strong> <span class="small text-muted">{{ z.einheit }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="card-body py-2">
+    <form method="post" action="{{ url_for('lager.bestellen_markieren') }}">
+      {% for z in bestellvorschlag %}
+        <input type="hidden" name="artikel_id[]" value="{{ z.artikel.id }}">
+        <input type="hidden" name="menge[]" value="{{ z.menge_vorschlag }}">
+      {% endfor %}
+      <button type="submit" class="btn btn-sm btn-warning">
+        Alle auf die Bestellliste setzen (als nachbestellen markieren)
+      </button>
+      <span class="small text-muted ms-2">→ erscheinen dann mit Barcode auf der druckbaren Bestellliste.</span>
+    </form>
+  </div>
+</div>
 {% endif %}
 
 {% if anzahl_mit_daten %}
@@ -61,7 +110,9 @@
         <tr>
           <th>Artikel</th>
           <th>Lieferant</th>
-          <th class="text-end">Bestand</th>
+          <th class="text-end" title="Gespeicherter Bestand (Wareneingang/Inventur)">Bestand</th>
+          <th class="text-end" title="Rechnerischer Bestand heute = letzter Stand − geschätzter Verbrauch seitdem">Voraussichtl.</th>
+          <th class="text-end" title="Wie lange der voraussichtliche Bestand noch reicht">reicht noch</th>
           <th class="text-end" title="Geschätzter Durchschnittsverbrauch pro Monat">Ø / Monat</th>
           <th class="text-end" title="Empfohlene Bestellmenge pro {{ reichweite }}-Tage-Bestellung">Bedarf {{ reichweite }}&nbsp;Tg.</th>
           <th class="small">Historie</th>
@@ -77,6 +128,12 @@
           </td>
           <td class="small">{{ z.artikel.lieferant or '' }}</td>
           <td class="text-end">{{ z.artikel.bestand if z.artikel.bestand is not none else '–' }}</td>
+          <td class="text-end">
+            {% if z.voraussichtlich is not none %}{{ zahl(z.voraussichtlich) }}{% else %}–{% endif %}
+          </td>
+          <td class="text-end {% if z.tage_rest is not none and z.tage_rest < reichweite %}text-danger fw-semibold{% endif %}">
+            {{ tage(z.tage_rest) }}{% if z.bestellen %} 🛒{% endif %}
+          </td>
           <td class="text-end">
             {% if z.monatsverbrauch is not none %}
               <strong>{{ zahl(z.monatsverbrauch) }}</strong> <span class="small text-muted">{{ z.einheit }}</span>

@@ -870,15 +870,73 @@ def _verbrauch_kennzahlen(total: float, erste_iso: Optional[str],
     }
 
 
+def _artikel_stand_datum(a: Dict[str, Any]) -> Optional[date]:
+    """Stichtag des zuletzt bekannten Bestands: 'bestand_stand' (bei Wareneingang/
+    Inventur gesetzt), sonst geaendert_am, sonst erstellt_am. Ab diesem Tag wird
+    der geschaetzte Verbrauch rechnerisch abgezogen."""
+    for feld in ("bestand_stand", "geaendert_am", "erstellt_am"):
+        wert = a.get(feld)
+        if wert:
+            try:
+                return date.fromisoformat(str(wert)[:10])
+            except ValueError:
+                continue
+    return None
+
+
+# Zielbestand nach einer Bestellung = Verbrauch fuer (reichweite * ZIEL_FAKTOR)
+# Tage. Bei 14 Tagen Rhythmus hat man direkt nach dem Auffuellen ~28 Tage Vorrat
+# und bestellt wieder, sobald die Reichweite unter 14 Tage faellt.
+BESTELL_ZIEL_FAKTOR = 2
+
+
+def _projektion(a: Dict[str, Any], tagesverbrauch: Optional[float],
+                reichweite_tage: int) -> Dict[str, Any]:
+    """Rechnerischer (voraussichtlicher) Bestand heute = zuletzt bekannter Bestand
+    minus geschaetzter Verbrauch seit dem Stichtag. Nicht destruktiv — der
+    gespeicherte Bestand bleibt unveraendert. Liefert zusaetzlich die verbleibende
+    Reichweite in Tagen und — falls unter 'reichweite_tage' — einen Bestellvorschlag.
+    """
+    bestand = a.get("bestand")
+    stand = _artikel_stand_datum(a)
+    tage_seit = max(0, (date.today() - stand).days) if stand else None
+    voraussichtlich = None
+    tage_rest = None
+    if bestand is not None and tagesverbrauch:
+        verbraucht = tagesverbrauch * (tage_seit or 0)
+        voraussichtlich = max(0.0, bestand - verbraucht)
+        tage_rest = voraussichtlich / tagesverbrauch
+    bestellen = (voraussichtlich is not None and tage_rest is not None
+                 and tage_rest < reichweite_tage)
+    menge_vorschlag = None
+    if bestellen:
+        ziel = tagesverbrauch * reichweite_tage * BESTELL_ZIEL_FAKTOR
+        menge_vorschlag = int(math.ceil(max(0.0, ziel - voraussichtlich)))
+    return {
+        "bestand_stand": stand.isoformat() if stand else None,
+        "tage_seit_stand": tage_seit,
+        "voraussichtlich": voraussichtlich,
+        "tage_rest": tage_rest,
+        "bestellen": bestellen,
+        "menge_vorschlag": menge_vorschlag,
+    }
+
+
 def lagerverbrauch_uebersicht(reichweite_tage: int = 14,
                               fenster_tage: int = 365) -> Dict[str, Any]:
-    """Verbrauchs-Uebersicht: jeder Lagerartikel mit Ø-Monatsverbrauch und
-    Bedarf fuer 'reichweite_tage', plus Lieferpositionen ohne Artikel-Zuordnung.
+    """Verbrauchs-Uebersicht: jeder Lagerartikel mit Ø-Monatsverbrauch, Bedarf und
+    voraussichtlichem (rechnerischem) Bestand, plus Bestellvorschlag und
+    Lieferpositionen ohne Artikel-Zuordnung.
 
-    Rueckgabe: {"zeilen": [...], "ohne_zuordnung": [...], "anzahl_mit_daten": int}.
+    Rueckgabe: {"zeilen", "ohne_zuordnung", "anzahl_mit_daten", "bestellvorschlag"}.
     Artikel mit Verbrauchsdaten stehen oben (hoechster Monatsverbrauch zuerst).
     """
     from .lieferschein import normalisiere_bestellnr
+
+    LEERE_PROJEKTION = {
+        "bestand_stand": None, "tage_seit_stand": None, "voraussichtlich": None,
+        "tage_rest": None, "bestellen": False, "menge_vorschlag": None,
+    }
 
     stats = lagerlieferschein_verbrauch(fenster_tage)
     benutzte_keys: set = set()
@@ -894,6 +952,7 @@ def lagerverbrauch_uebersicht(reichweite_tage: int = 14,
         if st:
             kennz = _verbrauch_kennzahlen(
                 st["total"], st.get("erste"), st.get("anzahl_lieferungen", 0), reichweite_tage)
+            proj = _projektion(a, kennz["tagesverbrauch"], reichweite_tage)
             zeilen.append({
                 "artikel": a,
                 "hat_daten": True,
@@ -903,6 +962,7 @@ def lagerverbrauch_uebersicht(reichweite_tage: int = 14,
                 "erste": st.get("erste"),
                 "letzte": st.get("letzte"),
                 **kennz,
+                **proj,
             })
         else:
             zeilen.append({
@@ -911,6 +971,7 @@ def lagerverbrauch_uebersicht(reichweite_tage: int = 14,
                 "erste": None, "letzte": None, "span_tage": None,
                 "monatsverbrauch": None, "tagesverbrauch": None,
                 "bedarf": None, "unsicher": False,
+                **LEERE_PROJEKTION,
             })
 
     zeilen.sort(key=lambda z: (
@@ -937,10 +998,16 @@ def lagerverbrauch_uebersicht(reichweite_tage: int = 14,
         })
     ohne_zuordnung.sort(key=lambda z: -(z["monatsverbrauch"] or 0))
 
+    # Bestellvorschlag: Artikel, deren voraussichtlicher Bestand unter die
+    # gewuenschte Reichweite faellt — knappste zuerst.
+    bestellvorschlag = [z for z in zeilen if z.get("bestellen")]
+    bestellvorschlag.sort(key=lambda z: (z["tage_rest"] if z["tage_rest"] is not None else 1e9))
+
     return {
         "zeilen": zeilen,
         "ohne_zuordnung": ohne_zuordnung,
         "anzahl_mit_daten": sum(1 for z in zeilen if z["hat_daten"]),
+        "bestellvorschlag": bestellvorschlag,
     }
 
 

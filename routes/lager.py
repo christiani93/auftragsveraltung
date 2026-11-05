@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import io
 import math
+from datetime import date
 
 from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import login_required
@@ -200,6 +201,9 @@ def bearbeiten(artikel_id: str):
         if not daten["bezeichnung"]:
             flash("Bezeichnung ist erforderlich.", "warning")
         else:
+            # Bestand im Formular geaendert (Inventur) -> Stichtag neu setzen
+            if daten.get("bestand") != artikel.get("bestand"):
+                daten["bestand_stand"] = date.today().isoformat()
             lagerartikel.update(artikel_id, daten)
             flash("Gespeichert.", "success")
             return redirect(url_for("lager.liste"))
@@ -239,7 +243,10 @@ def bestand_aendern(artikel_id: str):
         neu_wert = _als_int(setzen, aktuell)
     else:
         neu_wert = aktuell
-    lagerartikel.update(artikel_id, {"bestand": max(0, neu_wert)})
+    lagerartikel.update(artikel_id, {
+        "bestand": max(0, neu_wert),
+        "bestand_stand": date.today().isoformat(),
+    })
     return redirect(request.referrer or url_for("lager.liste"))
 
 
@@ -412,11 +419,14 @@ def lieferschein_uebernehmen():
 
         if not (bestand_mitfuehren and menge and menge > 0):
             continue
+        # Stichtag des Bestands = Lieferdatum (sonst heute) -> ab da wird der
+        # geschaetzte Verbrauch in der Projektion abgezogen.
+        stand = datum or date.today().isoformat()
         key = normalisiere_bestellnr(bestellnummer)
         treffer = artikel_map.get(key) if key else None
         if treffer:
             neu_bestand = _ganzzahl_wenn_moeglich((treffer.get("bestand") or 0) + menge)
-            updates = {"bestand": neu_bestand}
+            updates = {"bestand": neu_bestand, "bestand_stand": stand}
             # Lagerort nur setzen, wenn noch keiner hinterlegt ist
             if lagerort and not (treffer.get("lagerort") or "").strip():
                 updates["lagerort"] = lagerort
@@ -433,6 +443,7 @@ def lieferschein_uebernehmen():
                 "lieferant": lieferant,
                 "einheit": einheit or "Stk",
                 "bestand": _ganzzahl_wenn_moeglich(menge),
+                "bestand_stand": stand,
                 "mindestbestand": 0,
                 "bestellmenge": None,
                 "nachbestellen": False,
@@ -519,3 +530,29 @@ def verbrauch_uebernehmen():
     else:
         flash("Nichts übernommen.", "warning")
     return redirect(url_for("lager.verbrauch", tage=reichweite))
+
+
+@bp.route("/verbrauch/bestellen-markieren", methods=["POST"])
+@login_required
+def bestellen_markieren():
+    """Setzt die Artikel aus dem Bestellvorschlag auf 'nachbestellen' (mit
+    vorgeschlagener Bestellmenge) — sie erscheinen dann auf der druckbaren
+    Bestellliste. artikel_id[] + menge[] parallele Listen."""
+    ids = request.form.getlist("artikel_id[]")
+    mengen = request.form.getlist("menge[]")
+    anzahl = 0
+    for i, artikel_id in enumerate(ids):
+        artikel_id = (artikel_id or "").strip()
+        if not artikel_id or not lagerartikel.get(artikel_id):
+            continue
+        menge = _als_float_oder_none(mengen[i]) if i < len(mengen) else None
+        changes = {"nachbestellen": True}
+        if menge and menge > 0:
+            changes["bestellmenge"] = int(math.ceil(menge))
+        lagerartikel.update(artikel_id, changes)
+        anzahl += 1
+    if anzahl:
+        flash(f"{anzahl} Artikel für die Bestellliste markiert.", "success")
+        return redirect(url_for("lager.bestellliste"))
+    flash("Nichts markiert.", "warning")
+    return redirect(url_for("lager.verbrauch"))
