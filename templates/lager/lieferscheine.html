@@ -11,9 +11,11 @@
 
 <p class="text-muted">
   Lade die PDF-Lieferscheine von <strong>Würth</strong> oder <strong>Elektro-Material AG</strong> hoch.
-  Aus der gelieferten Menge über die Zeit schätzen wir den durchschnittlichen Monatsverbrauch –
-  so siehst du in der <a href="{{ url_for('lager.verbrauch') }}">Verbrauchs-Übersicht</a>, wie viel du
-  pro Bestellung (z.&nbsp;B. alle 14&nbsp;Tage) ordern solltest.
+  Der Import ist zugleich dein <strong>Wareneingang</strong>: die gelieferte Menge wird auf den Lagerbestand
+  gebucht (fehlende Artikel werden angelegt, Lagerort zuweisbar). Aus der Menge über die Zeit schätzen wir
+  ausserdem den Monatsverbrauch – so siehst du in der
+  <a href="{{ url_for('lager.verbrauch') }}">Verbrauchs-Übersicht</a>, wie viel du pro Bestellung
+  (z.&nbsp;B. alle 14&nbsp;Tage) ordern solltest.
 </p>
 
 <div class="card card-body mb-4">

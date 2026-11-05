@@ -341,50 +341,120 @@ def lieferschein_import():
               "Elektro-Material-Lieferschein?", "warning")
         return redirect(url_for("lager.lieferscheine"))
 
-    # Zuordnung zu bestehenden Lagerartikeln markieren
+    # Zuordnung zu bestehenden Lagerartikeln markieren (inkl. aktuellem Lagerort)
     artikel_map = _artikel_nach_bestellnr_map()
     for p in positionen:
         treffer = artikel_map.get(normalisiere_bestellnr(p.get("bestellnummer")))
         p["artikel_id"] = treffer["id"] if treffer else ""
         p["artikel_bezeichnung"] = treffer.get("bezeichnung") if treffer else ""
+        p["artikel_lagerort"] = (treffer.get("lagerort") or "").strip() if treffer else ""
+
+    nummer = parsed.get("nummer") or ""
+    schon_importiert = bool(nummer) and any(
+        (ls.get("nummer") or "") == nummer for ls in lagerlieferscheine.list())
 
     return render_template(
         "lager/lieferschein_import.html",
         lieferant=parsed.get("lieferant") or "",
-        nummer=parsed.get("nummer") or "",
+        nummer=nummer,
         datum=parsed.get("datum") or "",
         positionen=positionen,
+        lagerorte=lagerorte_liste(),
+        schon_importiert=schon_importiert,
     )
+
+
+def _ganzzahl_wenn_moeglich(wert: float):
+    """1250.0 -> 1250 (int), 1.5 -> 1.5 (float). Haelt den Bestand sauber."""
+    try:
+        if float(wert).is_integer():
+            return int(wert)
+    except (TypeError, ValueError):
+        pass
+    return wert
 
 
 @bp.route("/lieferschein/uebernehmen", methods=["POST"])
 @login_required
 def lieferschein_uebernehmen():
-    """Speichert die in der Vorschau bestaetigten Positionen als Lieferschein
-    (Verbrauchs-Historie)."""
+    """Verbucht die bestaetigten Positionen: Verbrauchs-Historie speichern und —
+    wenn als Wareneingang gewuenscht — den Lagerbestand erhoehen (bzw. fehlende
+    Artikel anlegen) sowie fehlende Lagerorte setzen."""
     lieferant = (request.form.get("lieferant") or "").strip()
     nummer = (request.form.get("nummer") or "").strip()
     datum = (request.form.get("datum") or "").strip() or None
+    bestand_mitfuehren = request.form.get("bestand_mitfuehren") == "on"
     felder = {k: request.form.getlist(k + "[]") for k in (
-        "bestellnummer", "bezeichnung", "menge", "einheit",
+        "bestellnummer", "bezeichnung", "menge", "einheit", "lagerort",
     )}
     uebernehmen = set(request.form.getlist("uebernehmen"))
+
+    artikel_map = _artikel_nach_bestellnr_map()
     positionen = []
+    eingang_gebucht = 0
+    artikel_angelegt = 0
+    lagerort_gesetzt = 0
     for i in range(len(felder["bestellnummer"])):
         if str(i) not in uebernehmen:
             continue
+        bestellnummer = felder["bestellnummer"][i].strip()
+        bezeichnung = felder["bezeichnung"][i].strip()
+        menge = _als_float_oder_none(felder["menge"][i])
+        einheit = felder["einheit"][i].strip()
+        lagerort = (felder["lagerort"][i].strip()
+                    if i < len(felder["lagerort"]) else "")
         positionen.append({
-            "bestellnummer": felder["bestellnummer"][i].strip(),
-            "bezeichnung": felder["bezeichnung"][i].strip(),
-            "menge": _als_float_oder_none(felder["menge"][i]),
-            "einheit": felder["einheit"][i].strip(),
+            "bestellnummer": bestellnummer,
+            "bezeichnung": bezeichnung,
+            "menge": menge,
+            "einheit": einheit,
         })
+
+        if not (bestand_mitfuehren and menge and menge > 0):
+            continue
+        key = normalisiere_bestellnr(bestellnummer)
+        treffer = artikel_map.get(key) if key else None
+        if treffer:
+            neu_bestand = _ganzzahl_wenn_moeglich((treffer.get("bestand") or 0) + menge)
+            updates = {"bestand": neu_bestand}
+            # Lagerort nur setzen, wenn noch keiner hinterlegt ist
+            if lagerort and not (treffer.get("lagerort") or "").strip():
+                updates["lagerort"] = lagerort
+                lagerort_gesetzt += 1
+            lagerartikel.update(treffer["id"], updates)
+            treffer.update(updates)  # Map aktuell halten (gleiche Nr. mehrfach)
+            eingang_gebucht += 1
+        else:
+            neu = lagerartikel.create({
+                "bezeichnung": bezeichnung or bestellnummer or "Unbenannt",
+                "barcode": "",
+                "bestellnummer": bestellnummer,
+                "lagerort": lagerort,
+                "lieferant": lieferant,
+                "einheit": einheit or "Stk",
+                "bestand": _ganzzahl_wenn_moeglich(menge),
+                "mindestbestand": 0,
+                "bestellmenge": None,
+                "nachbestellen": False,
+                "notizen": "",
+            })
+            if key:
+                artikel_map[key] = neu
+            artikel_angelegt += 1
+
     if not positionen:
         flash("Keine Position ausgewählt.", "warning")
         return redirect(url_for("lager.lieferscheine"))
+
     ls = lagerlieferschein_speichern(lieferant, nummer, datum, positionen)
-    flash(f"Lieferschein {nummer or '(ohne Nr.)'} mit "
-          f"{len(ls.get('positionen', []))} Position(en) importiert.", "success")
+    teile = [f"{len(ls.get('positionen', []))} Position(en) in die Verbrauchs-Historie"]
+    if artikel_angelegt:
+        teile.append(f"{artikel_angelegt} Artikel neu angelegt")
+    if eingang_gebucht:
+        teile.append(f"{eingang_gebucht}× Bestand erhöht")
+    if lagerort_gesetzt:
+        teile.append(f"{lagerort_gesetzt}× Lagerort gesetzt")
+    flash(f"Lieferschein {nummer or '(ohne Nr.)'}: " + ", ".join(teile) + ".", "success")
     return redirect(url_for("lager.verbrauch"))
 
 

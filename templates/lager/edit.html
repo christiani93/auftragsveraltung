@@ -47,6 +47,7 @@
     <div class="col-md-3">
       <label class="form-label">Bestand</label>
       <input type="number" name="bestand" class="form-control" step="1" value="{{ artikel.bestand if artikel.bestand is not none else '' }}">
+      <small class="text-muted">Ist-Bestand (Inventur). Normal führt der <a href="{{ url_for('lager.lieferscheine') }}">Wareneingang</a> den Bestand.</small>
     </div>
     <div class="col-md-3">
       <label class="form-label">Mindestbestand</label>
