@@ -103,6 +103,62 @@
 </div>
 {% endif %}
 
+{% if bestandskontrolle %}
+<div class="card border-info mb-4">
+  <div class="card-header bg-info-subtle fw-semibold">
+    🔎 Bestandskontrolle <span class="text-muted fw-normal">({{ bestandskontrolle|length }} Artikel – unsichere Schätzung, letzte Lieferung ≥ {{ bestandskontrolle_tage }}&nbsp;Tage her)</span>
+  </div>
+  <div class="card-body py-2 small text-muted">
+    Hier ist der geschätzte Verbrauch noch unsicher (zu wenig/zu kurze Historie) und die letzte Lieferung liegt
+    länger zurück. Am besten am Regal <strong>nachzählen</strong> und den Ist-Bestand eintragen – dann stimmt die
+    Projektion wieder. EAN fehlt? Direkt hier einscannen (📷).
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Artikel</th>
+          <th>EAN</th>
+          <th class="text-end">akt. Bestand</th>
+          <th style="width:170px;">Gezählt eintragen</th>
+          <th class="small">Grund / letzte Lief.</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for z in bestandskontrolle %}
+        <tr>
+          <td>
+            <a href="{{ url_for('lager.bearbeiten', artikel_id=z.artikel.id) }}">{{ z.artikel.bezeichnung }}</a>
+            {% if z.artikel.lagerort %}<span class="small text-muted ms-1">📍 {{ z.artikel.lagerort }}</span>{% endif %}
+          </td>
+          <td class="small">
+            {% if z.artikel.barcode %}<code>{{ z.artikel.barcode }}</code>
+            {% else %}
+              <form method="post" action="{{ url_for('lager.ean_setzen', artikel_id=z.artikel.id) }}" class="input-group input-group-sm" style="width:auto;">
+                <input type="text" name="barcode" id="ean-{{ z.artikel.id }}" class="form-control" placeholder="EAN scannen…" autocomplete="off" inputmode="numeric" style="max-width:130px;">
+                <button type="button" class="btn btn-outline-secondary cam-btn" data-target="ean-{{ z.artikel.id }}" data-label="{{ z.artikel.bezeichnung }}" title="Mit Kamera scannen">📷</button>
+              </form>
+            {% endif %}
+          </td>
+          <td class="text-end">{{ z.artikel.bestand if z.artikel.bestand is not none else '–' }}</td>
+          <td>
+            <form method="post" action="{{ url_for('lager.bestand_aendern', artikel_id=z.artikel.id) }}" class="input-group input-group-sm">
+              <input type="number" name="setzen" min="0" step="1" class="form-control text-end" placeholder="Stk" title="Gezählten Ist-Bestand eintragen (Stichtag heute)">
+              <button class="btn btn-outline-info" type="submit" title="Bestand übernehmen">✓</button>
+            </form>
+          </td>
+          <td class="small text-muted">
+            {% if z.anzahl_lieferungen < 2 %}nur 1 Lieferung{% elif z.span_tage is not none and z.span_tage < 30 %}kurze Historie{% else %}unsicher{% endif %}
+            {% if z.letzte %}<div>letzte: {{ z.letzte }}</div>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
 {% if anzahl_mit_daten %}
 <form method="post" action="{{ url_for('lager.verbrauch_uebernehmen') }}" class="mb-2">
   <input type="hidden" name="artikel_id" value="__alle__">
@@ -234,4 +290,46 @@
   </div>
 </div>
 {% endif %}
+
+{# Kamera-Overlay fuer EAN-Scan (Bestandskontrolle) #}
+<div id="cam-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.8); z-index:1080; align-items:center; justify-content:center;">
+  <div class="bg-white p-3 rounded shadow" style="max-width:460px; width:92%;">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <strong id="cam-title">EAN scannen</strong>
+      <button type="button" class="btn btn-sm btn-outline-secondary" id="cam-cancel">Abbrechen</button>
+    </div>
+    <div id="reader"></div>
+    <small class="text-muted">Barcode vor die Kamera halten – wird erkannt und direkt gespeichert.</small>
+  </div>
+</div>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+(function () {
+  const overlay = document.getElementById("cam-overlay");
+  if (!overlay) return;
+  const title = document.getElementById("cam-title");
+  const cancel = document.getElementById("cam-cancel");
+  let scanner = null, targetInput = null;
+  async function stopCam() {
+    if (scanner) { try { await scanner.stop(); } catch (e) {} scanner = null; }
+    overlay.style.display = "none";
+  }
+  async function openCam(input, label) {
+    if (typeof Html5Qrcode === "undefined") { alert("Kamera-Scanner konnte nicht geladen werden (offline?)."); return; }
+    targetInput = input;
+    title.textContent = "EAN scannen – " + label;
+    overlay.style.display = "flex";
+    scanner = new Html5Qrcode("reader");
+    try {
+      await scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 300, height: 150 } },
+        (decoded) => { targetInput.value = decoded; const f = targetInput.form; stopCam().then(() => { if (f) f.submit(); }); },
+        () => {});
+    } catch (e) { alert("Kamera nicht verfügbar: " + e); stopCam(); }
+  }
+  document.querySelectorAll(".cam-btn").forEach((b) => {
+    b.addEventListener("click", () => openCam(document.getElementById(b.dataset.target), b.dataset.label));
+  });
+  cancel.addEventListener("click", stopCam);
+})();
+</script>
 {% endblock %}

@@ -908,6 +908,10 @@ BESTELL_ZIEL_FAKTOR = 2
 # einen Bestellvorschlag — eine einzelne Lieferung ergibt keinen echten Verbrauch.
 MIN_LIEFERUNGEN_BESTELLUNG = 2
 
+# Artikel mit unsicherer Schaetzung, deren letzte Lieferung mindestens so viele
+# Tage her ist, gehoeren in die Bestandskontrolle (physisch nachzaehlen).
+BESTANDSKONTROLLE_TAGE = 14
+
 
 def _projektion(a: Dict[str, Any], tagesverbrauch: Optional[float],
                 reichweite_tage: int, anzahl_lieferungen: int = 0) -> Dict[str, Any]:
@@ -1025,11 +1029,23 @@ def lagerverbrauch_uebersicht(reichweite_tage: int = 14,
     bestellvorschlag = [z for z in zeilen if z.get("bestellen")]
     bestellvorschlag.sort(key=lambda z: (z["tage_rest"] if z["tage_rest"] is not None else 1e9))
 
+    # Bestandskontrolle: unsichere Schaetzung UND letzte Lieferung >= X Tage her
+    # -> physisch nachzaehlen, damit die Projektion wieder stimmt.
+    grenze_kontrolle = (date.today() - timedelta(days=BESTANDSKONTROLLE_TAGE)).isoformat()
+    bestandskontrolle = [
+        z for z in zeilen
+        if z["hat_daten"] and z["unsicher"] and z.get("letzte")
+        and z["letzte"] <= grenze_kontrolle
+    ]
+    bestandskontrolle.sort(key=lambda z: (z.get("letzte") or ""))
+
     return {
         "zeilen": zeilen,
         "ohne_zuordnung": ohne_zuordnung,
         "anzahl_mit_daten": sum(1 for z in zeilen if z["hat_daten"]),
         "bestellvorschlag": bestellvorschlag,
+        "bestandskontrolle": bestandskontrolle,
+        "bestandskontrolle_tage": BESTANDSKONTROLLE_TAGE,
     }
 
 
