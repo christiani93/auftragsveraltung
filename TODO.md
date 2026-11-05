@@ -83,6 +83,11 @@ Grosse Erweiterung in dieser Session (Commits bis `c61af5e`):
 - **Artikel-Detail**: Verbrauchsübersicht 1/3/6/12 Monate (kumulativ, aus
   Lieferscheinen) + gemessene Lieferzeit (`lagerartikel_verbrauch_perioden`).
 - **Reihenfolge** der Karten: Bestellvorschlag → Bestandskontrolle → Unterwegs.
+- **Statistik** `/lager/statistik` (`lager_top_verbrauch_pro_lagerort`): Top-Verbrauch
+  (Ø/Monat) je Lagerort, Zeitfenster + Top-N wählbar, Balken je Artikel. Lagerort je
+  Gruppe direkt umbenennen/zusammenführen (`lagerort_umbenennen`, setzt alle Artikel
+  des Orts um) mit Vorschlagsliste bestehender Orte. Hinweis: Ø/Monat kann bei kurzer
+  Historie stark überhöht wirken (gleiche Schätzlogik wie Verbrauchs-Übersicht, „?"=unsicher).
 
 **Offen / Ideen (optional, auf User-Wunsch):**
 - „überfällig"-Marker für `bestellt`-Artikel ab X Tagen unterwegs.
