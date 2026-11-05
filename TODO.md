@@ -46,6 +46,31 @@ Barcode-Lagerlisten erstellen und ausdrucken. UNABHÄNGIG vom auftragsbezogenen
 - Noch offen/Ideen: CSV-Import für Erstbestückung, Bestell-Historie,
   Dashboard-Kachel „X nachzubestellen".
 
+## Lagermaterial — Verbrauch & Bestell-Workflow (2026-11-05, deployt)
+
+Grosse Erweiterung in dieser Session (Commits bis `c61af5e`):
+- **Lieferschein-Import = Wareneingang**: PDF (Würth + EM) einlesen → Verbrauchs-
+  Historie (`lagerlieferscheine.json`) UND Bestand buchen (fehlende Artikel werden
+  angelegt, Lagerort zuweisbar falls leer). Würth-Parser neu in
+  `models/lieferschein.py`.
+- **Verbrauchs-Übersicht** `/lager/verbrauch`: Ø-Monatsverbrauch (Einkauf≈Verbrauch),
+  voraussichtlicher Bestand (rechnerisch, nicht destruktiv; `bestand_stand`-Stichtag),
+  „reicht noch X Tage", **Bestellvorschlag** (erst ab 2 Lieferungen), **Bestands-
+  kontrolle**-Gruppe (unsicher + letzte Lieferung ≥14 Tage). EAN + Ist-Bestand
+  inline editierbar, Kamera-Scan (html5-qrcode).
+- Status-Felder: `kein_ean`, `ausgelaufen`, `bestellt`/`bestellt_am`. „Artikel ohne
+  EAN"-Liste `/lager/ohne-ean`. „Bestellt/unterwegs" verhindert Mehrfachbestellung,
+  wird beim Wareneingang auto-aufgehoben.
+
+**Offen / Ideen (optional, auf User-Wunsch):**
+- Erwartete Lieferzeit pro Lieferant bzw. „überfällig"-Marker für `bestellt`-Artikel
+  ab X Tagen (dem User als Option angeboten).
+- Dashboard-Kachel „X nachzubestellen" / Bestell-Historie (aus altem TODO).
+- **User-Aufgabe (kein Code):** einmalige physische Inventur der aktiv genutzten
+  Artikel — Lieferscheine erst ab Anfang August eingelesen, Restbestand davor nicht
+  erfasst → gespeicherter/voraussichtlicher Bestand tendenziell zu tief, bis gezählt.
+  Bohrer D3,5mm (`Spiralbohrer…D3,5MM`, Art `0625250350 961`) hat noch keinen EAN.
+
 ## Erledigt (zur Erinnerung, kann bei Bedarf geloescht werden)
 
 - Crashguard-Rollout: `.env` auf dem Server gesetzt, Deploy-Skript nutzt das
