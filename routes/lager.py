@@ -9,9 +9,13 @@ Bearbeiten/Loeschen/Bestand aendern ist fuer alle Modul-Nutzer erlaubt.
 """
 from __future__ import annotations
 
+import io
+import math
+
 from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import login_required
 
+from models.lieferschein import normalisiere_bestellnr, parse_lieferschein_fuers_lager
 from models.produktsuche import ean_lookup
 from models.repos import (
     lager_lieferanten_liste,
@@ -19,10 +23,25 @@ from models.repos import (
     lagerartikel_by_barcode,
     lagerartikel_nachzubestellen,
     lagerartikel_sortiert,
+    lagerlieferschein_speichern,
+    lagerlieferscheine,
+    lagerlieferscheine_sortiert,
     lagerorte_liste,
+    lagerverbrauch_uebersicht,
 )
 
 bp = Blueprint("lager", __name__)
+
+
+def _als_float_oder_none(wert):
+    """'1', '1.5', '2,0' -> float; leer/ungueltig -> None."""
+    s = (wert or "").strip().replace("'", "").replace("’", "").replace(",", ".")
+    if not s:
+        return None
+    try:
+        return round(float(s), 3)
+    except ValueError:
+        return None
 
 
 def _als_int(wert, default=0):
@@ -158,7 +177,12 @@ def neu():
         flash("Artikel angelegt.", "success")
         return redirect(url_for("lager.bearbeiten", artikel_id=neuer["id"]))
 
-    vorbefuellt = {"einheit": "Stk", "barcode": (request.args.get("barcode") or "").strip()}
+    vorbefuellt = {
+        "einheit": "Stk",
+        "barcode": (request.args.get("barcode") or "").strip(),
+        "bestellnummer": (request.args.get("bestellnummer") or "").strip(),
+        "bezeichnung": (request.args.get("bezeichnung") or "").strip(),
+    }
     return render_template(
         "lager/edit.html", neu=True, artikel=vorbefuellt,
         lagerorte=lagerorte_liste(), lieferanten=lager_lieferanten_liste(),
@@ -264,3 +288,164 @@ def lagerliste():
             gruppen.append((ort, []))
         gruppen[idx[ort]][1].append(a)
     return render_template("lager/lagerliste.html", gruppen=gruppen, anzahl=len(artikel))
+
+
+# ----- Lieferschein-Import (Verbrauchs-Historie) ------------------------------
+
+def _artikel_nach_bestellnr_map() -> dict:
+    """{normalisierte Bestellnummer/Barcode -> Artikel} fuer die Zuordnung von
+    Lieferschein-Positionen zu vorhandenen Lagerartikeln."""
+    m: dict = {}
+    for a in lagerartikel.list():
+        for feld in ("bestellnummer", "barcode"):
+            key = normalisiere_bestellnr(a.get(feld))
+            if key:
+                m.setdefault(key, a)
+    return m
+
+
+@bp.route("/lieferscheine")
+@login_required
+def lieferscheine():
+    """Uebersicht der importierten Lieferscheine (Verbrauchs-Historie)."""
+    return render_template(
+        "lager/lieferscheine.html",
+        lieferscheine=lagerlieferscheine_sortiert(),
+        lieferanten=lager_lieferanten_liste(),
+    )
+
+
+@bp.route("/lieferschein/import", methods=["POST"])
+@login_required
+def lieferschein_import():
+    """Lieferschein-PDF (Wuerth oder Elektro-Material) hochladen und parsen.
+    Zeigt eine editierbare Vorschau; gespeichert wird erst nach Bestaetigung."""
+    datei = request.files.get("lieferschein")
+    lieferant_hint = (request.form.get("lieferant_hint") or "").strip()
+    if not datei or not datei.filename:
+        flash("Keine Datei gewählt.", "warning")
+        return redirect(url_for("lager.lieferscheine"))
+    if not datei.filename.lower().endswith(".pdf"):
+        flash("Bitte ein PDF hochladen.", "warning")
+        return redirect(url_for("lager.lieferscheine"))
+    try:
+        daten = io.BytesIO(datei.read())
+        parsed = parse_lieferschein_fuers_lager(daten, lieferant_hint=lieferant_hint)
+    except Exception as e:  # pragma: no cover — defensiv gegen kaputte PDFs
+        flash(f"Lieferschein konnte nicht gelesen werden: {e}", "warning")
+        return redirect(url_for("lager.lieferscheine"))
+
+    positionen = parsed.get("positionen") or []
+    if not positionen:
+        flash("Keine Artikelpositionen erkannt. Ist es ein Würth- oder "
+              "Elektro-Material-Lieferschein?", "warning")
+        return redirect(url_for("lager.lieferscheine"))
+
+    # Zuordnung zu bestehenden Lagerartikeln markieren
+    artikel_map = _artikel_nach_bestellnr_map()
+    for p in positionen:
+        treffer = artikel_map.get(normalisiere_bestellnr(p.get("bestellnummer")))
+        p["artikel_id"] = treffer["id"] if treffer else ""
+        p["artikel_bezeichnung"] = treffer.get("bezeichnung") if treffer else ""
+
+    return render_template(
+        "lager/lieferschein_import.html",
+        lieferant=parsed.get("lieferant") or "",
+        nummer=parsed.get("nummer") or "",
+        datum=parsed.get("datum") or "",
+        positionen=positionen,
+    )
+
+
+@bp.route("/lieferschein/uebernehmen", methods=["POST"])
+@login_required
+def lieferschein_uebernehmen():
+    """Speichert die in der Vorschau bestaetigten Positionen als Lieferschein
+    (Verbrauchs-Historie)."""
+    lieferant = (request.form.get("lieferant") or "").strip()
+    nummer = (request.form.get("nummer") or "").strip()
+    datum = (request.form.get("datum") or "").strip() or None
+    felder = {k: request.form.getlist(k + "[]") for k in (
+        "bestellnummer", "bezeichnung", "menge", "einheit",
+    )}
+    uebernehmen = set(request.form.getlist("uebernehmen"))
+    positionen = []
+    for i in range(len(felder["bestellnummer"])):
+        if str(i) not in uebernehmen:
+            continue
+        positionen.append({
+            "bestellnummer": felder["bestellnummer"][i].strip(),
+            "bezeichnung": felder["bezeichnung"][i].strip(),
+            "menge": _als_float_oder_none(felder["menge"][i]),
+            "einheit": felder["einheit"][i].strip(),
+        })
+    if not positionen:
+        flash("Keine Position ausgewählt.", "warning")
+        return redirect(url_for("lager.lieferscheine"))
+    ls = lagerlieferschein_speichern(lieferant, nummer, datum, positionen)
+    flash(f"Lieferschein {nummer or '(ohne Nr.)'} mit "
+          f"{len(ls.get('positionen', []))} Position(en) importiert.", "success")
+    return redirect(url_for("lager.verbrauch"))
+
+
+@bp.route("/lieferschein/<lieferschein_id>/loeschen", methods=["POST"])
+@login_required
+def lieferschein_loeschen(lieferschein_id: str):
+    if not lagerlieferscheine.get(lieferschein_id):
+        abort(404)
+    lagerlieferscheine.delete(lieferschein_id)
+    flash("Lieferschein gelöscht.", "success")
+    return redirect(url_for("lager.lieferscheine"))
+
+
+# ----- Verbrauchs-Uebersicht (Monatsverbrauch + Bestellvorschlag) -------------
+
+@bp.route("/verbrauch")
+@login_required
+def verbrauch():
+    """Durchschnittlicher Monatsverbrauch je Artikel (aus den importierten
+    Lieferscheinen) und Bedarf fuer den gewuenschten Bestellrhythmus."""
+    reichweite = _als_int(request.args.get("tage"), 14)
+    if reichweite <= 0:
+        reichweite = 14
+    fenster = _als_int(request.args.get("fenster"), 365)
+    daten = lagerverbrauch_uebersicht(reichweite_tage=reichweite, fenster_tage=fenster)
+    return render_template(
+        "lager/verbrauch.html",
+        reichweite=reichweite,
+        fenster=fenster,
+        anzahl_lieferscheine=len(lagerlieferscheine.list()),
+        **daten,
+    )
+
+
+@bp.route("/verbrauch/uebernehmen", methods=["POST"])
+@login_required
+def verbrauch_uebernehmen():
+    """Uebernimmt den errechneten Bedarf als Mindestbestand + Bestellmenge eines
+    Artikels, damit der bestehende Nachbestell-Workflow (Bestellliste) greift.
+    Mit artikel_id='__alle__' fuer alle uebergebenen Artikel auf einmal."""
+    reichweite = _als_int(request.form.get("tage"), 14)
+    ziel = request.form.get("artikel_id") or ""
+    if ziel == "__alle__":
+        paare = zip(request.form.getlist("alle_artikel_id[]"),
+                    request.form.getlist("alle_bedarf[]"))
+    else:
+        paare = [(ziel, request.form.get("bedarf"))]
+    anzahl = 0
+    for artikel_id, bedarf_roh in paare:
+        artikel_id = (artikel_id or "").strip()
+        bedarf = _als_float_oder_none(bedarf_roh)
+        if not artikel_id or not bedarf or bedarf <= 0:
+            continue
+        if not lagerartikel.get(artikel_id):
+            continue
+        menge = max(1, math.ceil(bedarf))
+        lagerartikel.update(artikel_id, {"mindestbestand": menge, "bestellmenge": menge})
+        anzahl += 1
+    if anzahl:
+        flash(f"Bedarf für {anzahl} Artikel als Mindestbestand & Bestellmenge "
+              f"übernommen ({reichweite} Tage).", "success")
+    else:
+        flash("Nichts übernommen.", "warning")
+    return redirect(url_for("lager.verbrauch", tage=reichweite))

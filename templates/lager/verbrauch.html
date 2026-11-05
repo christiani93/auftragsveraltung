@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block title %}Verbrauchs-Übersicht{% endblock %}
+
+{% macro zahl(v) %}{% if v is none %}–{% else %}{{ v|round(0, 'common')|int }}{% endif %}{% endmacro %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <h1 class="h3 mb-0">Verbrauchs-Übersicht</h1>
+  <div class="d-flex gap-2 flex-wrap">
+    <a class="btn btn-outline-primary" href="{{ url_for('lager.lieferscheine') }}">📄 Lieferscheine</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('lager.bestellliste') }}">🖨️ Bestellliste</a>
+  </div>
+</div>
+
+<p class="text-muted">
+  Geschätzter Ø-Verbrauch aus {{ anzahl_lieferscheine }} importierten Lieferschein(en): Einkauf über die Zeit
+  ≈ Verbrauch. <strong>Bedarf {{ reichweite }}&nbsp;Tage</strong> = was du pro Bestellung ordern solltest, um auf
+  einen {{ reichweite }}-Tage-Rhythmus zu kommen.
+</p>
+
+<form method="get" class="row g-2 align-items-end mb-3">
+  <div class="col-auto">
+    <label class="form-label small mb-0">Bestellrhythmus (Tage)</label>
+    <input type="number" name="tage" min="1" step="1" value="{{ reichweite }}" class="form-control form-control-sm" style="width:110px;">
+  </div>
+  <div class="col-auto">
+    <label class="form-label small mb-0">Zeitfenster (Tage)</label>
+    <input type="number" name="fenster" min="30" step="1" value="{{ fenster }}" class="form-control form-control-sm" style="width:120px;">
+  </div>
+  <div class="col-auto">
+    <button class="btn btn-sm btn-outline-secondary" type="submit">Aktualisieren</button>
+  </div>
+</form>
+
+{% if anzahl_lieferscheine == 0 %}
+  <div class="alert alert-info">
+    Noch keine Lieferscheine importiert. <a href="{{ url_for('lager.lieferscheine') }}">Jetzt importieren</a>,
+    dann wird hier der Verbrauch geschätzt.
+  </div>
+{% endif %}
+
+{% if anzahl_mit_daten %}
+<form method="post" action="{{ url_for('lager.verbrauch_uebernehmen') }}" class="mb-2">
+  <input type="hidden" name="artikel_id" value="__alle__">
+  <input type="hidden" name="tage" value="{{ reichweite }}">
+  {% for z in zeilen if z.hat_daten and z.bedarf %}
+    <input type="hidden" name="alle_artikel_id[]" value="{{ z.artikel.id }}">
+    <input type="hidden" name="alle_bedarf[]" value="{{ z.bedarf }}">
+  {% endfor %}
+  <button type="submit" class="btn btn-sm btn-outline-primary"
+          onclick="return confirm('Bei allen Artikeln mit Verbrauchsdaten den {{ reichweite }}-Tage-Bedarf als Mindestbestand & Bestellmenge setzen?');">
+    Bedarf für alle als Mindestbestand &amp; Bestellmenge übernehmen
+  </button>
+</form>
+{% endif %}
+
+<div class="card mb-4">
+  <div class="table-responsive">
+    <table class="table table-sm table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Artikel</th>
+          <th>Lieferant</th>
+          <th class="text-end">Bestand</th>
+          <th class="text-end" title="Geschätzter Durchschnittsverbrauch pro Monat">Ø / Monat</th>
+          <th class="text-end" title="Empfohlene Bestellmenge pro {{ reichweite }}-Tage-Bestellung">Bedarf {{ reichweite }}&nbsp;Tg.</th>
+          <th class="small">Historie</th>
+          <th class="text-end">Aktion</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for z in zeilen %}
+        <tr class="{% if not z.hat_daten %}text-muted{% endif %}">
+          <td>
+            <a href="{{ url_for('lager.bearbeiten', artikel_id=z.artikel.id) }}">{{ z.artikel.bezeichnung }}</a>
+            {% if z.artikel.bestellnummer %}<div class="small text-muted">Best-Nr {{ z.artikel.bestellnummer }}</div>{% endif %}
+          </td>
+          <td class="small">{{ z.artikel.lieferant or '' }}</td>
+          <td class="text-end">{{ z.artikel.bestand if z.artikel.bestand is not none else '–' }}</td>
+          <td class="text-end">
+            {% if z.monatsverbrauch is not none %}
+              <strong>{{ zahl(z.monatsverbrauch) }}</strong> <span class="small text-muted">{{ z.einheit }}</span>
+              {% if z.unsicher %}<span class="badge bg-warning text-dark ms-1" title="Kurze/dünne Historie – Schätzung noch unsicher.">?</span>{% endif %}
+            {% else %}–{% endif %}
+          </td>
+          <td class="text-end">
+            {% if z.bedarf is not none %}<strong>{{ zahl(z.bedarf) }}</strong> <span class="small text-muted">{{ z.einheit }}</span>{% else %}–{% endif %}
+          </td>
+          <td class="small text-muted">
+            {% if z.hat_daten %}
+              {{ zahl(z.total) }} {{ z.einheit }} · {{ z.anzahl_lieferungen }}&times;
+              {% if z.erste %}<div>{{ z.erste }} → {{ z.letzte }}</div>{% endif %}
+            {% else %}keine Lieferscheine{% endif %}
+          </td>
+          <td class="text-end">
+            {% if z.hat_daten and z.bedarf %}
+            <form method="post" action="{{ url_for('lager.verbrauch_uebernehmen') }}" class="d-inline">
+              <input type="hidden" name="artikel_id" value="{{ z.artikel.id }}">
+              <input type="hidden" name="bedarf" value="{{ z.bedarf }}">
+              <input type="hidden" name="tage" value="{{ reichweite }}">
+              <button class="btn btn-sm btn-outline-primary py-0"
+                      title="Mindestbestand & Bestellmenge dieses Artikels auf den {{ reichweite }}-Tage-Bedarf setzen">
+                → min/Best.
+              </button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if ohne_zuordnung %}
+<h2 class="h5">Lieferpositionen ohne zugeordneten Lagerartikel <span class="text-muted fw-normal">({{ ohne_zuordnung|length }})</span></h2>
+<p class="text-muted small">
+  Diese Bestellnummern tauchen in Lieferscheinen auf, haben aber noch keinen Lagerartikel. Lege einen Artikel mit
+  passender Bestellnummer an, dann wird der Verbrauch oben zugeordnet.
+</p>
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Bestell-Nr</th>
+          <th>Bezeichnung</th>
+          <th class="text-end">Ø / Monat</th>
+          <th class="text-end">Bedarf {{ reichweite }}&nbsp;Tg.</th>
+          <th class="small">Historie</th>
+          <th class="text-end">Aktion</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for z in ohne_zuordnung %}
+        <tr>
+          <td class="small"><code>{{ z.bestellnummer }}</code></td>
+          <td>{{ z.bezeichnung }}</td>
+          <td class="text-end">{% if z.monatsverbrauch is not none %}{{ zahl(z.monatsverbrauch) }} <span class="small text-muted">{{ z.einheit }}</span>{% else %}–{% endif %}</td>
+          <td class="text-end">{% if z.bedarf is not none %}{{ zahl(z.bedarf) }} <span class="small text-muted">{{ z.einheit }}</span>{% else %}–{% endif %}</td>
+          <td class="small text-muted">{{ zahl(z.total) }} {{ z.einheit }} · {{ z.anzahl_lieferungen }}&times;</td>
+          <td class="text-end">
+            <a class="btn btn-sm btn-outline-secondary py-0"
+               href="{{ url_for('lager.neu') }}?bestellnummer={{ z.bestellnummer|urlencode }}&bezeichnung={{ z.bezeichnung|urlencode }}">+ Artikel</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

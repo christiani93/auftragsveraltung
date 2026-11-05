@@ -33,7 +33,7 @@ from __future__ import annotations
 import math
 import uuid
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from .storage import JsonStore
@@ -58,6 +58,7 @@ mieter = JsonStore("mieter.json")
 mietreservationen = JsonStore("mietreservationen.json")
 material = JsonStore("material.json")
 lagerartikel = JsonStore("lagerartikel.json")
+lagerlieferscheine = JsonStore("lagerlieferscheine.json")
 
 VERMIET_STATUS = ["verfuegbar", "ausgeliehen", "wartung"]
 VERMIET_STATUS_LABEL = {
@@ -742,6 +743,205 @@ def lagerartikel_nachzubestellen() -> List[Dict[str, Any]]:
         (a.get("bezeichnung") or "").lower(),
     ))
     return out
+
+
+# ----- Lager-Lieferscheine / Verbrauchsstatistik ------------------------------
+#
+# Importierte Lieferscheine (Wuerth/EM) dienen als Verbrauchs-Historie: was ueber
+# die Zeit eingekauft wird, entspricht im Mittel dem Verbrauch. Daraus schaetzen
+# wir den durchschnittlichen Monatsverbrauch je Artikel und einen Bestellvorschlag
+# fuer einen gewuenschten Bestellrhythmus (Standard: 14 Tage).
+#
+# lagerlieferscheine.json-Record:
+#   id, lieferant, nummer, datum (ISO), erstellt_am,
+#   positionen: [ {bestellnummer, bezeichnung, menge (float), einheit} ]
+
+TAGE_PRO_MONAT = 30.44  # mittlere Monatslaenge (365.25 / 12)
+
+
+def lagerlieferschein_speichern(lieferant: str, nummer: str, datum: Optional[str],
+                                positionen: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Legt einen importierten Lieferschein (Verbrauchs-Historie) ab. Nur
+    Positionen mit erfasster Menge > 0 werden gespeichert."""
+    saubere = []
+    for p in positionen:
+        menge = p.get("menge")
+        if menge is None or menge <= 0:
+            continue
+        saubere.append({
+            "bestellnummer": (p.get("bestellnummer") or "").strip(),
+            "bezeichnung": (p.get("bezeichnung") or "").strip(),
+            "menge": float(menge),
+            "einheit": (p.get("einheit") or "").strip(),
+        })
+    return lagerlieferscheine.create({
+        "lieferant": (lieferant or "").strip(),
+        "nummer": (nummer or "").strip(),
+        "datum": datum or None,
+        "positionen": saubere,
+    })
+
+
+def lagerlieferscheine_sortiert() -> List[Dict[str, Any]]:
+    """Alle importierten Lieferscheine, neueste zuerst (nach Datum, dann Import)."""
+    items = lagerlieferscheine.list()
+    items.sort(key=lambda l: (
+        l.get("datum") or "0000-00-00",
+        l.get("erstellt_am") or "",
+    ), reverse=True)
+    return items
+
+
+def lagerlieferschein_verbrauch(fenster_tage: int = 365) -> Dict[str, Dict[str, Any]]:
+    """Aggregiert importierte Lieferschein-Positionen je normalisierter
+    Bestellnummer innerhalb des Zeitfensters (Default: letzte 365 Tage).
+
+    Rueckgabe: key -> {beispiel_nr, bezeichnung, einheit, total,
+    anzahl_positionen, anzahl_lieferungen, erste (ISO), letzte (ISO)}.
+    """
+    from .lieferschein import normalisiere_bestellnr
+
+    grenze = (date.today() - timedelta(days=fenster_tage)).isoformat()
+    agg: Dict[str, Dict[str, Any]] = {}
+    for ls in lagerlieferscheine.list():
+        datum = ls.get("datum") or ""
+        if datum and datum < grenze:
+            continue
+        ls_id = ls.get("id")
+        for p in ls.get("positionen", []):
+            key = normalisiere_bestellnr(p.get("bestellnummer"))
+            if not key:
+                continue
+            menge = p.get("menge") or 0
+            eintrag = agg.get(key)
+            if eintrag is None:
+                eintrag = {
+                    "beispiel_nr": (p.get("bestellnummer") or "").strip(),
+                    "bezeichnung": (p.get("bezeichnung") or "").strip(),
+                    "einheit": (p.get("einheit") or "").strip(),
+                    "total": 0.0,
+                    "anzahl_positionen": 0,
+                    "_lieferscheine": set(),
+                    "erste": datum or None,
+                    "letzte": datum or None,
+                }
+                agg[key] = eintrag
+            eintrag["total"] += float(menge)
+            eintrag["anzahl_positionen"] += 1
+            if ls_id:
+                eintrag["_lieferscheine"].add(ls_id)
+            if p.get("bezeichnung"):
+                eintrag["bezeichnung"] = p["bezeichnung"].strip()
+            if datum:
+                if not eintrag["erste"] or datum < eintrag["erste"]:
+                    eintrag["erste"] = datum
+                if not eintrag["letzte"] or datum > eintrag["letzte"]:
+                    eintrag["letzte"] = datum
+    for eintrag in agg.values():
+        eintrag["anzahl_lieferungen"] = len(eintrag.pop("_lieferscheine"))
+    return agg
+
+
+def _verbrauch_kennzahlen(total: float, erste_iso: Optional[str],
+                          anzahl_lieferungen: int, reichweite_tage: int) -> Dict[str, Any]:
+    """Rechnet aus Gesamtmenge + erstem Lieferdatum den Ø-Monatsverbrauch sowie
+    den Bedarf fuer 'reichweite_tage'. 'unsicher' = zu kurze/duenne Historie."""
+    heute = date.today()
+    span_tage = None
+    monatsverbrauch = None
+    if erste_iso:
+        try:
+            span_tage = (heute - date.fromisoformat(erste_iso)).days
+        except ValueError:
+            span_tage = None
+    if span_tage and span_tage >= 1 and total > 0:
+        monatsverbrauch = total / (span_tage / TAGE_PRO_MONAT)
+    tagesverbrauch = (monatsverbrauch / TAGE_PRO_MONAT) if monatsverbrauch else None
+    bedarf = (tagesverbrauch * reichweite_tage) if tagesverbrauch else None
+    unsicher = bool(monatsverbrauch) and (
+        (span_tage is not None and span_tage < 30) or anzahl_lieferungen < 2
+    )
+    return {
+        "span_tage": span_tage,
+        "monatsverbrauch": monatsverbrauch,
+        "tagesverbrauch": tagesverbrauch,
+        "bedarf": bedarf,
+        "unsicher": unsicher,
+    }
+
+
+def lagerverbrauch_uebersicht(reichweite_tage: int = 14,
+                              fenster_tage: int = 365) -> Dict[str, Any]:
+    """Verbrauchs-Uebersicht: jeder Lagerartikel mit Ø-Monatsverbrauch und
+    Bedarf fuer 'reichweite_tage', plus Lieferpositionen ohne Artikel-Zuordnung.
+
+    Rueckgabe: {"zeilen": [...], "ohne_zuordnung": [...], "anzahl_mit_daten": int}.
+    Artikel mit Verbrauchsdaten stehen oben (hoechster Monatsverbrauch zuerst).
+    """
+    from .lieferschein import normalisiere_bestellnr
+
+    stats = lagerlieferschein_verbrauch(fenster_tage)
+    benutzte_keys: set = set()
+    zeilen: List[Dict[str, Any]] = []
+    for a in lagerartikel_sortiert():
+        st = None
+        for feld in ("bestellnummer", "barcode"):
+            key = normalisiere_bestellnr(a.get(feld))
+            if key and key in stats:
+                st = stats[key]
+                benutzte_keys.add(key)
+                break
+        if st:
+            kennz = _verbrauch_kennzahlen(
+                st["total"], st.get("erste"), st.get("anzahl_lieferungen", 0), reichweite_tage)
+            zeilen.append({
+                "artikel": a,
+                "hat_daten": True,
+                "total": st["total"],
+                "einheit": st.get("einheit") or a.get("einheit") or "",
+                "anzahl_lieferungen": st.get("anzahl_lieferungen", 0),
+                "erste": st.get("erste"),
+                "letzte": st.get("letzte"),
+                **kennz,
+            })
+        else:
+            zeilen.append({
+                "artikel": a, "hat_daten": False, "total": 0.0,
+                "einheit": a.get("einheit") or "", "anzahl_lieferungen": 0,
+                "erste": None, "letzte": None, "span_tage": None,
+                "monatsverbrauch": None, "tagesverbrauch": None,
+                "bedarf": None, "unsicher": False,
+            })
+
+    zeilen.sort(key=lambda z: (
+        not z["hat_daten"],
+        -(z["monatsverbrauch"] or 0),
+        (z["artikel"].get("bezeichnung") or "").lower(),
+    ))
+
+    ohne_zuordnung: List[Dict[str, Any]] = []
+    for key, st in stats.items():
+        if key in benutzte_keys:
+            continue
+        kennz = _verbrauch_kennzahlen(
+            st["total"], st.get("erste"), st.get("anzahl_lieferungen", 0), reichweite_tage)
+        ohne_zuordnung.append({
+            "bestellnummer": st.get("beispiel_nr") or "",
+            "bezeichnung": st.get("bezeichnung") or "",
+            "einheit": st.get("einheit") or "",
+            "total": st["total"],
+            "anzahl_lieferungen": st.get("anzahl_lieferungen", 0),
+            "erste": st.get("erste"),
+            "letzte": st.get("letzte"),
+            **kennz,
+        })
+    ohne_zuordnung.sort(key=lambda z: -(z["monatsverbrauch"] or 0))
+
+    return {
+        "zeilen": zeilen,
+        "ohne_zuordnung": ohne_zuordnung,
+        "anzahl_mit_daten": sum(1 for z in zeilen if z["hat_daten"]),
+    }
 
 
 def material_item_abrechnung_setzen(material_id: str, abgerechnet: bool,

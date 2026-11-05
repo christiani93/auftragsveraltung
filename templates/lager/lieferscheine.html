@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Lieferscheine importieren{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <h1 class="h3 mb-0">Lieferscheine</h1>
+  <div class="d-flex gap-2 flex-wrap">
+    <a class="btn btn-outline-primary" href="{{ url_for('lager.verbrauch') }}">📈 Verbrauchs-Übersicht</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('lager.liste') }}">Lagerbestand</a>
+  </div>
+</div>
+
+<p class="text-muted">
+  Lade die PDF-Lieferscheine von <strong>Würth</strong> oder <strong>Elektro-Material AG</strong> hoch.
+  Aus der gelieferten Menge über die Zeit schätzen wir den durchschnittlichen Monatsverbrauch –
+  so siehst du in der <a href="{{ url_for('lager.verbrauch') }}">Verbrauchs-Übersicht</a>, wie viel du
+  pro Bestellung (z.&nbsp;B. alle 14&nbsp;Tage) ordern solltest.
+</p>
+
+<div class="card card-body mb-4">
+  <h6 class="text-muted small text-uppercase mb-2">Lieferschein importieren</h6>
+  <form method="post" action="{{ url_for('lager.lieferschein_import') }}" enctype="multipart/form-data"
+        class="row g-2 align-items-center">
+    <div class="col-auto flex-grow-1">
+      <input type="file" name="lieferschein" accept="application/pdf" class="form-control" required>
+    </div>
+    <div class="col-auto">
+      <select name="lieferant_hint" class="form-select" title="Lieferant (meist automatisch erkannt)">
+        <option value="">Lieferant automatisch erkennen</option>
+        <option value="wuerth">Würth</option>
+        <option value="em">Elektro-Material AG</option>
+      </select>
+    </div>
+    <div class="col-auto">
+      <button type="submit" class="btn btn-primary text-nowrap">📄 Einlesen</button>
+    </div>
+  </form>
+  <small class="text-muted mt-2">Rückständige (nicht gelieferte) Positionen werden automatisch ausgelassen.</small>
+</div>
+
+<h2 class="h5">Importierte Lieferscheine <span class="text-muted fw-normal">({{ lieferscheine|length }})</span></h2>
+{% if not lieferscheine %}
+  <div class="alert alert-info">Noch keine Lieferscheine importiert.</div>
+{% else %}
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-sm table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Datum</th>
+          <th>Lieferant</th>
+          <th>Nummer</th>
+          <th class="text-end">Positionen</th>
+          <th class="text-end">Aktion</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ls in lieferscheine %}
+        <tr>
+          <td>{{ ls.datum or '—' }}</td>
+          <td>{{ ls.lieferant or '—' }}</td>
+          <td class="small"><code>{{ ls.nummer or '—' }}</code></td>
+          <td class="text-end">{{ ls.positionen|length }}</td>
+          <td class="text-end">
+            <form method="post" action="{{ url_for('lager.lieferschein_loeschen', lieferschein_id=ls.id) }}" class="d-inline"
+                  onsubmit="return confirm('Diesen Lieferschein aus der Verbrauchs-Historie löschen?');">
+              <button class="btn btn-sm btn-outline-danger py-0">Löschen</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
