@@ -30,6 +30,7 @@ from models.repos import (
     lagerlieferscheine,
     lagerlieferscheine_sortiert,
     lagerorte_liste,
+    lager_top_verbrauch_pro_lagerort,
     lagerverbrauch_uebersicht,
     lieferzeit_update,
 )
@@ -597,6 +598,54 @@ def verbrauch():
         anzahl_ohne_ean=len(lagerartikel_ohne_ean()),
         **daten,
     )
+
+
+@bp.route("/statistik")
+@login_required
+def statistik():
+    """Statistik-Seite: Top-Verbrauch je Lagerort (Ø-Monatsverbrauch aus den
+    Lieferscheinen im gewaehlten Zeitfenster)."""
+    fenster = _als_int(request.args.get("fenster"), 365)
+    if fenster < 30:
+        fenster = 30
+    top = _als_int(request.args.get("top"), 5)
+    if top < 1:
+        top = 5
+    daten = lager_top_verbrauch_pro_lagerort(fenster_tage=fenster, top_n=top)
+    return render_template(
+        "lager/statistik.html",
+        fenster=fenster,
+        top=top,
+        anzahl_lieferscheine=len(lagerlieferscheine.list()),
+        lagerorte=lagerorte_liste(),
+        **daten,
+    )
+
+
+@bp.route("/lagerort/umbenennen", methods=["POST"])
+@login_required
+def lagerort_umbenennen():
+    """Setzt den Lagerort fuer ALLE Artikel einer Lagerort-Gruppe neu (umbenennen
+    bzw. zusammenfuehren). 'alt' = bisheriger Ort (leer = 'Ohne Lagerort'),
+    'neu' = Zielort (bestehender Vorschlag oder neuer)."""
+    alt = (request.form.get("alt") or "").strip()
+    neu = (request.form.get("neu") or "").strip()
+    if not neu:
+        flash("Kein Lagerort angegeben.", "warning")
+        return redirect(request.referrer or url_for("lager.statistik"))
+    if neu == alt:
+        return redirect(request.referrer or url_for("lager.statistik"))
+    anzahl = 0
+    for a in lagerartikel.list():
+        if (a.get("lagerort") or "").strip() == alt:
+            lagerartikel.update(a["id"], {"lagerort": neu})
+            anzahl += 1
+    if anzahl:
+        quelle = alt or "Ohne Lagerort"
+        flash(f"{anzahl} Artikel von «{quelle}» auf «{neu}» gesetzt.", "success")
+    else:
+        flash("Keine Artikel geändert.", "info")
+    return redirect(request.referrer or url_for("lager.statistik"))
 
 
 @bp.route("/verbrauch/uebernehmen", methods=["POST"])

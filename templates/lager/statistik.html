@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Lager-Statistik{% endblock %}
+
+{% macro zahl1(v) %}{% if v is none %}–{% else %}{{ v|round(1)|float }}{% endif %}{% endmacro %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <h1 class="h3 mb-0">📊 Lager-Statistik</h1>
+  <div class="d-flex gap-2 flex-wrap">
+    <a class="btn btn-outline-primary" href="{{ url_for('lager.verbrauch') }}">📈 Verbrauchs-Übersicht</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('lager.liste') }}">Zum Lagerbestand</a>
+  </div>
+</div>
+
+<h2 class="h5">Top-Verbrauch pro Lagerort</h2>
+<p class="text-muted">
+  Je Lagerort die Artikel mit dem höchsten geschätzten <strong>Ø-Monatsverbrauch</strong> (aus
+  {{ anzahl_lieferscheine }} importierten Lieferschein(en) im gewählten Zeitfenster – Einkauf ≈ Verbrauch).
+  Lagerorte mit dem meisten Durchsatz stehen oben.
+</p>
+
+<form method="get" class="row g-2 align-items-end mb-3">
+  <div class="col-auto">
+    <label class="form-label small mb-0">Zeitfenster (Tage)</label>
+    <input type="number" name="fenster" min="30" step="1" value="{{ fenster }}" class="form-control form-control-sm" style="width:120px;">
+  </div>
+  <div class="col-auto">
+    <label class="form-label small mb-0">Top je Lagerort</label>
+    <input type="number" name="top" min="1" step="1" value="{{ top }}" class="form-control form-control-sm" style="width:110px;">
+  </div>
+  <div class="col-auto">
+    <button class="btn btn-sm btn-outline-secondary" type="submit">Aktualisieren</button>
+  </div>
+</form>
+
+<datalist id="lagerorte-all">
+  {% for o in lagerorte %}<option value="{{ o }}">{% endfor %}
+</datalist>
+
+{% if anzahl_lieferscheine == 0 %}
+  <div class="alert alert-info">
+    Noch keine Lieferscheine importiert. <a href="{{ url_for('lager.lieferscheine') }}">Jetzt importieren</a>,
+    dann kann hier der Verbrauch je Lagerort ausgewertet werden.
+  </div>
+{% elif not gruppen %}
+  <div class="alert alert-info">Keine Artikel mit Verbrauchsdaten im gewählten Zeitfenster.</div>
+{% else %}
+  <div class="row g-3">
+    {% for g in gruppen %}
+    <div class="col-12 col-lg-6">
+      <div class="card h-100">
+        <div class="card-header d-flex justify-content-between align-items-center gap-2 flex-wrap">
+          <form method="post" action="{{ url_for('lager.lagerort_umbenennen') }}" class="d-inline-flex align-items-center gap-1"
+                onsubmit="return confirm('Lagerort «{{ g.lagerort }}» ({{ g.anzahl_artikel }} Artikel mit Verbrauch, ggf. mehr) auf den eingegebenen Ort setzen?');">
+            <span>📍</span>
+            <input type="hidden" name="alt" value="{% if g.lagerort != 'Ohne Lagerort' %}{{ g.lagerort }}{% endif %}">
+            <input type="text" name="neu" value="{% if g.lagerort != 'Ohne Lagerort' %}{{ g.lagerort }}{% endif %}"
+                   list="lagerorte-all" class="form-control form-control-sm fw-semibold" style="max-width:160px;"
+                   placeholder="Lagerort…" title="Lagerort für alle Artikel dieser Gruppe umbenennen/zuweisen">
+            <button class="btn btn-sm btn-outline-secondary py-0" type="submit" title="Lagerort für alle Artikel dieser Gruppe setzen">✎</button>
+          </form>
+          <span class="small text-muted">{{ g.anzahl_artikel }} Artikel · Ø {{ zahl1(g.gesamt_monat) }}/Monat</span>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th style="width:1.6rem;"></th>
+                <th>Artikel</th>
+                <th style="width:40%;">Ø / Monat</th>
+                <th class="text-end">im Fenster</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for a in g.artikel %}
+              <tr>
+                <td class="text-muted">{{ loop.index }}.</td>
+                <td>
+                  <a href="{{ url_for('lager.bearbeiten', artikel_id=a.id) }}">{{ a.bezeichnung }}</a>
+                  {% if a.unsicher %}<span class="badge bg-warning text-dark ms-1" title="Kurze/dünne Historie – Schätzung noch unsicher.">?</span>{% endif %}
+                </td>
+                <td>
+                  <div class="d-flex align-items-center gap-2">
+                    <div class="progress flex-grow-1" style="height:14px; min-width:60px;" role="progressbar"
+                         aria-valuenow="{{ a.monatsverbrauch|round(0)|int }}" aria-valuemin="0" aria-valuemax="{{ g.max_monat|round(0)|int }}">
+                      <div class="progress-bar bg-info" style="width: {% if g.max_monat %}{{ (100 * a.monatsverbrauch / g.max_monat)|round(0)|int }}{% else %}0{% endif %}%;"></div>
+                    </div>
+                    <span class="small text-nowrap"><strong>{{ zahl1(a.monatsverbrauch) }}</strong> {{ a.einheit }}</span>
+                  </div>
+                </td>
+                <td class="text-end small text-muted text-nowrap">
+                  {{ zahl1(a.total) }} {{ a.einheit }}<br>{{ a.anzahl_lieferungen }}&times; Lief.
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% if g.weitere %}
+        <div class="card-footer py-1 small text-muted">+ {{ g.weitere }} weitere Artikel mit Verbrauch an diesem Lagerort</div>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+{% endif %}
+{% endblock %}

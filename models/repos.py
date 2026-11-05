@@ -1194,6 +1194,63 @@ def lagerverbrauch_uebersicht(reichweite_tage: int = 14,
     }
 
 
+def lager_top_verbrauch_pro_lagerort(fenster_tage: int = 365,
+                                     top_n: int = 5) -> Dict[str, Any]:
+    """Statistik: je Lagerort die Artikel mit dem hoechsten geschaetzten
+    Ø-Monatsverbrauch (aus den Lieferscheinen im Zeitfenster). Auslaufartikel und
+    Artikel ohne Verbrauchsdaten bleiben aussen vor. Lagerorte nach Gesamt-
+    Monatsverbrauch absteigend (aktivste oben), 'Ohne Lagerort' ans Ende.
+
+    Rueckgabe: {"gruppen": [{lagerort, artikel:[...], weitere, anzahl_artikel,
+    gesamt_monat, max_monat}], "fenster_tage", "top_n"}.
+    """
+    from .lieferschein import normalisiere_bestellnr
+
+    stats = lagerlieferschein_verbrauch(fenster_tage)
+    gruppen_map: Dict[str, List[Dict[str, Any]]] = {}
+    for a in lagerartikel_sortiert():
+        if a.get("ausgelaufen"):
+            continue
+        st = None
+        for feld in ("bestellnummer", "barcode"):
+            key = normalisiere_bestellnr(a.get(feld))
+            if key and key in stats:
+                st = stats[key]
+                break
+        if not st:
+            continue
+        kennz = _verbrauch_kennzahlen(
+            st["total"], st.get("erste"), st.get("anzahl_lieferungen", 0), 30)
+        mv = kennz["monatsverbrauch"]
+        if not mv:
+            continue
+        ort = (a.get("lagerort") or "").strip() or "Ohne Lagerort"
+        gruppen_map.setdefault(ort, []).append({
+            "id": a.get("id"),
+            "bezeichnung": a.get("bezeichnung") or "",
+            "einheit": st.get("einheit") or a.get("einheit") or "",
+            "monatsverbrauch": mv,
+            "total": st["total"],
+            "anzahl_lieferungen": st.get("anzahl_lieferungen", 0),
+            "unsicher": kennz["unsicher"],
+        })
+
+    gruppen: List[Dict[str, Any]] = []
+    for ort, items in gruppen_map.items():
+        items.sort(key=lambda e: -(e["monatsverbrauch"] or 0))
+        gruppen.append({
+            "lagerort": ort,
+            "artikel": items[:top_n],
+            "weitere": max(0, len(items) - top_n),
+            "anzahl_artikel": len(items),
+            "gesamt_monat": sum(e["monatsverbrauch"] or 0 for e in items),
+            "max_monat": items[0]["monatsverbrauch"] if items else 0,
+        })
+    gruppen.sort(key=lambda g: (g["lagerort"] == "Ohne Lagerort",
+                                -(g["gesamt_monat"] or 0)))
+    return {"gruppen": gruppen, "fenster_tage": fenster_tage, "top_n": top_n}
+
+
 def material_item_abrechnung_setzen(material_id: str, abgerechnet: bool,
                                     abgerechnet_am: Optional[str] = None):
     """Setzt/entfernt das Abgerechnet-Flag einer einzelnen Material-Position (Toggle)."""
