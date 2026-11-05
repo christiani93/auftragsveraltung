@@ -62,9 +62,21 @@ Grosse Erweiterung in dieser Session (Commits bis `c61af5e`):
   EAN"-Liste `/lager/ohne-ean`. „Bestellt/unterwegs" verhindert Mehrfachbestellung,
   wird beim Wareneingang auto-aufgehoben.
 
+## Lagermaterial — Bestellvorschlag EAN-Gruppierung + Lieferzeit (2026-11-05)
+
+- **Bestellvorschlag in zwei Gruppen**: „mit EAN (scannbar)" mit gerendertem
+  CODE128-Barcode (JsBarcode) zum Scannen mit der Würth-App, und „ohne EAN
+  (manuell)" mit Artikelnummer als Text (im Shop über Notebook eintippen).
+- **Abhaken**: Checkbox je Zeile (+ Kopf-Checkbox „alle"), Buttons „Markierte als
+  bestellt" (→ unterwegs) und „Markierte auf Bestellliste". `bestellen_markieren`
+  liest die Menge jetzt per `menge_<id>` (robust gegen abgewählte Zeilen).
+- **Lieferzeit** (Query-Param `lieferzeit`, Default 2 Tage): Bestellschwelle =
+  Rhythmus + Lieferzeit (früher bestellen); Bestellmenge deckt zusätzlich den
+  Verbrauch während der Lieferzeit. Eingabefeld im Filter.
+- **Reihenfolge** der Karten: Bestellvorschlag → Bestandskontrolle → Unterwegs.
+
 **Offen / Ideen (optional, auf User-Wunsch):**
-- Erwartete Lieferzeit pro Lieferant bzw. „überfällig"-Marker für `bestellt`-Artikel
-  ab X Tagen (dem User als Option angeboten).
+- „überfällig"-Marker für `bestellt`-Artikel ab X Tagen unterwegs.
 - Dashboard-Kachel „X nachzubestellen" / Bestell-Historie (aus altem TODO).
 - **User-Aufgabe (kein Code):** einmalige physische Inventur der aktiv genutzten
   Artikel — Lieferscheine erst ab Anfang August eingelesen, Restbestand davor nicht

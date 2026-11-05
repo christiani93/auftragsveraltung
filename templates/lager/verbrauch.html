@@ -4,6 +4,80 @@
 {% macro zahl(v) %}{% if v is none %}–{% else %}{{ v|round(0, 'common')|int }}{% endif %}{% endmacro %}
 {% macro tage(v) %}{% if v is none %}–{% else %}{{ v|round(0, 'common')|int }} Tg.{% endif %}{% endmacro %}
 
+{# Eine Bestellvorschlag-Gruppe (mit oder ohne EAN). Checkboxen + Mengen sind per
+   HTML5-form-Attribut dem Footer-Formular 'fid' zugeordnet, damit die kleinen
+   Bestand-/Auslaufen-Formulare je Zeile nicht verschachtelt werden muessen. #}
+{% macro bv_gruppe(fid, titel, icon, hinweis, zeilen, mit_barcode, reichweite, lieferzeit) %}
+<div class="card border-warning mb-4">
+  <div class="card-header bg-warning-subtle fw-semibold">
+    {{ icon }} {{ titel }} <span class="text-muted fw-normal">({{ zeilen|length }} Artikel)</span>
+  </div>
+  <div class="card-body py-2 small text-muted">{{ hinweis }}</div>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th style="width:2.2rem;"><input type="checkbox" class="bv-all" data-form="{{ fid }}" checked title="Alle an-/abwählen"></th>
+          <th>Artikel</th>
+          <th>{% if mit_barcode %}Barcode (EAN){% else %}Artikelnummer{% endif %}</th>
+          <th>Lieferant</th>
+          <th class="text-end" title="Tatsächlichen Bestand eintragen, falls real mehr vorhanden ist als berechnet">Bestand ✎</th>
+          <th class="text-end">reicht noch</th>
+          <th class="text-end">Bestellmenge</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for z in zeilen %}
+        <tr>
+          <td><input type="checkbox" class="bv-chk" form="{{ fid }}" name="artikel_id[]" value="{{ z.artikel.id }}" checked></td>
+          <td>
+            <a href="{{ url_for('lager.bearbeiten', artikel_id=z.artikel.id) }}">{{ z.artikel.bezeichnung }}</a>
+            {% if z.artikel.lagerort %}<span class="small text-muted ms-1">📍 {{ z.artikel.lagerort }}</span>{% endif %}
+          </td>
+          <td class="small">
+            {% if mit_barcode %}
+              <svg class="lager-barcode" data-code="{{ z.artikel.barcode|replace(' ', '') }}"></svg>
+              <div class="text-muted">{{ z.artikel.barcode }}{% if z.artikel.bestellnummer %} · Best-Nr {{ z.artikel.bestellnummer }}{% endif %}</div>
+            {% else %}
+              {% if z.artikel.bestellnummer %}<code class="fs-6">{{ z.artikel.bestellnummer }}</code>
+              {% else %}<span class="text-danger">keine Artikelnummer</span>{% endif %}
+            {% endif %}
+          </td>
+          <td class="small">{{ z.artikel.lieferant or '' }}</td>
+          <td class="text-end">
+            <form method="post" action="{{ url_for('lager.bestand_aendern', artikel_id=z.artikel.id) }}" class="d-inline-flex gap-1 justify-content-end">
+              <input type="number" name="setzen" value="{{ z.artikel.bestand if z.artikel.bestand is not none else '' }}" min="0" step="1" class="form-control form-control-sm text-end py-0" style="width:70px;" title="Tatsächlichen Bestand eintragen (Inventur, Stichtag heute) – rechnet neu">
+              <button class="btn btn-sm btn-outline-secondary py-0" type="submit" title="Bestand übernehmen – rechnet neu">✓</button>
+            </form>
+          </td>
+          <td class="text-end {% if z.tage_rest is not none and z.tage_rest < (reichweite + lieferzeit) %}text-danger fw-semibold{% endif %}">{{ tage(z.tage_rest) }}</td>
+          <td class="text-end" style="white-space:nowrap;">
+            <strong>{{ zahl(z.menge_vorschlag) }}</strong> <span class="small text-muted">{{ z.einheit }}</span>
+            <input type="hidden" form="{{ fid }}" name="menge_{{ z.artikel.id }}" value="{{ z.menge_vorschlag }}">
+            <form method="post" action="{{ url_for('lager.auslaufen_toggle', artikel_id=z.artikel.id) }}" class="d-inline"
+                  onsubmit="return confirm('«{{ z.artikel.bezeichnung }}» auslaufen lassen? Verschwindet aus dem Bestellvorschlag.');">
+              <button class="btn btn-sm btn-outline-secondary py-0 ms-1" title="Auslaufen lassen – nicht mehr bestellen">⏳</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="card-body py-2 d-flex flex-wrap gap-2 align-items-center">
+    <form id="{{ fid }}" method="post" action="{{ url_for('lager.bestellt_markieren') }}" class="d-flex flex-wrap gap-2 align-items-center mb-0">
+      <button type="submit" class="btn btn-sm btn-success" title="Angekreuzte Artikel als bestellt (unterwegs) markieren">📦 Markierte als bestellt</button>
+      <button type="submit" class="btn btn-sm btn-outline-warning" formaction="{{ url_for('lager.bestellen_markieren') }}" title="Angekreuzte Artikel auf die druckbare Bestellliste setzen">🖨️ Markierte auf Bestellliste</button>
+    </form>
+    {% if mit_barcode %}
+      <span class="small text-muted">Barcode mit der Würth-App scannen → in den Warenkorb, dann hier «Markierte als bestellt».</span>
+    {% else %}
+      <span class="small text-muted">Artikelnummer im Shop über das Notebook eintragen, dann hier «Markierte als bestellt».</span>
+    {% endif %}
+  </div>
+</div>
+{% endmacro %}
+
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
   <h1 class="h3 mb-0">Verbrauchs-Übersicht</h1>
@@ -23,15 +97,21 @@
 <p class="text-muted">
   Geschätzter Ø-Verbrauch aus {{ anzahl_lieferscheine }} importierten Lieferschein(en): Einkauf über die Zeit
   ≈ Verbrauch. Der <strong>voraussichtliche Bestand</strong> rechnet vom letzten Wareneingang/der letzten Inventur
-  den geschätzten Verbrauch ab (der gespeicherte Bestand bleibt unverändert). Fällt er unter {{ reichweite }}&nbsp;Tage
-  Reichweite, kommt der Artikel in den <strong>Bestellvorschlag</strong> –
-  aber erst ab <strong>2 Lieferungen</strong>, sonst ist der Verbrauch zu unsicher.
+  den geschätzten Verbrauch ab (der gespeicherte Bestand bleibt unverändert). Fällt er unter
+  {{ reichweite }}&nbsp;Tage Reichweite{% if lieferzeit %} <strong>+ {{ lieferzeit }}&nbsp;Tage Lieferzeit</strong>{% endif %},
+  kommt der Artikel in den <strong>Bestellvorschlag</strong> – aber erst ab <strong>2 Lieferungen</strong>,
+  sonst ist der Verbrauch zu unsicher. Die <strong>Lieferzeit</strong> sorgt dafür, dass früh genug (und etwas mehr)
+  bestellt wird, damit die Ware ankommt, bevor der Bestand knapp wird.
 </p>
 
 <form method="get" class="row g-2 align-items-end mb-3">
   <div class="col-auto">
     <label class="form-label small mb-0">Bestellrhythmus (Tage)</label>
     <input type="number" name="tage" min="1" step="1" value="{{ reichweite }}" class="form-control form-control-sm" style="width:110px;">
+  </div>
+  <div class="col-auto">
+    <label class="form-label small mb-0" title="Wie lange die Lieferung dauert – wird in den Bestellvorschlag eingerechnet">Lieferzeit (Tage)</label>
+    <input type="number" name="lieferzeit" min="0" step="1" value="{{ lieferzeit }}" class="form-control form-control-sm" style="width:110px;">
   </div>
   <div class="col-auto">
     <label class="form-label small mb-0">Zeitfenster (Tage)</label>
@@ -50,133 +130,18 @@
 {% endif %}
 
 {% if bestellvorschlag %}
-<div class="card border-warning mb-4">
-  <div class="card-header bg-warning-subtle fw-semibold">
-    🛒 Bestellvorschlag <span class="text-muted fw-normal">({{ bestellvorschlag|length }} Artikel reichen weniger als {{ reichweite }}&nbsp;Tage)</span>
-  </div>
-  <div class="table-responsive">
-    <table class="table table-sm align-middle mb-0">
-      <thead class="table-light">
-        <tr>
-          <th>Artikel</th>
-          <th>EAN / Best-Nr</th>
-          <th>Lieferant</th>
-          <th class="text-end" title="Tatsächlichen Bestand eintragen, falls real mehr vorhanden ist als berechnet">Bestand ✎</th>
-          <th class="text-end" title="Rechnerischer Bestand heute = letzter Stand − geschätzter Verbrauch seitdem">Voraussichtl. Bestand</th>
-          <th class="text-end">reicht noch</th>
-          <th class="text-end">Bestellen</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for z in bestellvorschlag %}
-        <tr>
-          <td>
-            <a href="{{ url_for('lager.bearbeiten', artikel_id=z.artikel.id) }}">{{ z.artikel.bezeichnung }}</a>
-            {% if z.artikel.lagerort %}<span class="small text-muted ms-1">📍 {{ z.artikel.lagerort }}</span>{% endif %}
-          </td>
-          <td class="small">
-            {% if z.artikel.barcode %}<code>{{ z.artikel.barcode }}</code>
-            {% elif z.artikel.kein_ean %}<span class="text-muted">kein EAN</span>
-            {% else %}
-              <form method="post" action="{{ url_for('lager.ean_setzen', artikel_id=z.artikel.id) }}" class="input-group input-group-sm" style="width:auto;">
-                <input type="text" name="barcode" id="eanbv-{{ z.artikel.id }}" class="form-control" placeholder="EAN scannen…" autocomplete="off" inputmode="numeric" style="max-width:120px;">
-                <button type="button" class="btn btn-outline-secondary cam-btn" data-target="eanbv-{{ z.artikel.id }}" data-label="{{ z.artikel.bezeichnung }}" title="Mit Kamera scannen">📷</button>
-              </form>
-            {% endif %}
-            {% if z.artikel.bestellnummer %}<div class="text-muted">Best-Nr {{ z.artikel.bestellnummer }}</div>{% endif %}
-          </td>
-          <td class="small">{{ z.artikel.lieferant or '' }}</td>
-          <td class="text-end">
-            <form method="post" action="{{ url_for('lager.bestand_aendern', artikel_id=z.artikel.id) }}" class="d-inline-flex gap-1 justify-content-end">
-              <input type="number" name="setzen" value="{{ z.artikel.bestand if z.artikel.bestand is not none else '' }}" min="0" step="1" class="form-control form-control-sm text-end py-0" style="width:70px;" title="Tatsächlichen Bestand eintragen (Inventur, Stichtag heute) – rechnet neu">
-              <button class="btn btn-sm btn-outline-secondary py-0" type="submit" title="Bestand übernehmen – rechnet neu">✓</button>
-            </form>
-          </td>
-          <td class="text-end">{{ zahl(z.voraussichtlich) }} <span class="small text-muted">{{ z.einheit }}</span></td>
-          <td class="text-end {% if z.tage_rest is not none and z.tage_rest < reichweite %}text-danger fw-semibold{% endif %}">{{ tage(z.tage_rest) }}</td>
-          <td class="text-end" style="white-space:nowrap;">
-            <strong>{{ zahl(z.menge_vorschlag) }}</strong> <span class="small text-muted">{{ z.einheit }}</span>
-            <form method="post" action="{{ url_for('lager.bestellt_markieren') }}" class="d-inline">
-              <input type="hidden" name="artikel_id" value="{{ z.artikel.id }}">
-              <button class="btn btn-sm btn-outline-success py-0 ms-1" title="Als bestellt markieren – unterwegs, bis die Lieferung kommt">📦 bestellt</button>
-            </form>
-            <form method="post" action="{{ url_for('lager.auslaufen_toggle', artikel_id=z.artikel.id) }}" class="d-inline"
-                  onsubmit="return confirm('«{{ z.artikel.bezeichnung }}» auslaufen lassen? Verschwindet aus dem Bestellvorschlag.');">
-              <button class="btn btn-sm btn-outline-secondary py-0" title="Auslaufen lassen – nicht mehr bestellen">⏳</button>
-            </form>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  <div class="card-body py-2 d-flex flex-wrap gap-2 align-items-center">
-    <form method="post" action="{{ url_for('lager.bestellt_markieren') }}"
-          onsubmit="return confirm('Alle {{ bestellvorschlag|length }} Artikel als bestellt markieren? Sie verschwinden bis zur Lieferung aus dem Vorschlag.');">
-      {% for z in bestellvorschlag %}<input type="hidden" name="artikel_id[]" value="{{ z.artikel.id }}">{% endfor %}
-      <button type="submit" class="btn btn-sm btn-success">📦 Alle als bestellt markieren</button>
-    </form>
-    <form method="post" action="{{ url_for('lager.bestellen_markieren') }}">
-      {% for z in bestellvorschlag %}
-        <input type="hidden" name="artikel_id[]" value="{{ z.artikel.id }}">
-        <input type="hidden" name="menge[]" value="{{ z.menge_vorschlag }}">
-      {% endfor %}
-      <button type="submit" class="btn btn-sm btn-outline-warning">Auf druckbare Bestellliste setzen</button>
-    </form>
-    <span class="small text-muted">Tipp: Bestand stimmt nicht? In der Spalte <strong>Bestand&nbsp;✎</strong> korrigieren – ist real mehr da, fällt der Artikel aus dem Vorschlag.</span>
-  </div>
-</div>
-{% endif %}
-
-{% if bestellt_offen %}
-<div class="card border-success mb-4">
-  <div class="card-header bg-success-subtle fw-semibold">
-    🚚 Bestellt / unterwegs <span class="text-muted fw-normal">({{ bestellt_offen|length }} – warten auf Lieferung)</span>
-  </div>
-  <div class="card-body py-2 small text-muted">
-    Bestellt – erscheinen nicht im Vorschlag. Sobald du den <strong>Wareneingang</strong> (Lieferschein) buchst,
-    verschwinden sie hier automatisch. Ohne Lieferschein geliefert? «✓ erhalten» klicken.
-  </div>
-  <div class="table-responsive">
-    <table class="table table-sm align-middle mb-0">
-      <thead class="table-light">
-        <tr>
-          <th>Artikel</th>
-          <th>EAN / Best-Nr</th>
-          <th>Lieferant</th>
-          <th class="text-end">bestellt am</th>
-          <th class="text-end">Aktion</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for b in bestellt_offen %}
-        <tr>
-          <td>
-            <a href="{{ url_for('lager.bearbeiten', artikel_id=b.artikel.id) }}">{{ b.artikel.bezeichnung }}</a>
-            {% if b.artikel.lagerort %}<span class="small text-muted ms-1">📍 {{ b.artikel.lagerort }}</span>{% endif %}
-          </td>
-          <td class="small">
-            {% if b.artikel.barcode %}<code>{{ b.artikel.barcode }}</code>
-            {% elif b.artikel.kein_ean %}<span class="text-muted">kein EAN</span>
-            {% else %}<span class="text-muted">–</span>{% endif %}
-            {% if b.artikel.bestellnummer %}<div class="text-muted">Best-Nr {{ b.artikel.bestellnummer }}</div>{% endif %}
-          </td>
-          <td class="small">{{ b.artikel.lieferant or '' }}</td>
-          <td class="text-end small">
-            {{ b.bestellt_am or '—' }}
-            {% if b.tage_seit is not none %}<div class="text-muted">seit {{ b.tage_seit }} Tg.</div>{% endif %}
-          </td>
-          <td class="text-end">
-            <form method="post" action="{{ url_for('lager.bestellt_erhalten', artikel_id=b.artikel.id) }}" class="d-inline">
-              <button class="btn btn-sm btn-outline-success py-0" title="Lieferung erhalten – Status aufheben">✓ erhalten</button>
-            </form>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</div>
+  {% if bestellvorschlag_mit_ean %}
+    {{ bv_gruppe('bvform-ean',
+        'Bestellvorschlag — mit EAN (scannbar)', '🛒🏷️',
+        'Diese Artikel haben einen EAN. Barcode mit der Würth-App scannen und in den Warenkorb legen – danach unten «Markierte als bestellt».',
+        bestellvorschlag_mit_ean, true, reichweite, lieferzeit) }}
+  {% endif %}
+  {% if bestellvorschlag_ohne_ean %}
+    {{ bv_gruppe('bvform-noean',
+        'Bestellvorschlag — ohne EAN (manuell)', '🛒⌨️',
+        'Diese Artikel haben keinen EAN. Artikelnummer im Shop über das Notebook einzeln eintragen – danach unten «Markierte als bestellt».',
+        bestellvorschlag_ohne_ean, false, reichweite, lieferzeit) }}
+  {% endif %}
 {% endif %}
 
 {% if bestandskontrolle %}
@@ -226,6 +191,57 @@
           <td class="small text-muted">
             {% if z.anzahl_lieferungen < 2 %}nur 1 Lieferung{% elif z.span_tage is not none and z.span_tage < 30 %}kurze Historie{% else %}unsicher{% endif %}
             {% if z.letzte %}<div>letzte: {{ z.letzte }}</div>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% if bestellt_offen %}
+<div class="card border-success mb-4">
+  <div class="card-header bg-success-subtle fw-semibold">
+    🚚 Bestellt / unterwegs <span class="text-muted fw-normal">({{ bestellt_offen|length }} – warten auf Lieferung)</span>
+  </div>
+  <div class="card-body py-2 small text-muted">
+    Bestellt – erscheinen nicht im Vorschlag. Sobald du den <strong>Wareneingang</strong> (Lieferschein) buchst,
+    verschwinden sie hier automatisch. Ohne Lieferschein geliefert? «✓ erhalten» klicken.
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Artikel</th>
+          <th>EAN / Best-Nr</th>
+          <th>Lieferant</th>
+          <th class="text-end">bestellt am</th>
+          <th class="text-end">Aktion</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for b in bestellt_offen %}
+        <tr>
+          <td>
+            <a href="{{ url_for('lager.bearbeiten', artikel_id=b.artikel.id) }}">{{ b.artikel.bezeichnung }}</a>
+            {% if b.artikel.lagerort %}<span class="small text-muted ms-1">📍 {{ b.artikel.lagerort }}</span>{% endif %}
+          </td>
+          <td class="small">
+            {% if b.artikel.barcode %}<code>{{ b.artikel.barcode }}</code>
+            {% elif b.artikel.kein_ean %}<span class="text-muted">kein EAN</span>
+            {% else %}<span class="text-muted">–</span>{% endif %}
+            {% if b.artikel.bestellnummer %}<div class="text-muted">Best-Nr {{ b.artikel.bestellnummer }}</div>{% endif %}
+          </td>
+          <td class="small">{{ b.artikel.lieferant or '' }}</td>
+          <td class="text-end small">
+            {{ b.bestellt_am or '—' }}
+            {% if b.tage_seit is not none %}<div class="text-muted">seit {{ b.tage_seit }} Tg.</div>{% endif %}
+          </td>
+          <td class="text-end">
+            <form method="post" action="{{ url_for('lager.bestellt_erhalten', artikel_id=b.artikel.id) }}" class="d-inline">
+              <button class="btn btn-sm btn-outline-success py-0" title="Lieferung erhalten – Status aufheben">✓ erhalten</button>
+            </form>
           </td>
         </tr>
         {% endfor %}
@@ -407,5 +423,28 @@
   });
   cancel.addEventListener("click", stopCam);
 })();
+</script>
+
+{# Strichcodes im Bestellvorschlag (mit EAN) rendern – zum Scannen mit der Würth-App #}
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<script>
+  document.querySelectorAll("svg.lager-barcode").forEach(function (el) {
+    var code = el.getAttribute("data-code");
+    if (!code) return;
+    try {
+      JsBarcode(el, code, { format: "CODE128", height: 38, width: 1.4, fontSize: 12, margin: 2 });
+    } catch (e) {
+      el.outerHTML = '<span class="small text-muted">' + code + '</span>';
+    }
+  });
+  // "Alle auswählen"-Kopf-Checkbox je Bestellvorschlag-Gruppe
+  document.querySelectorAll("input.bv-all").forEach(function (head) {
+    head.addEventListener("change", function () {
+      var fid = head.dataset.form;
+      document.querySelectorAll('input.bv-chk[form="' + fid + '"]').forEach(function (c) {
+        c.checked = head.checked;
+      });
+    });
+  });
 </script>
 {% endblock %}

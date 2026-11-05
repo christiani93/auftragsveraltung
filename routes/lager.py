@@ -578,11 +578,16 @@ def verbrauch():
     if reichweite <= 0:
         reichweite = 14
     fenster = _als_int(request.args.get("fenster"), 365)
-    daten = lagerverbrauch_uebersicht(reichweite_tage=reichweite, fenster_tage=fenster)
+    lieferzeit = _als_int(request.args.get("lieferzeit"), 2)
+    if lieferzeit < 0:
+        lieferzeit = 0
+    daten = lagerverbrauch_uebersicht(
+        reichweite_tage=reichweite, fenster_tage=fenster, lieferzeit_tage=lieferzeit)
     return render_template(
         "lager/verbrauch.html",
         reichweite=reichweite,
         fenster=fenster,
+        lieferzeit=lieferzeit,
         anzahl_lieferscheine=len(lagerlieferscheine.list()),
         anzahl_ohne_ean=len(lagerartikel_ohne_ean()),
         **daten,
@@ -626,15 +631,15 @@ def verbrauch_uebernehmen():
 def bestellen_markieren():
     """Setzt die Artikel aus dem Bestellvorschlag auf 'nachbestellen' (mit
     vorgeschlagener Bestellmenge) — sie erscheinen dann auf der druckbaren
-    Bestellliste. artikel_id[] + menge[] parallele Listen."""
+    Bestellliste. Angekreuzte Artikel kommen als artikel_id[]; die zugehoerige
+    Menge steht je Artikel in 'menge_<id>' (robust gegen abgewaehlte Zeilen)."""
     ids = request.form.getlist("artikel_id[]")
-    mengen = request.form.getlist("menge[]")
     anzahl = 0
-    for i, artikel_id in enumerate(ids):
+    for artikel_id in ids:
         artikel_id = (artikel_id or "").strip()
         if not artikel_id or not lagerartikel.get(artikel_id):
             continue
-        menge = _als_float_oder_none(mengen[i]) if i < len(mengen) else None
+        menge = _als_float_oder_none(request.form.get("menge_" + artikel_id))
         changes = {"nachbestellen": True}
         if menge and menge > 0:
             changes["bestellmenge"] = int(math.ceil(menge))

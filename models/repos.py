@@ -919,13 +919,20 @@ BESTANDSKONTROLLE_TAGE = 14
 
 
 def _projektion(a: Dict[str, Any], tagesverbrauch: Optional[float],
-                reichweite_tage: int, anzahl_lieferungen: int = 0) -> Dict[str, Any]:
+                reichweite_tage: int, anzahl_lieferungen: int = 0,
+                lieferzeit_tage: int = 0) -> Dict[str, Any]:
     """Rechnerischer (voraussichtlicher) Bestand heute = zuletzt bekannter Bestand
     minus geschaetzter Verbrauch seit dem Stichtag. Nicht destruktiv — der
     gespeicherte Bestand bleibt unveraendert. Liefert zusaetzlich die verbleibende
-    Reichweite in Tagen und — falls unter 'reichweite_tage' UND mit genug
-    Lieferhistorie — einen Bestellvorschlag.
+    Reichweite in Tagen und — falls unter der Schwelle UND mit genug Lieferhistorie
+    — einen Bestellvorschlag.
+
+    Die Lieferzeit wird eingerechnet: frueh genug bestellen, damit die Ware
+    ankommt, bevor der Bestand unter den gewuenschten Rhythmus faellt -> Schwelle =
+    Rhythmus + Lieferzeit. Die Bestellmenge deckt zusaetzlich den Verbrauch
+    waehrend der Lieferzeit (bis die Ware wirklich eintrifft).
     """
+    lieferzeit_tage = max(0, lieferzeit_tage or 0)
     bestand = a.get("bestand")
     stand = _artikel_stand_datum(a)
     tage_seit = max(0, (date.today() - stand).days) if stand else None
@@ -935,37 +942,48 @@ def _projektion(a: Dict[str, Any], tagesverbrauch: Optional[float],
         verbraucht = tagesverbrauch * (tage_seit or 0)
         voraussichtlich = max(0.0, bestand - verbraucht)
         tage_rest = voraussichtlich / tagesverbrauch
+    schwelle_tage = reichweite_tage + lieferzeit_tage
     bestellen = (voraussichtlich is not None and tage_rest is not None
-                 and tage_rest < reichweite_tage
+                 and tage_rest < schwelle_tage
                  and anzahl_lieferungen >= MIN_LIEFERUNGEN_BESTELLUNG)
     menge_vorschlag = None
     if bestellen:
         ziel = tagesverbrauch * reichweite_tage * BESTELL_ZIEL_FAKTOR
-        menge_vorschlag = int(math.ceil(max(0.0, ziel - voraussichtlich)))
+        # Bis die Ware eintrifft, wird waehrend der Lieferzeit weiter verbraucht.
+        bestand_bei_ankunft = max(0.0, voraussichtlich - tagesverbrauch * lieferzeit_tage)
+        menge_vorschlag = int(math.ceil(max(0.0, ziel - bestand_bei_ankunft)))
     return {
         "bestand_stand": stand.isoformat() if stand else None,
         "tage_seit_stand": tage_seit,
         "voraussichtlich": voraussichtlich,
         "tage_rest": tage_rest,
+        "schwelle_tage": schwelle_tage,
         "bestellen": bestellen,
         "menge_vorschlag": menge_vorschlag,
     }
 
 
 def lagerverbrauch_uebersicht(reichweite_tage: int = 14,
-                              fenster_tage: int = 365) -> Dict[str, Any]:
+                              fenster_tage: int = 365,
+                              lieferzeit_tage: int = 0) -> Dict[str, Any]:
     """Verbrauchs-Uebersicht: jeder Lagerartikel mit Ø-Monatsverbrauch, Bedarf und
     voraussichtlichem (rechnerischem) Bestand, plus Bestellvorschlag und
     Lieferpositionen ohne Artikel-Zuordnung.
 
-    Rueckgabe: {"zeilen", "ohne_zuordnung", "anzahl_mit_daten", "bestellvorschlag"}.
+    'lieferzeit_tage' wird in den Bestellvorschlag eingerechnet (frueher bestellen,
+    mehr bestellen). Der Bestellvorschlag wird zusaetzlich in zwei Gruppen geteilt:
+    Artikel mit EAN (per Barcode scannbar) und ohne EAN (Artikelnummer manuell).
+
+    Rueckgabe: {"zeilen", "ohne_zuordnung", "anzahl_mit_daten", "bestellvorschlag",
+    "bestellvorschlag_mit_ean", "bestellvorschlag_ohne_ean", ...}.
     Artikel mit Verbrauchsdaten stehen oben (hoechster Monatsverbrauch zuerst).
     """
     from .lieferschein import normalisiere_bestellnr
 
     LEERE_PROJEKTION = {
         "bestand_stand": None, "tage_seit_stand": None, "voraussichtlich": None,
-        "tage_rest": None, "bestellen": False, "menge_vorschlag": None,
+        "tage_rest": None, "schwelle_tage": reichweite_tage, "bestellen": False,
+        "menge_vorschlag": None,
     }
 
     stats = lagerlieferschein_verbrauch(fenster_tage)
@@ -983,7 +1001,7 @@ def lagerverbrauch_uebersicht(reichweite_tage: int = 14,
             kennz = _verbrauch_kennzahlen(
                 st["total"], st.get("erste"), st.get("anzahl_lieferungen", 0), reichweite_tage)
             proj = _projektion(a, kennz["tagesverbrauch"], reichweite_tage,
-                               st.get("anzahl_lieferungen", 0))
+                               st.get("anzahl_lieferungen", 0), lieferzeit_tage)
             zeilen.append({
                 "artikel": a,
                 "hat_daten": True,
@@ -1036,6 +1054,13 @@ def lagerverbrauch_uebersicht(reichweite_tage: int = 14,
                         and not z["artikel"].get("bestellt")]
     bestellvorschlag.sort(key=lambda z: (z["tage_rest"] if z["tage_rest"] is not None else 1e9))
 
+    # Aufteilung fuer die Bestellung: mit EAN -> Barcode, scannbar (z.B. Wuerth-App);
+    # ohne EAN -> nur Artikelnummer, manuell im Shop einzutippen.
+    bestellvorschlag_mit_ean = [z for z in bestellvorschlag
+                                if (z["artikel"].get("barcode") or "").strip()]
+    bestellvorschlag_ohne_ean = [z for z in bestellvorschlag
+                                 if not (z["artikel"].get("barcode") or "").strip()]
+
     # Bestandskontrolle: unsichere Schaetzung UND letzte Lieferung >= X Tage her
     # -> physisch nachzaehlen, damit die Projektion wieder stimmt.
     grenze_kontrolle = (date.today() - timedelta(days=BESTANDSKONTROLLE_TAGE)).isoformat()
@@ -1073,9 +1098,12 @@ def lagerverbrauch_uebersicht(reichweite_tage: int = 14,
         "ohne_zuordnung": ohne_zuordnung,
         "anzahl_mit_daten": sum(1 for z in zeilen if z["hat_daten"]),
         "bestellvorschlag": bestellvorschlag,
+        "bestellvorschlag_mit_ean": bestellvorschlag_mit_ean,
+        "bestellvorschlag_ohne_ean": bestellvorschlag_ohne_ean,
         "bestandskontrolle": bestandskontrolle,
         "bestandskontrolle_tage": BESTANDSKONTROLLE_TAGE,
         "bestellt_offen": bestellt_offen,
+        "lieferzeit_tage": lieferzeit_tage,
     }
 
 
