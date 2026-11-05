@@ -74,6 +74,7 @@ def _form_zu_artikel() -> dict:
         "bestellmenge": _als_int_oder_none(request.form.get("bestellmenge")),
         "nachbestellen": request.form.get("nachbestellen") == "on",
         "kein_ean": request.form.get("kein_ean") == "on",
+        "ausgelaufen": request.form.get("ausgelaufen") == "on",
         "notizen": (request.form.get("notizen") or "").strip(),
     }
 
@@ -85,8 +86,12 @@ def _form_zu_artikel() -> dict:
 def liste():
     suche = (request.args.get("q") or "").strip()
     nur_bestellen = request.args.get("bestellen") == "1"
+    mit_ausgelaufen = request.args.get("ausgelaufen") == "1"
 
-    artikel = lagerartikel_sortiert()
+    alle = lagerartikel_sortiert()
+    anzahl_ausgelaufen = sum(1 for a in alle if a.get("ausgelaufen"))
+    # Ausgelaufene Artikel standardmaessig ausblenden
+    artikel = alle if mit_ausgelaufen else [a for a in alle if not a.get("ausgelaufen")]
     if suche:
         s = suche.lower()
         artikel = [
@@ -119,6 +124,8 @@ def liste():
         nur_bestellen=nur_bestellen,
         bestell_ids=bestell_ids,
         anzahl_bestellen=len(bestell_ids),
+        mit_ausgelaufen=mit_ausgelaufen,
+        anzahl_ausgelaufen=anzahl_ausgelaufen,
     )
 
 
@@ -238,14 +245,9 @@ def bestand_aendern(artikel_id: str):
         abort(404)
     aktuell = artikel.get("bestand") or 0
     delta = request.form.get("delta")
-    entnehmen = request.form.get("entnehmen")
     setzen = request.form.get("setzen")
     if delta is not None:
         neu_wert = aktuell + _als_int(delta, 0)
-    elif entnehmen is not None:
-        # Entnahme/Abgang: angegebene Menge vom Bestand abbuchen ("aus dem
-        # Bestand streichen"). Vorzeichen egal -> immer abziehen.
-        neu_wert = aktuell - abs(_als_int(entnehmen, 0))
     elif setzen is not None:
         neu_wert = _als_int(setzen, aktuell)
     else:
@@ -319,6 +321,27 @@ def kein_ean_setzen(artikel_id: str):
     lagerartikel.update(artikel_id, {"kein_ean": True})
     flash("Als «kein EAN vorhanden» markiert.", "success")
     return redirect(request.referrer or url_for("lager.ohne_ean"))
+
+
+@bp.route("/<artikel_id>/auslaufen", methods=["POST"])
+@login_required
+def auslaufen_toggle(artikel_id: str):
+    """Schaltet den Auslauf-Status um: ein 'ausgelaufener' Artikel wird nicht
+    mehr bestellt (raus aus Bestellvorschlag/Bestandskontrolle/Nachbestell-/
+    Ohne-EAN-Listen) und im Lagerbestand standardmaessig ausgeblendet. Bestand
+    und Verbrauchs-Historie bleiben erhalten – er laeuft einfach aus."""
+    artikel = lagerartikel.get(artikel_id)
+    if not artikel:
+        abort(404)
+    neu = not artikel.get("ausgelaufen")
+    lagerartikel.update(artikel_id, {"ausgelaufen": neu})
+    if neu:
+        # beim Auslaufen auch nicht mehr aktiv nachbestellen
+        lagerartikel.update(artikel_id, {"nachbestellen": False})
+        flash(f"«{artikel.get('bezeichnung')}» läuft aus – wird nicht mehr bestellt.", "success")
+    else:
+        flash(f"«{artikel.get('bezeichnung')}» ist wieder aktiv.", "success")
+    return redirect(request.referrer or url_for("lager.liste"))
 
 
 # ----- Bestellliste (Druck) ---------------------------------------------------

@@ -733,7 +733,8 @@ def lagerartikel_ohne_ean() -> List[Dict[str, Any]]:
     Isolierbaender ohne Strichcode), werden ausgeblendet. Sortiert nach Lagerort,
     dann Bezeichnung."""
     items = [a for a in lagerartikel.list()
-             if not (a.get("barcode") or "").strip() and not a.get("kein_ean")]
+             if not (a.get("barcode") or "").strip() and not a.get("kein_ean")
+             and not a.get("ausgelaufen")]
     items.sort(key=lambda a: (
         (a.get("lagerort") or "￿").lower(),
         (a.get("bezeichnung") or "").lower(),
@@ -747,6 +748,8 @@ def lagerartikel_nachzubestellen() -> List[Dict[str, Any]]:
     Sortiert nach Lieferant, dann Bezeichnung (bestell-lieferantenweise)."""
     out = []
     for a in lagerartikel.list():
+        if a.get("ausgelaufen"):
+            continue  # Auslaufartikel werden nicht mehr bestellt
         manuell = bool(a.get("nachbestellen"))
         mind = a.get("mindestbestand") or 0
         bestand = a.get("bestand")
@@ -1026,7 +1029,8 @@ def lagerverbrauch_uebersicht(reichweite_tage: int = 14,
 
     # Bestellvorschlag: Artikel, deren voraussichtlicher Bestand unter die
     # gewuenschte Reichweite faellt — knappste zuerst.
-    bestellvorschlag = [z for z in zeilen if z.get("bestellen")]
+    bestellvorschlag = [z for z in zeilen
+                        if z.get("bestellen") and not z["artikel"].get("ausgelaufen")]
     bestellvorschlag.sort(key=lambda z: (z["tage_rest"] if z["tage_rest"] is not None else 1e9))
 
     # Bestandskontrolle: unsichere Schaetzung UND letzte Lieferung >= X Tage her
@@ -1036,6 +1040,7 @@ def lagerverbrauch_uebersicht(reichweite_tage: int = 14,
         z for z in zeilen
         if z["hat_daten"] and z["unsicher"] and z.get("letzte")
         and z["letzte"] <= grenze_kontrolle
+        and not z["artikel"].get("ausgelaufen")
     ]
     bestandskontrolle.sort(key=lambda z: (z.get("letzte") or ""))
 

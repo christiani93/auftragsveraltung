@@ -69,6 +69,12 @@
         <label class="form-check-label" for="nachbestellen">🛒 Jetzt nachbestellen</label>
       </div>
     </div>
+    <div class="col-12">
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" name="ausgelaufen" id="ausgelaufen" {% if artikel.ausgelaufen %}checked{% endif %}>
+        <label class="form-check-label" for="ausgelaufen">⏳ Auslaufartikel – nicht mehr bestellen (aus Bestellvorschlag & Listen ausblenden, Bestand läuft aus)</label>
+      </div>
+    </div>
 
     <div class="col-12">
       <label class="form-label">Notizen</label>

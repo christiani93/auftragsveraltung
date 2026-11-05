@@ -21,9 +21,17 @@
       <label class="form-check-label" for="f-best">Nur nachzubestellen</label>
     </div>
   </div>
+  {% if anzahl_ausgelaufen or mit_ausgelaufen %}
+  <div class="col-auto">
+    <div class="form-check">
+      <input class="form-check-input" type="checkbox" name="ausgelaufen" value="1" id="f-aus" {% if mit_ausgelaufen %}checked{% endif %} onchange="this.form.submit()">
+      <label class="form-check-label" for="f-aus">Ausgelaufene zeigen ({{ anzahl_ausgelaufen }})</label>
+    </div>
+  </div>
+  {% endif %}
   <div class="col-auto">
     <button class="btn btn-outline-secondary" type="submit">Filtern</button>
-    {% if suche or nur_bestellen %}<a class="btn btn-link" href="{{ url_for('lager.liste') }}">Zurücksetzen</a>{% endif %}
+    {% if suche or nur_bestellen or mit_ausgelaufen %}<a class="btn btn-link" href="{{ url_for('lager.liste') }}">Zurücksetzen</a>{% endif %}
   </div>
 </form>
 
@@ -47,10 +55,11 @@
         </thead>
         <tbody>
           {% for a in artikel %}
-          <tr class="{% if a.id in bestell_ids %}table-warning{% endif %}">
+          <tr class="{% if a.ausgelaufen %}text-muted{% elif a.id in bestell_ids %}table-warning{% endif %}">
             <td>
-              <a href="{{ url_for('lager.bearbeiten', artikel_id=a.id) }}">{{ a.bezeichnung }}</a>
-              {% if a.id in bestell_ids %}<span class="badge bg-warning text-dark ms-1">nachbestellen</span>{% endif %}
+              <a href="{{ url_for('lager.bearbeiten', artikel_id=a.id) }}" {% if a.ausgelaufen %}class="text-decoration-line-through"{% endif %}>{{ a.bezeichnung }}</a>
+              {% if a.ausgelaufen %}<span class="badge bg-secondary ms-1">⏳ ausgelaufen</span>{% endif %}
+              {% if not a.ausgelaufen and a.id in bestell_ids %}<span class="badge bg-warning text-dark ms-1">nachbestellen</span>{% endif %}
               {% if a.notizen %}<div class="small text-muted">{{ a.notizen }}</div>{% endif %}
             </td>
             <td class="small">
@@ -64,15 +73,17 @@
                 <span class="fw-semibold" style="min-width:2.5em; display:inline-block;">{{ a.bestand if a.bestand is not none else '–' }}</span>
                 <button name="delta" value="1" class="btn btn-sm btn-outline-secondary py-0 px-2" title="plus 1">+</button>
               </form>
-              <form method="post" action="{{ url_for('lager.bestand_aendern', artikel_id=a.id) }}" class="d-inline-flex align-items-center gap-1 mt-1 justify-content-center">
-                <input type="number" name="entnehmen" min="1" step="1" class="form-control form-control-sm text-end py-0" style="width:56px;" placeholder="Anz." title="Menge aus dem Bestand streichen (Entnahme)">
-                <button class="btn btn-sm btn-outline-danger py-0" type="submit" title="Aus dem Bestand streichen (Entnahme)">− entnehmen</button>
-              </form>
               {% if a.mindestbestand %}<div class="small text-muted">min. {{ a.mindestbestand }}</div>{% endif %}
             </td>
             <td class="text-end" style="white-space:nowrap;">
+              {% if not a.ausgelaufen %}
               <form method="post" action="{{ url_for('lager.nachbestellen_toggle', artikel_id=a.id) }}" class="d-inline">
                 <button class="btn btn-sm {{ 'btn-warning' if a.nachbestellen else 'btn-outline-warning' }} py-0" title="Nachbestellen-Flag umschalten">🛒</button>
+              </form>
+              {% endif %}
+              <form method="post" action="{{ url_for('lager.auslaufen_toggle', artikel_id=a.id) }}" class="d-inline"
+                    {% if not a.ausgelaufen %}onsubmit="return confirm('«{{ a.bezeichnung }}» auslaufen lassen? Wird nicht mehr bestellt und ausgeblendet.');"{% endif %}>
+                <button class="btn btn-sm {{ 'btn-secondary' if a.ausgelaufen else 'btn-outline-secondary' }} py-0" title="{{ 'Wieder aktivieren' if a.ausgelaufen else 'Artikel auslaufen lassen (nicht mehr bestellen)' }}">⏳</button>
               </form>
               <a class="btn btn-sm btn-outline-secondary py-0" href="{{ url_for('lager.bearbeiten', artikel_id=a.id) }}">✎</a>
             </td>

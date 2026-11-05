@@ -94,7 +94,13 @@
           </td>
           <td class="text-end">{{ zahl(z.voraussichtlich) }} <span class="small text-muted">{{ z.einheit }}</span></td>
           <td class="text-end {% if z.tage_rest is not none and z.tage_rest < reichweite %}text-danger fw-semibold{% endif %}">{{ tage(z.tage_rest) }}</td>
-          <td class="text-end"><strong>{{ zahl(z.menge_vorschlag) }}</strong> <span class="small text-muted">{{ z.einheit }}</span></td>
+          <td class="text-end">
+            <strong>{{ zahl(z.menge_vorschlag) }}</strong> <span class="small text-muted">{{ z.einheit }}</span>
+            <form method="post" action="{{ url_for('lager.auslaufen_toggle', artikel_id=z.artikel.id) }}" class="d-inline"
+                  onsubmit="return confirm('«{{ z.artikel.bezeichnung }}» auslaufen lassen? Verschwindet aus dem Bestellvorschlag.');">
+              <button class="btn btn-sm btn-outline-secondary py-0 ms-1" title="Auslaufen lassen – nicht mehr bestellen">⏳</button>
+            </form>
+          </td>
         </tr>
         {% endfor %}
       </tbody>
