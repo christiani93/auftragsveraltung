@@ -1219,6 +1219,10 @@ def lager_top_verbrauch_pro_lagerort(fenster_tage: int = 365,
                 break
         if not st:
             continue
+        # Wie beim Bestellvorschlag: erst ab 2 Lieferungen ist die Verbrauchsrate
+        # aussagekraeftig — eine einzelne (oft grosse) Lieferung verzerrt sonst.
+        if st.get("anzahl_lieferungen", 0) < MIN_LIEFERUNGEN_BESTELLUNG:
+            continue
         kennz = _verbrauch_kennzahlen(
             st["total"], st.get("erste"), st.get("anzahl_lieferungen", 0), 30)
         mv = kennz["monatsverbrauch"]
