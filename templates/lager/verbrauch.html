@@ -69,13 +69,33 @@
             <div class="small text-muted" title="In den Vorschlag eingerechnete Lieferzeit – ✓ = aus Bestell-/Lieferdaten gemessen, sonst Standardwert">⏱ {{ z.lieferzeit_eff }} Tg.{% if z.lieferzeit_gemessen %} ✓{% else %} (Std.){% endif %}</div>
           </td>
           <td class="text-end" style="white-space:nowrap;">
-            <strong>{{ zahl(z.menge_vorschlag) }}</strong> <span class="small text-muted">{{ z.einheit }}</span>
-            {% if z.artikel.verpackungsmenge and z.menge_vorschlag %}<div class="small text-muted">≈ {{ ((z.menge_vorschlag + z.artikel.verpackungsmenge - 1) // z.artikel.verpackungsmenge) }} Pk. à {{ z.artikel.verpackungsmenge }}</div>{% endif %}
-            <input type="hidden" form="{{ fid }}" name="menge_{{ z.artikel.id }}" value="{{ z.menge_vorschlag }}">
-            <form method="post" action="{{ url_for('lager.auslaufen_toggle', artikel_id=z.artikel.id) }}" class="d-inline"
-                  onsubmit="return confirm('«{{ z.artikel.bezeichnung }}» auslaufen lassen? Verschwindet aus dem Bestellvorschlag.');">
-              <button class="btn btn-sm btn-outline-secondary py-0 ms-1" title="Auslaufen lassen – nicht mehr bestellen">⏳</button>
-            </form>
+            {% if z.artikel.liefereinheit and z.menge_vorschlag %}
+              {% set le = z.artikel.liefereinheit %}
+              {% set le_anz = ((z.menge_vorschlag + le - 1) // le) %}
+              <strong>{{ le_anz }} × {{ le }}</strong>
+              <div class="small text-muted">= {{ le_anz * le }} {{ z.einheit }}</div>
+              <input type="hidden" form="{{ fid }}" name="menge_{{ z.artikel.id }}" value="{{ le_anz * le }}">
+            {% else %}
+              <strong>{{ zahl(z.menge_vorschlag) }}</strong> <span class="small text-muted">{{ z.einheit }}</span>
+              {% if z.menge_vorschlag %}
+              <form method="post" action="{{ url_for('lager.liefereinheit_setzen', artikel_id=z.artikel.id) }}" class="input-group input-group-sm mt-1" style="max-width:150px; margin-left:auto;" title="Liefereinheit (Stück pro Bestelleinheit) fehlt – hier setzen, dann wird in x × LE bestellt">
+                <span class="input-group-text py-0">LE</span>
+                <input type="number" name="liefereinheit" min="1" step="1" class="form-control py-0" placeholder="?">
+                <button class="btn btn-outline-secondary py-0" type="submit">✓</button>
+              </form>
+              {% endif %}
+              <input type="hidden" form="{{ fid }}" name="menge_{{ z.artikel.id }}" value="{{ z.menge_vorschlag }}">
+            {% endif %}
+            <div class="mt-1">
+              <form method="post" action="{{ url_for('lager.bestellt_markieren') }}" class="d-inline">
+                <input type="hidden" name="artikel_id" value="{{ z.artikel.id }}">
+                <button class="btn btn-sm btn-outline-success py-0" title="Nur diesen Artikel als bestellt markieren – unterwegs, bis die Lieferung kommt">📦 bestellt</button>
+              </form>
+              <form method="post" action="{{ url_for('lager.auslaufen_toggle', artikel_id=z.artikel.id) }}" class="d-inline"
+                    onsubmit="return confirm('«{{ z.artikel.bezeichnung }}» auslaufen lassen? Verschwindet aus dem Bestellvorschlag.');">
+                <button class="btn btn-sm btn-outline-secondary py-0" title="Auslaufen lassen – nicht mehr bestellen">⏳</button>
+              </form>
+            </div>
           </td>
         </tr>
         {% endfor %}
@@ -209,18 +229,18 @@
           </td>
           <td class="text-end">
             {{ z.artikel.bestand if z.artikel.bestand is not none else '–' }}
-            {% if z.artikel.verpackungsmenge and z.artikel.bestand is not none %}<div class="small text-muted">{{ (z.artikel.bestand / z.artikel.verpackungsmenge)|round(1) }} Pk.</div>{% endif %}
+            {% if z.artikel.liefereinheit and z.artikel.bestand is not none %}<div class="small text-muted">{{ (z.artikel.bestand / z.artikel.liefereinheit)|round(1) }} LE</div>{% endif %}
           </td>
           <td>
-            <form method="post" action="{{ url_for('lager.bestand_aendern', artikel_id=z.artikel.id) }}" class="input-group input-group-sm {% if z.artikel.verpackungsmenge %}mb-1{% endif %}">
+            <form method="post" action="{{ url_for('lager.bestand_aendern', artikel_id=z.artikel.id) }}" class="input-group input-group-sm {% if z.artikel.liefereinheit %}mb-1{% endif %}">
               <input type="number" name="setzen" min="0" step="1" class="form-control text-end" placeholder="Stk" title="Gezählten Ist-Bestand in Stück eintragen (Stichtag heute)">
               <button class="btn btn-outline-info" type="submit" title="Bestand übernehmen">✓</button>
             </form>
-            {% if z.artikel.verpackungsmenge %}
+            {% if z.artikel.liefereinheit %}
             <form method="post" action="{{ url_for('lager.bestand_aendern', artikel_id=z.artikel.id) }}" class="input-group input-group-sm">
-              <input type="number" name="pakete" min="0" step="1" class="form-control text-end" placeholder="Pakete" title="Gezählte Pakete eintragen – wird × VE ({{ z.artikel.verpackungsmenge }}) gerechnet">
-              <span class="input-group-text">×{{ z.artikel.verpackungsmenge }}</span>
-              <button class="btn btn-outline-info" type="submit" title="Pakete × VE übernehmen">✓</button>
+              <input type="number" name="pakete" min="0" step="1" class="form-control text-end" placeholder="LE" title="Gezählte Liefereinheiten eintragen – wird × {{ z.artikel.liefereinheit }} gerechnet">
+              <span class="input-group-text">×{{ z.artikel.liefereinheit }}</span>
+              <button class="btn btn-outline-info" type="submit" title="LE × Größe übernehmen">✓</button>
             </form>
             {% endif %}
           </td>

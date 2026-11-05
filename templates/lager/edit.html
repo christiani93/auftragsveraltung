@@ -49,9 +49,9 @@
     </div>
 
     <div class="col-md-3">
-      <label class="form-label">Verpackungsmenge (VE)</label>
-      <input type="number" name="verpackungsmenge" id="f-ve" class="form-control" min="1" step="1" value="{{ artikel.verpackungsmenge if artikel.get('verpackungsmenge') is not none else '' }}" placeholder="z.B. 100">
-      <small class="text-muted">Stück pro Paket/Bestelleinheit (manuell, z.B. 100). Für Paket-Zählung & Bestellmenge.</small>
+      <label class="form-label">Liefereinheit (LE)</label>
+      <input type="number" name="liefereinheit" id="f-ve" class="form-control" min="1" step="1" value="{{ artikel.liefereinheit if artikel.get('liefereinheit') is not none else '' }}" placeholder="z.B. 100">
+      <small class="text-muted">Stück pro Bestelleinheit (manuell, z.B. 100). Für LE-Zählung & Bestellmenge.</small>
     </div>
     <div class="col-md-3">
       <label class="form-label">Bestand</label>
@@ -59,9 +59,9 @@
       <small class="text-muted"><span id="bestand-pakete-info"></span><span id="bestand-pakete-hint">Ist-Bestand (Inventur).</span></small>
     </div>
     <div class="col-md-3">
-      <label class="form-label">…oder Pakete zählen</label>
-      <input type="number" id="f-pakete" class="form-control" min="0" step="1" placeholder="Anzahl Pakete">
-      <small class="text-muted">Pakete × VE → füllt den Bestand.</small>
+      <label class="form-label">…oder in LE zählen</label>
+      <input type="number" id="f-pakete" class="form-control" min="0" step="1" placeholder="Anzahl LE">
+      <small class="text-muted">Anzahl LE × LE-Größe → füllt den Bestand.</small>
     </div>
     <div class="col-md-3">
       <label class="form-label">Mindestbestand</label>
@@ -193,7 +193,7 @@
     const v = veVal(); const b = parseInt(bestandInput.value, 10);
     if (v > 0 && !isNaN(b)) {
       const p = b / v;
-      info.textContent = "≈ " + (Math.round(p * 100) / 100) + " Pakete à " + v + " · ";
+      info.textContent = "≈ " + (Math.round(p * 100) / 100) + " LE à " + v + " · ";
     } else { info.textContent = ""; }
   }
   if (ve && bestandInput && pakete && info) {

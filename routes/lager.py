@@ -75,7 +75,7 @@ def _form_zu_artikel() -> dict:
         "bestand": _als_int_oder_none(request.form.get("bestand")),
         "mindestbestand": _als_int(request.form.get("mindestbestand"), 0),
         "bestellmenge": _als_int_oder_none(request.form.get("bestellmenge")),
-        "verpackungsmenge": _als_int_oder_none(request.form.get("verpackungsmenge")),
+        "liefereinheit": _als_int_oder_none(request.form.get("liefereinheit")),
         "nachbestellen": request.form.get("nachbestellen") == "on",
         "kein_ean": request.form.get("kein_ean") == "on",
         "ausgelaufen": request.form.get("ausgelaufen") == "on",
@@ -252,10 +252,10 @@ def bestand_aendern(artikel_id: str):
     delta = request.form.get("delta")
     setzen = request.form.get("setzen")
     pakete = request.form.get("pakete")
-    ve = artikel.get("verpackungsmenge") or 0
-    if pakete is not None and pakete != "" and ve > 0:
-        # Ist-Bestand in Paketen gezaehlt -> Stueck = Pakete * Verpackungsmenge
-        neu_wert = _als_int(pakete, 0) * ve
+    le = artikel.get("liefereinheit") or 0
+    if pakete is not None and pakete != "" and le > 0:
+        # Ist-Bestand in Liefereinheiten gezaehlt -> Stueck = LE-Anzahl * LE-Groesse
+        neu_wert = _als_int(pakete, 0) * le
     elif delta is not None:
         neu_wert = aktuell + _als_int(delta, 0)
     elif setzen is not None:
@@ -267,6 +267,22 @@ def bestand_aendern(artikel_id: str):
         "bestand_stand": date.today().isoformat(),
     })
     return redirect(request.referrer or url_for("lager.liste"))
+
+
+@bp.route("/<artikel_id>/liefereinheit", methods=["POST"])
+@login_required
+def liefereinheit_setzen(artikel_id: str):
+    """Setzt die Liefereinheit (LE = Stueck pro Bestelleinheit) eines Artikels —
+    z.B. direkt im Bestellvorschlag nachgetragen, wenn noch keine hinterlegt ist."""
+    if not lagerartikel.get(artikel_id):
+        abort(404)
+    le = _als_int_oder_none(request.form.get("liefereinheit"))
+    lagerartikel.update(artikel_id, {"liefereinheit": le})
+    if le:
+        flash(f"Liefereinheit = {le} Stück gesetzt.", "success")
+    else:
+        flash("Liefereinheit entfernt.", "info")
+    return redirect(request.referrer or url_for("lager.verbrauch"))
 
 
 @bp.route("/<artikel_id>/nachbestellen", methods=["POST"])
