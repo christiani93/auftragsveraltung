@@ -83,6 +83,12 @@ Grosse Erweiterung in dieser Session (Commits bis `c61af5e`):
 - **Artikel-Detail**: Verbrauchsübersicht 1/3/6/12 Monate (kumulativ, aus
   Lieferscheinen) + gemessene Lieferzeit (`lagerartikel_verbrauch_perioden`).
 - **Reihenfolge** der Karten: Bestellvorschlag → Bestandskontrolle → Unterwegs.
+- **Verbrauch = Nachbestell-Modell** (`_verbrauch_kennzahlen`): Ø-Verbrauch =
+  (Gesamtmenge − Menge der **1. Lieferung**) ÷ Spanne (erste..letzte Lieferung).
+  Die 1. Lieferung ist Grundbestand (z.B. nie erfasster Restbestand vor August) und
+  zählt NICHT als Verbrauch; die gerade gelieferte letzte Menge bläht den Schnitt
+  nicht mehr auf. Braucht automatisch ≥2 Lieferungen. `lagerlieferschein_verbrauch`
+  liefert dafür `erste_menge`. Wirkt überall (Bestellvorschlag, Übersicht, Statistik).
 - **Statistik** `/lager/statistik` (`lager_top_verbrauch_pro_lagerort`): Top-Verbrauch
   (Ø/Monat) je Lagerort, Zeitfenster + Top-N wählbar, Balken je Artikel. Lagerort je
   Gruppe direkt umbenennen/zusammenführen (`lagerort_umbenennen`, setzt alle Artikel
