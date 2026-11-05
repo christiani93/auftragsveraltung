@@ -729,8 +729,11 @@ def lager_lieferanten_liste() -> List[str]:
 def lagerartikel_ohne_ean() -> List[Dict[str, Any]]:
     """Lagerartikel ohne erfassten Barcode/EAN — diese muessen noch am Regal
     eingescannt werden (betrifft v.a. per Wareneingang automatisch angelegte
-    Artikel). Sortiert nach Lagerort, dann Bezeichnung."""
-    items = [a for a in lagerartikel.list() if not (a.get("barcode") or "").strip()]
+    Artikel). Artikel, die bewusst als 'kein EAN vorhanden' markiert sind (z.B.
+    Isolierbaender ohne Strichcode), werden ausgeblendet. Sortiert nach Lagerort,
+    dann Bezeichnung."""
+    items = [a for a in lagerartikel.list()
+             if not (a.get("barcode") or "").strip() and not a.get("kein_ean")]
     items.sort(key=lambda a: (
         (a.get("lagerort") or "￿").lower(),
         (a.get("bezeichnung") or "").lower(),

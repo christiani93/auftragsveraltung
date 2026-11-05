@@ -73,6 +73,7 @@ def _form_zu_artikel() -> dict:
         "mindestbestand": _als_int(request.form.get("mindestbestand"), 0),
         "bestellmenge": _als_int_oder_none(request.form.get("bestellmenge")),
         "nachbestellen": request.form.get("nachbestellen") == "on",
+        "kein_ean": request.form.get("kein_ean") == "on",
         "notizen": (request.form.get("notizen") or "").strip(),
     }
 
@@ -299,6 +300,19 @@ def ean_setzen(artikel_id: str):
         else:
             lagerartikel.update(artikel_id, {"barcode": code})
             flash(f"EAN für «{artikel.get('bezeichnung')}» gespeichert.", "success")
+    return redirect(request.referrer or url_for("lager.ohne_ean"))
+
+
+@bp.route("/<artikel_id>/kein-ean", methods=["POST"])
+@login_required
+def kein_ean_setzen(artikel_id: str):
+    """Markiert einen Artikel als 'kein EAN vorhanden' (z.B. Isolierband ohne
+    Strichcode) — er verschwindet aus der 'ohne EAN'-Liste. Rueckgaengig im
+    Bearbeiten-Formular."""
+    if not lagerartikel.get(artikel_id):
+        abort(404)
+    lagerartikel.update(artikel_id, {"kein_ean": True})
+    flash("Als «kein EAN vorhanden» markiert.", "success")
     return redirect(request.referrer or url_for("lager.ohne_ean"))
 
 

@@ -12,8 +12,9 @@
 <p class="text-muted">
   Diese Artikel haben noch keinen Barcode/EAN hinterlegt – typisch für automatisch über den
   <a href="{{ url_for('lager.lieferscheine') }}">Wareneingang</a> angelegte Artikel. Ohne EAN lassen sie sich auf
-  den gedruckten Listen nicht abscannen. Geh die Liste am Regal durch und scanne je Zeile den Strichcode
-  der Verpackung ein (Scanner tippt Code + Enter → speichert direkt).
+  den gedruckten Listen nicht abscannen. Geh die Liste am Regal durch und scanne je Zeile den Strichcode der
+  Verpackung – mit <strong>USB-Handscanner</strong> (ins Feld, Code + Enter) oder am Handy/Tablet über die
+  <strong>Kamera</strong> (📷).
 </p>
 
 {% if not gruppen %}
@@ -30,7 +31,7 @@
             <th>Bezeichnung</th>
             <th>Lieferant</th>
             <th style="width:120px;">Best-Nr</th>
-            <th style="width:280px;">EAN einscannen</th>
+            <th style="width:320px;">EAN einscannen</th>
           </tr>
         </thead>
         <tbody>
@@ -43,10 +44,17 @@
             <td class="small">{{ a.lieferant or '' }}</td>
             <td class="small text-muted">{{ a.bestellnummer or '—' }}</td>
             <td>
-              <form method="post" action="{{ url_for('lager.ean_setzen', artikel_id=a.id) }}" class="input-group input-group-sm">
-                <input type="text" name="barcode" class="form-control" placeholder="EAN scannen…" autocomplete="off" inputmode="numeric">
-                <button class="btn btn-outline-primary" type="submit">Speichern</button>
-              </form>
+              <div class="d-flex gap-1 flex-wrap">
+                <form method="post" action="{{ url_for('lager.ean_setzen', artikel_id=a.id) }}" class="input-group input-group-sm" style="width:auto;">
+                  <input type="text" name="barcode" id="ean-{{ a.id }}" class="form-control" placeholder="EAN scannen…" autocomplete="off" inputmode="numeric">
+                  <button type="button" class="btn btn-outline-secondary cam-btn" data-target="ean-{{ a.id }}" data-label="{{ a.bezeichnung }}" title="Mit Kamera scannen">📷</button>
+                  <button class="btn btn-outline-primary" type="submit">Speichern</button>
+                </form>
+                <form method="post" action="{{ url_for('lager.kein_ean_setzen', artikel_id=a.id) }}"
+                      onsubmit="return confirm('«{{ a.bezeichnung }}» hat keinen EAN? Verschwindet dann aus dieser Liste.');">
+                  <button class="btn btn-sm btn-outline-secondary text-nowrap" type="submit" title="Artikel hat keinen Strichcode (z.B. Isolierband)">🚫 kein EAN</button>
+                </form>
+              </div>
             </td>
           </tr>
           {% endfor %}
@@ -55,5 +63,61 @@
     </div>
   </div>
   {% endfor %}
+
+  <!-- Kamera-Overlay -->
+  <div id="cam-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.8); z-index:1080; align-items:center; justify-content:center;">
+    <div class="bg-white p-3 rounded shadow" style="max-width:460px; width:92%;">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <strong id="cam-title">EAN scannen</strong>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="cam-cancel">Abbrechen</button>
+      </div>
+      <div id="reader"></div>
+      <small class="text-muted">Barcode vor die Kamera halten – wird erkannt und direkt gespeichert.</small>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script>
+  (function () {
+    const overlay = document.getElementById("cam-overlay");
+    const title = document.getElementById("cam-title");
+    const cancel = document.getElementById("cam-cancel");
+    let scanner = null;
+    let targetInput = null;
+
+    async function stopCam() {
+      if (scanner) { try { await scanner.stop(); } catch (e) {} scanner = null; }
+      overlay.style.display = "none";
+    }
+
+    async function openCam(input, label) {
+      if (typeof Html5Qrcode === "undefined") { alert("Kamera-Scanner konnte nicht geladen werden (offline?)."); return; }
+      targetInput = input;
+      title.textContent = "EAN scannen – " + label;
+      overlay.style.display = "flex";
+      scanner = new Html5Qrcode("reader");
+      try {
+        await scanner.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 300, height: 150 } },
+          (decoded) => {
+            targetInput.value = decoded;
+            const form = targetInput.form;
+            stopCam().then(() => { if (form) form.submit(); });
+          },
+          () => {}
+        );
+      } catch (e) {
+        alert("Kamera nicht verfügbar: " + e);
+        stopCam();
+      }
+    }
+
+    document.querySelectorAll(".cam-btn").forEach((b) => {
+      b.addEventListener("click", () => openCam(document.getElementById(b.dataset.target), b.dataset.label));
+    });
+    cancel.addEventListener("click", stopCam);
+  })();
+  </script>
 {% endif %}
 {% endblock %}

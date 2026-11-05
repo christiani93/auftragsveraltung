@@ -75,6 +75,7 @@
           </td>
           <td class="small">
             {% if z.artikel.barcode %}<code>{{ z.artikel.barcode }}</code>
+            {% elif z.artikel.kein_ean %}<span class="text-muted">kein EAN</span>
             {% else %}<a class="badge bg-danger-subtle text-danger-emphasis text-decoration-none" href="{{ url_for('lager.ohne_ean') }}" title="EAN noch nicht erfasst – zum Nachtragen">EAN fehlt</a>{% endif %}
             {% if z.artikel.bestellnummer %}<div class="text-muted">Best-Nr {{ z.artikel.bestellnummer }}</div>{% endif %}
           </td>
@@ -123,8 +124,9 @@
       <thead class="table-light">
         <tr>
           <th>Artikel</th>
+          <th>EAN</th>
           <th>Lieferant</th>
-          <th class="text-end" title="Gespeicherter Bestand (Wareneingang/Inventur)">Bestand</th>
+          <th class="text-end" title="Ist-Bestand hier setzen (Inventur) – rechnet ab heute wieder runter">Bestand ✎</th>
           <th class="text-end" title="Rechnerischer Bestand heute = letzter Stand − geschätzter Verbrauch seitdem">Voraussichtl.</th>
           <th class="text-end" title="Wie lange der voraussichtliche Bestand noch reicht">reicht noch</th>
           <th class="text-end" title="Geschätzter Durchschnittsverbrauch pro Monat">Ø / Monat</th>
@@ -140,8 +142,18 @@
             <a href="{{ url_for('lager.bearbeiten', artikel_id=z.artikel.id) }}">{{ z.artikel.bezeichnung }}</a>
             {% if z.artikel.bestellnummer %}<div class="small text-muted">Best-Nr {{ z.artikel.bestellnummer }}</div>{% endif %}
           </td>
+          <td class="small">
+            {% if z.artikel.barcode %}<code>{{ z.artikel.barcode }}</code>
+            {% elif z.artikel.kein_ean %}<span class="text-muted">—</span>
+            {% else %}<a class="badge bg-danger-subtle text-danger-emphasis text-decoration-none" href="{{ url_for('lager.ohne_ean') }}" title="EAN noch nicht erfasst – zum Nachtragen">EAN fehlt</a>{% endif %}
+          </td>
           <td class="small">{{ z.artikel.lieferant or '' }}</td>
-          <td class="text-end">{{ z.artikel.bestand if z.artikel.bestand is not none else '–' }}</td>
+          <td class="text-end">
+            <form method="post" action="{{ url_for('lager.bestand_aendern', artikel_id=z.artikel.id) }}" class="d-inline-flex gap-1 justify-content-end">
+              <input type="number" name="setzen" value="{{ z.artikel.bestand if z.artikel.bestand is not none else '' }}" step="1" min="0" class="form-control form-control-sm text-end py-0" style="width:72px;" title="Ist-Bestand (Inventur) setzen – Stichtag wird auf heute gesetzt">
+              <button class="btn btn-sm btn-outline-secondary py-0" type="submit" title="Bestand übernehmen (zählt ab heute runter)">✓</button>
+            </form>
+          </td>
           <td class="text-end">
             {% if z.voraussichtlich is not none %}{{ zahl(z.voraussichtlich) }}{% else %}–{% endif %}
           </td>
