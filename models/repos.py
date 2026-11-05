@@ -844,6 +844,7 @@ def lagerlieferschein_verbrauch(fenster_tage: int = 365) -> Dict[str, Dict[str, 
                     "_lieferscheine": set(),
                     "erste": datum or None,
                     "letzte": datum or None,
+                    "erste_menge": 0.0,  # Menge der (datierten) ersten Lieferung
                 }
                 agg[key] = eintrag
             eintrag["total"] += float(menge)
@@ -854,7 +855,11 @@ def lagerlieferschein_verbrauch(fenster_tage: int = 365) -> Dict[str, Dict[str, 
                 eintrag["bezeichnung"] = p["bezeichnung"].strip()
             if datum:
                 if not eintrag["erste"] or datum < eintrag["erste"]:
+                    # Neue frueheste Lieferung -> Menge der ersten Lieferung neu setzen
                     eintrag["erste"] = datum
+                    eintrag["erste_menge"] = float(menge)
+                elif datum == eintrag["erste"]:
+                    eintrag["erste_menge"] += float(menge)
                 if not eintrag["letzte"] or datum > eintrag["letzte"]:
                     eintrag["letzte"] = datum
     for eintrag in agg.values():
@@ -863,19 +868,31 @@ def lagerlieferschein_verbrauch(fenster_tage: int = 365) -> Dict[str, Dict[str, 
 
 
 def _verbrauch_kennzahlen(total: float, erste_iso: Optional[str],
+                          letzte_iso: Optional[str], erste_menge: float,
                           anzahl_lieferungen: int, reichweite_tage: int) -> Dict[str, Any]:
-    """Rechnet aus Gesamtmenge + erstem Lieferdatum den Ø-Monatsverbrauch sowie
-    den Bedarf fuer 'reichweite_tage'. 'unsicher' = zu kurze/duenne Historie."""
-    heute = date.today()
+    """Ø-Monatsverbrauch nach dem Nachbestell-Modell: Was nachbestellt wird, ist
+    im Mittel der Verbrauch seit der letzten Bestellung. Daher zaehlt die ERSTE
+    Lieferung (= Grundbestand, z.B. der nie erfasste Restbestand vor August) NICHT
+    als Verbrauch, und gemessen wird ueber die Spanne zwischen erster und letzter
+    Lieferung (die letzte Lieferung ist gerade erst angekommen, aber ihre Menge
+    deckt den Verbrauch bis dahin ab).
+
+        verbraucht = Gesamtmenge − Menge der 1. Lieferung
+        Spanne     = letzte − erste Lieferung (Tage)
+
+    Dadurch braucht es automatisch >= 2 Lieferungen, sonst ist 'verbraucht' = 0
+    bzw. die Spanne 0 -> kein Ergebnis ('unsicher'/None). 'reichweite_tage' dient
+    nur zur Umrechnung in den Bedarf. 'unsicher' = kurze/duenne Historie."""
     span_tage = None
-    monatsverbrauch = None
-    if erste_iso:
+    if erste_iso and letzte_iso:
         try:
-            span_tage = (heute - date.fromisoformat(erste_iso)).days
+            span_tage = (date.fromisoformat(letzte_iso) - date.fromisoformat(erste_iso)).days
         except ValueError:
             span_tage = None
-    if span_tage and span_tage >= 1 and total > 0:
-        monatsverbrauch = total / (span_tage / TAGE_PRO_MONAT)
+    verbraucht = total - (erste_menge or 0)
+    monatsverbrauch = None
+    if span_tage and span_tage >= 1 and verbraucht > 0:
+        monatsverbrauch = verbraucht / (span_tage / TAGE_PRO_MONAT)
     tagesverbrauch = (monatsverbrauch / TAGE_PRO_MONAT) if monatsverbrauch else None
     bedarf = (tagesverbrauch * reichweite_tage) if tagesverbrauch else None
     unsicher = bool(monatsverbrauch) and (
@@ -883,6 +900,7 @@ def _verbrauch_kennzahlen(total: float, erste_iso: Optional[str],
     )
     return {
         "span_tage": span_tage,
+        "verbraucht": verbraucht if verbraucht > 0 else 0.0,
         "monatsverbrauch": monatsverbrauch,
         "tagesverbrauch": tagesverbrauch,
         "bedarf": bedarf,
@@ -1086,7 +1104,8 @@ def lagerverbrauch_uebersicht(reichweite_tage: int = 14,
                 break
         if st:
             kennz = _verbrauch_kennzahlen(
-                st["total"], st.get("erste"), st.get("anzahl_lieferungen", 0), reichweite_tage)
+                st["total"], st.get("erste"), st.get("letzte"), st.get("erste_menge", 0),
+                st.get("anzahl_lieferungen", 0), reichweite_tage)
             proj = _projektion(a, kennz["tagesverbrauch"], reichweite_tage,
                                st.get("anzahl_lieferungen", 0), lieferzeit_tage)
             zeilen.append({
@@ -1121,7 +1140,8 @@ def lagerverbrauch_uebersicht(reichweite_tage: int = 14,
         if key in benutzte_keys:
             continue
         kennz = _verbrauch_kennzahlen(
-            st["total"], st.get("erste"), st.get("anzahl_lieferungen", 0), reichweite_tage)
+            st["total"], st.get("erste"), st.get("letzte"), st.get("erste_menge", 0),
+            st.get("anzahl_lieferungen", 0), reichweite_tage)
         ohne_zuordnung.append({
             "bestellnummer": st.get("beispiel_nr") or "",
             "bezeichnung": st.get("bezeichnung") or "",
@@ -1224,7 +1244,8 @@ def lager_top_verbrauch_pro_lagerort(fenster_tage: int = 365,
         if st.get("anzahl_lieferungen", 0) < MIN_LIEFERUNGEN_BESTELLUNG:
             continue
         kennz = _verbrauch_kennzahlen(
-            st["total"], st.get("erste"), st.get("anzahl_lieferungen", 0), 30)
+            st["total"], st.get("erste"), st.get("letzte"), st.get("erste_menge", 0),
+            st.get("anzahl_lieferungen", 0), 30)
         mv = kennz["monatsverbrauch"]
         if not mv:
             continue
