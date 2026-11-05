@@ -901,13 +901,18 @@ def _artikel_stand_datum(a: Dict[str, Any]) -> Optional[date]:
 # und bestellt wieder, sobald die Reichweite unter 14 Tage faellt.
 BESTELL_ZIEL_FAKTOR = 2
 
+# Erst ab so vielen Lieferungen ist eine Verbrauchsrate aussagekraeftig genug fuer
+# einen Bestellvorschlag — eine einzelne Lieferung ergibt keinen echten Verbrauch.
+MIN_LIEFERUNGEN_BESTELLUNG = 2
+
 
 def _projektion(a: Dict[str, Any], tagesverbrauch: Optional[float],
-                reichweite_tage: int) -> Dict[str, Any]:
+                reichweite_tage: int, anzahl_lieferungen: int = 0) -> Dict[str, Any]:
     """Rechnerischer (voraussichtlicher) Bestand heute = zuletzt bekannter Bestand
     minus geschaetzter Verbrauch seit dem Stichtag. Nicht destruktiv — der
     gespeicherte Bestand bleibt unveraendert. Liefert zusaetzlich die verbleibende
-    Reichweite in Tagen und — falls unter 'reichweite_tage' — einen Bestellvorschlag.
+    Reichweite in Tagen und — falls unter 'reichweite_tage' UND mit genug
+    Lieferhistorie — einen Bestellvorschlag.
     """
     bestand = a.get("bestand")
     stand = _artikel_stand_datum(a)
@@ -919,7 +924,8 @@ def _projektion(a: Dict[str, Any], tagesverbrauch: Optional[float],
         voraussichtlich = max(0.0, bestand - verbraucht)
         tage_rest = voraussichtlich / tagesverbrauch
     bestellen = (voraussichtlich is not None and tage_rest is not None
-                 and tage_rest < reichweite_tage)
+                 and tage_rest < reichweite_tage
+                 and anzahl_lieferungen >= MIN_LIEFERUNGEN_BESTELLUNG)
     menge_vorschlag = None
     if bestellen:
         ziel = tagesverbrauch * reichweite_tage * BESTELL_ZIEL_FAKTOR
@@ -964,7 +970,8 @@ def lagerverbrauch_uebersicht(reichweite_tage: int = 14,
         if st:
             kennz = _verbrauch_kennzahlen(
                 st["total"], st.get("erste"), st.get("anzahl_lieferungen", 0), reichweite_tage)
-            proj = _projektion(a, kennz["tagesverbrauch"], reichweite_tage)
+            proj = _projektion(a, kennz["tagesverbrauch"], reichweite_tage,
+                               st.get("anzahl_lieferungen", 0))
             zeilen.append({
                 "artikel": a,
                 "hat_daten": True,

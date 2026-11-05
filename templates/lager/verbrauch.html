@@ -24,7 +24,8 @@
   Geschätzter Ø-Verbrauch aus {{ anzahl_lieferscheine }} importierten Lieferschein(en): Einkauf über die Zeit
   ≈ Verbrauch. Der <strong>voraussichtliche Bestand</strong> rechnet vom letzten Wareneingang/der letzten Inventur
   den geschätzten Verbrauch ab (der gespeicherte Bestand bleibt unverändert). Fällt er unter {{ reichweite }}&nbsp;Tage
-  Reichweite, kommt der Artikel in den <strong>Bestellvorschlag</strong>.
+  Reichweite, kommt der Artikel in den <strong>Bestellvorschlag</strong> –
+  aber erst ab <strong>2 Lieferungen</strong>, sonst ist der Verbrauch zu unsicher.
 </p>
 
 <form method="get" class="row g-2 align-items-end mb-3">
@@ -144,8 +145,9 @@
           <td class="text-end">
             {% if z.voraussichtlich is not none %}{{ zahl(z.voraussichtlich) }}{% else %}–{% endif %}
           </td>
-          <td class="text-end {% if z.tage_rest is not none and z.tage_rest < reichweite %}text-danger fw-semibold{% endif %}">
+          <td class="text-end {% if z.bestellen %}text-danger fw-semibold{% endif %}">
             {{ tage(z.tage_rest) }}{% if z.bestellen %} 🛒{% endif %}
+            {% if z.tage_rest is not none and z.tage_rest < reichweite and z.anzahl_lieferungen < 2 %}<span class="badge bg-secondary-subtle text-secondary-emphasis ms-1" title="Erst 1 Lieferung – Verbrauch noch zu unsicher für einen Bestellvorschlag.">1 Lief.</span>{% endif %}
           </td>
           <td class="text-end">
             {% if z.monatsverbrauch is not none %}
