@@ -750,6 +750,8 @@ def lagerartikel_nachzubestellen() -> List[Dict[str, Any]]:
     for a in lagerartikel.list():
         if a.get("ausgelaufen"):
             continue  # Auslaufartikel werden nicht mehr bestellt
+        if a.get("bestellt"):
+            continue  # bereits bestellt (unterwegs) -> nicht erneut auflisten
         manuell = bool(a.get("nachbestellen"))
         mind = a.get("mindestbestand") or 0
         bestand = a.get("bestand")
@@ -1030,7 +1032,8 @@ def lagerverbrauch_uebersicht(reichweite_tage: int = 14,
     # Bestellvorschlag: Artikel, deren voraussichtlicher Bestand unter die
     # gewuenschte Reichweite faellt — knappste zuerst.
     bestellvorschlag = [z for z in zeilen
-                        if z.get("bestellen") and not z["artikel"].get("ausgelaufen")]
+                        if z.get("bestellen") and not z["artikel"].get("ausgelaufen")
+                        and not z["artikel"].get("bestellt")]
     bestellvorschlag.sort(key=lambda z: (z["tage_rest"] if z["tage_rest"] is not None else 1e9))
 
     # Bestandskontrolle: unsichere Schaetzung UND letzte Lieferung >= X Tage her
@@ -1044,6 +1047,27 @@ def lagerverbrauch_uebersicht(reichweite_tage: int = 14,
     ]
     bestandskontrolle.sort(key=lambda z: (z.get("letzte") or ""))
 
+    # Bestellt / unterwegs: als bestellt markierte Artikel (warten auf Lieferung).
+    heute = date.today()
+    bestellt_offen = []
+    for z in zeilen:
+        a = z["artikel"]
+        if not a.get("bestellt"):
+            continue
+        tage_seit = None
+        if a.get("bestellt_am"):
+            try:
+                tage_seit = (heute - date.fromisoformat(str(a["bestellt_am"])[:10])).days
+            except ValueError:
+                tage_seit = None
+        bestellt_offen.append({
+            "artikel": a,
+            "bestellt_am": a.get("bestellt_am"),
+            "tage_seit": tage_seit,
+            "einheit": z.get("einheit") or a.get("einheit") or "",
+        })
+    bestellt_offen.sort(key=lambda b: (b["bestellt_am"] or ""))
+
     return {
         "zeilen": zeilen,
         "ohne_zuordnung": ohne_zuordnung,
@@ -1051,6 +1075,7 @@ def lagerverbrauch_uebersicht(reichweite_tage: int = 14,
         "bestellvorschlag": bestellvorschlag,
         "bestandskontrolle": bestandskontrolle,
         "bestandskontrolle_tage": BESTANDSKONTROLLE_TAGE,
+        "bestellt_offen": bestellt_offen,
     }
 
 

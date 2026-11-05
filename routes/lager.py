@@ -511,6 +511,10 @@ def lieferschein_uebernehmen():
         if treffer:
             neu_bestand = _ganzzahl_wenn_moeglich((treffer.get("bestand") or 0) + menge)
             updates = {"bestand": neu_bestand, "bestand_stand": stand}
+            # Lieferung angekommen -> evtl. gesetzten "bestellt"-Status loeschen
+            if treffer.get("bestellt"):
+                updates["bestellt"] = False
+                updates["bestellt_am"] = None
             # Lagerort nur setzen, wenn noch keiner hinterlegt ist
             if lagerort and not (treffer.get("lagerort") or "").strip():
                 updates["lagerort"] = lagerort
@@ -641,3 +645,43 @@ def bestellen_markieren():
         return redirect(url_for("lager.bestellliste"))
     flash("Nichts markiert.", "warning")
     return redirect(url_for("lager.verbrauch"))
+
+
+@bp.route("/verbrauch/bestellt-markieren", methods=["POST"])
+@login_required
+def bestellt_markieren():
+    """Markiert Artikel als 'bestellt' (unterwegs): raus aus dem Bestellvorschlag,
+    bis die Lieferung ankommt. Einzeln (artikel_id) oder mehrere (artikel_id[])."""
+    ids = request.form.getlist("artikel_id[]")
+    einzel = (request.form.get("artikel_id") or "").strip()
+    if einzel:
+        ids = [einzel]
+    heute = date.today().isoformat()
+    anzahl = 0
+    for artikel_id in ids:
+        artikel_id = (artikel_id or "").strip()
+        if not artikel_id or not lagerartikel.get(artikel_id):
+            continue
+        # bestellt setzen; 'nachbestellen' ist damit erledigt
+        lagerartikel.update(artikel_id, {
+            "bestellt": True, "bestellt_am": heute, "nachbestellen": False,
+        })
+        anzahl += 1
+    if anzahl:
+        flash(f"{anzahl} Artikel als bestellt markiert – erscheinen wieder, "
+              "sobald die Lieferung gebucht ist.", "success")
+    else:
+        flash("Nichts markiert.", "warning")
+    return redirect(request.referrer or url_for("lager.verbrauch"))
+
+
+@bp.route("/<artikel_id>/bestellt-erhalten", methods=["POST"])
+@login_required
+def bestellt_erhalten(artikel_id: str):
+    """Hebt den 'bestellt'-Status manuell auf (Lieferung erhalten, ohne dass ein
+    Lieferschein importiert wurde)."""
+    if not lagerartikel.get(artikel_id):
+        abort(404)
+    lagerartikel.update(artikel_id, {"bestellt": False, "bestellt_am": None})
+    flash("Als erhalten markiert.", "success")
+    return redirect(request.referrer or url_for("lager.verbrauch"))
