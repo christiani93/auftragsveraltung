@@ -917,6 +917,45 @@ MIN_LIEFERUNGEN_BESTELLUNG = 2
 # Tage her ist, gehoeren in die Bestandskontrolle (physisch nachzaehlen).
 BESTANDSKONTROLLE_TAGE = 14
 
+# Pro-Artikel gemessene Lieferzeit: wie viele der letzten Mess-Werte (Bestell- bis
+# Lieferdatum) fuer den gleitenden Schnitt behalten werden, und als plausibel
+# akzeptierte Spanne (alles ausserhalb gilt als Datenfehler/vergessenes Flag).
+LIEFERZEIT_HISTORIE_MAX = 10
+LIEFERZEIT_MAX_TAGE = 90
+
+
+def _gemessene_lieferzeit_tage(bestellt_am, geliefert_am) -> Optional[int]:
+    """Tage zwischen Bestell- und Lieferdatum (0..LIEFERZEIT_MAX_TAGE), sonst None.
+    None = nicht ermittelbar (fehlendes Datum, unplausibel/negativ)."""
+    if not bestellt_am or not geliefert_am:
+        return None
+    try:
+        b = date.fromisoformat(str(bestellt_am)[:10])
+        g = date.fromisoformat(str(geliefert_am)[:10])
+    except ValueError:
+        return None
+    tage = (g - b).days
+    if 0 <= tage <= LIEFERZEIT_MAX_TAGE:
+        return tage
+    return None
+
+
+def lieferzeit_update(artikel: Dict[str, Any], geliefert_am) -> Dict[str, Any]:
+    """Aus 'bestellt_am' des Artikels + Lieferdatum die real gemessene Lieferzeit
+    bilden und die Artikel-Updates (Historie + gleitender Schnitt 'lieferzeit_tage')
+    zurueckgeben. Leeres Dict, wenn keine Messung moeglich ist. Wird beim
+    Wareneingang / 'erhalten' aufgerufen, bevor 'bestellt_am' geloescht wird."""
+    lz = _gemessene_lieferzeit_tage(artikel.get("bestellt_am"), geliefert_am)
+    if lz is None:
+        return {}
+    hist = [int(x) for x in (artikel.get("lieferzeit_historie") or []) if isinstance(x, (int, float))]
+    hist.append(lz)
+    hist = hist[-LIEFERZEIT_HISTORIE_MAX:]
+    return {
+        "lieferzeit_historie": hist,
+        "lieferzeit_tage": int(round(sum(hist) / len(hist))),
+    }
+
 
 def _projektion(a: Dict[str, Any], tagesverbrauch: Optional[float],
                 reichweite_tage: int, anzahl_lieferungen: int = 0,
@@ -932,7 +971,11 @@ def _projektion(a: Dict[str, Any], tagesverbrauch: Optional[float],
     Rhythmus + Lieferzeit. Die Bestellmenge deckt zusaetzlich den Verbrauch
     waehrend der Lieferzeit (bis die Ware wirklich eintrifft).
     """
-    lieferzeit_tage = max(0, lieferzeit_tage or 0)
+    # Pro-Artikel real gemessene Lieferzeit (Bestell- bis Lieferdatum) hat Vorrang
+    # vor dem uebergebenen globalen Standard. Siehe 'lieferzeit_update'.
+    art_lz = a.get("lieferzeit_tage")
+    gemessen = isinstance(art_lz, (int, float)) and art_lz >= 0
+    eff_lieferzeit = max(0, int(art_lz if gemessen else (lieferzeit_tage or 0)))
     bestand = a.get("bestand")
     stand = _artikel_stand_datum(a)
     tage_seit = max(0, (date.today() - stand).days) if stand else None
@@ -942,7 +985,7 @@ def _projektion(a: Dict[str, Any], tagesverbrauch: Optional[float],
         verbraucht = tagesverbrauch * (tage_seit or 0)
         voraussichtlich = max(0.0, bestand - verbraucht)
         tage_rest = voraussichtlich / tagesverbrauch
-    schwelle_tage = reichweite_tage + lieferzeit_tage
+    schwelle_tage = reichweite_tage + eff_lieferzeit
     bestellen = (voraussichtlich is not None and tage_rest is not None
                  and tage_rest < schwelle_tage
                  and anzahl_lieferungen >= MIN_LIEFERUNGEN_BESTELLUNG)
@@ -950,7 +993,7 @@ def _projektion(a: Dict[str, Any], tagesverbrauch: Optional[float],
     if bestellen:
         ziel = tagesverbrauch * reichweite_tage * BESTELL_ZIEL_FAKTOR
         # Bis die Ware eintrifft, wird waehrend der Lieferzeit weiter verbraucht.
-        bestand_bei_ankunft = max(0.0, voraussichtlich - tagesverbrauch * lieferzeit_tage)
+        bestand_bei_ankunft = max(0.0, voraussichtlich - tagesverbrauch * eff_lieferzeit)
         menge_vorschlag = int(math.ceil(max(0.0, ziel - bestand_bei_ankunft)))
     return {
         "bestand_stand": stand.isoformat() if stand else None,
@@ -958,8 +1001,51 @@ def _projektion(a: Dict[str, Any], tagesverbrauch: Optional[float],
         "voraussichtlich": voraussichtlich,
         "tage_rest": tage_rest,
         "schwelle_tage": schwelle_tage,
+        "lieferzeit_eff": eff_lieferzeit,
+        "lieferzeit_gemessen": gemessen,
         "bestellen": bestellen,
         "menge_vorschlag": menge_vorschlag,
+    }
+
+
+def lagerartikel_verbrauch_perioden(artikel: Dict[str, Any],
+                                    monate=(1, 3, 6, 12)) -> Dict[str, Any]:
+    """Eingekaufte Menge dieses Artikels je rueckblickendem Zeitfenster (1/3/6/12
+    Monate) aus den importierten Lieferscheinen = geschaetzter Verbrauch. Fenster
+    sind kumulativ (12 Monate enthaelt die 6/3/1). Undatierte Lieferscheine zaehlen
+    nicht mit. Rueckgabe: {"perioden": [{monate, total, anzahl}], "einheit"}."""
+    from .lieferschein import normalisiere_bestellnr
+
+    keys = set()
+    for feld in ("bestellnummer", "barcode"):
+        k = normalisiere_bestellnr(artikel.get(feld))
+        if k:
+            keys.add(k)
+    heute = date.today()
+    grenzen = {m: (heute - timedelta(days=round(m * TAGE_PRO_MONAT))).isoformat()
+               for m in monate}
+    summen = {m: 0.0 for m in monate}
+    anzahl = {m: 0 for m in monate}
+    einheit = (artikel.get("einheit") or "").strip()
+    if keys:
+        for ls in lagerlieferscheine.list():
+            datum = ls.get("datum") or ""
+            if not datum:
+                continue
+            for p in ls.get("positionen", []):
+                if normalisiere_bestellnr(p.get("bestellnummer")) not in keys:
+                    continue
+                menge = float(p.get("menge") or 0)
+                if p.get("einheit"):
+                    einheit = p["einheit"].strip()
+                for m in monate:
+                    if datum >= grenzen[m]:
+                        summen[m] += menge
+                        anzahl[m] += 1
+    return {
+        "perioden": [{"monate": m, "total": summen[m], "anzahl": anzahl[m]}
+                     for m in monate],
+        "einheit": einheit,
     }
 
 
@@ -982,8 +1068,9 @@ def lagerverbrauch_uebersicht(reichweite_tage: int = 14,
 
     LEERE_PROJEKTION = {
         "bestand_stand": None, "tage_seit_stand": None, "voraussichtlich": None,
-        "tage_rest": None, "schwelle_tage": reichweite_tage, "bestellen": False,
-        "menge_vorschlag": None,
+        "tage_rest": None, "schwelle_tage": reichweite_tage,
+        "lieferzeit_eff": lieferzeit_tage, "lieferzeit_gemessen": False,
+        "bestellen": False, "menge_vorschlag": None,
     }
 
     stats = lagerlieferschein_verbrauch(fenster_tage)

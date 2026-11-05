@@ -70,9 +70,18 @@ Grosse Erweiterung in dieser Session (Commits bis `c61af5e`):
 - **Abhaken**: Checkbox je Zeile (+ Kopf-Checkbox „alle"), Buttons „Markierte als
   bestellt" (→ unterwegs) und „Markierte auf Bestellliste". `bestellen_markieren`
   liest die Menge jetzt per `menge_<id>` (robust gegen abgewählte Zeilen).
-- **Lieferzeit** (Query-Param `lieferzeit`, Default 2 Tage): Bestellschwelle =
-  Rhythmus + Lieferzeit (früher bestellen); Bestellmenge deckt zusätzlich den
-  Verbrauch während der Lieferzeit. Eingabefeld im Filter.
+- **Lieferzeit pro Artikel gemessen**: beim Wareneingang / „✓ erhalten" wird
+  `Lieferdatum − bestellt_am` berechnet und als `lieferzeit_historie` (+ gleitender
+  Schnitt `lieferzeit_tage`) am Artikel gespeichert (`lieferzeit_update` in repos,
+  0–90 Tage plausibel, letzte 10 Messungen). `_projektion` nutzt den gemessenen
+  Artikel-Wert; wo keiner existiert, greift der globale Standard (Query-Param
+  `lieferzeit`, Default **2** Tage = obere Grenze von „1–2 Tage je nach Bestellzeit").
+  Bestellschwelle = Rhythmus + Lieferzeit (früher bestellen); Menge deckt den
+  Verbrauch während der Lieferzeit mit. Anzeige je Zeile (⏱ X Tg. ✓/Std.).
+- **EAN nachtragen im Vorschlag**: „ohne EAN"-Gruppe hat wieder EAN-Scan (Handscanner
+  + Kamera) und „∅ kein EAN"-Button; „kein EAN" auch in der Bestandskontrolle ergänzt.
+- **Artikel-Detail**: Verbrauchsübersicht 1/3/6/12 Monate (kumulativ, aus
+  Lieferscheinen) + gemessene Lieferzeit (`lagerartikel_verbrauch_perioden`).
 - **Reihenfolge** der Karten: Bestellvorschlag → Bestandskontrolle → Unterwegs.
 
 **Offen / Ideen (optional, auf User-Wunsch):**

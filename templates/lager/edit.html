@@ -96,6 +96,40 @@
 
 {% if not neu %}
 <form id="delete-form" method="post" action="{{ url_for('lager.loeschen', artikel_id=artikel.id) }}" class="d-none"></form>
+
+<div class="card mt-4">
+  <div class="card-header fw-semibold">📈 Verbrauch (aus Lieferscheinen)</div>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Zeitraum</th>
+          <th class="text-end">Eingekauft</th>
+          <th class="text-end">Lieferungen</th>
+          <th class="text-end">Ø / Monat</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in verbrauch.perioden %}
+        <tr>
+          <td>letzte {{ p.monate }}&nbsp;{{ 'Monat' if p.monate == 1 else 'Monate' }}</td>
+          <td class="text-end">{{ p.total|round(1)|float }} <span class="small text-muted">{{ verbrauch.einheit }}</span></td>
+          <td class="text-end">{{ p.anzahl }}</td>
+          <td class="text-end">{% if p.total %}{{ (p.total / p.monate)|round(1)|float }}{% else %}–{% endif %} <span class="small text-muted">{{ verbrauch.einheit }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="card-body py-2 small text-muted">
+    Geschätzt aus den importierten Lieferscheinen (Einkauf ≈ Verbrauch). Zeiträume sind kumulativ.
+    {% set art_lz = artikel.get('lieferzeit_tage') %}
+    {% set art_lz_hist = artikel.get('lieferzeit_historie') %}
+    {% if art_lz is not none %}
+      · ⏱ Gemessene Lieferzeit: <strong>{{ art_lz }}&nbsp;Tage</strong>{% if art_lz_hist %} (aus {{ art_lz_hist|length }} Lieferung(en){% if art_lz_hist|length > 1 %}: {{ art_lz_hist|join(', ') }}&nbsp;Tg.{% endif %}){% endif %}.
+    {% endif %}
+  </div>
+</div>
 {% endif %}
 
 <script>

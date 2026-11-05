@@ -25,11 +25,13 @@ from models.repos import (
     lagerartikel_nachzubestellen,
     lagerartikel_ohne_ean,
     lagerartikel_sortiert,
+    lagerartikel_verbrauch_perioden,
     lagerlieferschein_speichern,
     lagerlieferscheine,
     lagerlieferscheine_sortiert,
     lagerorte_liste,
     lagerverbrauch_uebersicht,
+    lieferzeit_update,
 )
 
 bp = Blueprint("lager", __name__)
@@ -220,6 +222,7 @@ def bearbeiten(artikel_id: str):
     return render_template(
         "lager/edit.html", neu=False, artikel=artikel,
         lagerorte=lagerorte_liste(), lieferanten=lager_lieferanten_liste(),
+        verbrauch=lagerartikel_verbrauch_perioden(artikel),
     )
 
 
@@ -513,6 +516,8 @@ def lieferschein_uebernehmen():
             updates = {"bestand": neu_bestand, "bestand_stand": stand}
             # Lieferung angekommen -> evtl. gesetzten "bestellt"-Status loeschen
             if treffer.get("bestellt"):
+                # Real gemessene Lieferzeit festhalten, bevor bestellt_am geloescht wird
+                updates.update(lieferzeit_update(treffer, stand))
                 updates["bestellt"] = False
                 updates["bestellt_am"] = None
             # Lagerort nur setzen, wenn noch keiner hinterlegt ist
@@ -684,9 +689,12 @@ def bestellt_markieren():
 @login_required
 def bestellt_erhalten(artikel_id: str):
     """Hebt den 'bestellt'-Status manuell auf (Lieferung erhalten, ohne dass ein
-    Lieferschein importiert wurde)."""
-    if not lagerartikel.get(artikel_id):
+    Lieferschein importiert wurde). Lieferdatum = heute -> Lieferzeit messen."""
+    artikel = lagerartikel.get(artikel_id)
+    if not artikel:
         abort(404)
-    lagerartikel.update(artikel_id, {"bestellt": False, "bestellt_am": None})
+    updates = {"bestellt": False, "bestellt_am": None}
+    updates.update(lieferzeit_update(artikel, date.today().isoformat()))
+    lagerartikel.update(artikel_id, updates)
     flash("Als erhalten markiert.", "success")
     return redirect(request.referrer or url_for("lager.verbrauch"))

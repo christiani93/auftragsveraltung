@@ -41,6 +41,20 @@
             {% else %}
               {% if z.artikel.bestellnummer %}<code class="fs-6">{{ z.artikel.bestellnummer }}</code>
               {% else %}<span class="text-danger">keine Artikelnummer</span>{% endif %}
+              {# EAN nachtragen (wandert dann in die scannbare Gruppe) oder als 'kein EAN' markieren #}
+              {% if z.artikel.kein_ean %}
+                <div class="text-muted mt-1">kein EAN</div>
+              {% else %}
+                <div class="d-flex gap-1 mt-1">
+                  <form method="post" action="{{ url_for('lager.ean_setzen', artikel_id=z.artikel.id) }}" class="input-group input-group-sm" style="width:auto;">
+                    <input type="text" name="barcode" id="eanbv-{{ z.artikel.id }}" class="form-control" placeholder="EAN scannen…" autocomplete="off" inputmode="numeric" style="max-width:110px;">
+                    <button type="button" class="btn btn-outline-secondary cam-btn" data-target="eanbv-{{ z.artikel.id }}" data-label="{{ z.artikel.bezeichnung }}" title="Mit Kamera scannen">📷</button>
+                  </form>
+                  <form method="post" action="{{ url_for('lager.kein_ean_setzen', artikel_id=z.artikel.id) }}">
+                    <button class="btn btn-sm btn-outline-secondary" title="Dieser Artikel hat keinen Strichcode">∅ kein EAN</button>
+                  </form>
+                </div>
+              {% endif %}
             {% endif %}
           </td>
           <td class="small">{{ z.artikel.lieferant or '' }}</td>
@@ -50,7 +64,10 @@
               <button class="btn btn-sm btn-outline-secondary py-0" type="submit" title="Bestand übernehmen – rechnet neu">✓</button>
             </form>
           </td>
-          <td class="text-end {% if z.tage_rest is not none and z.tage_rest < (reichweite + lieferzeit) %}text-danger fw-semibold{% endif %}">{{ tage(z.tage_rest) }}</td>
+          <td class="text-end {% if z.tage_rest is not none and z.tage_rest < (reichweite + z.lieferzeit_eff) %}text-danger fw-semibold{% endif %}">
+            {{ tage(z.tage_rest) }}
+            <div class="small text-muted" title="In den Vorschlag eingerechnete Lieferzeit – ✓ = aus Bestell-/Lieferdaten gemessen, sonst Standardwert">⏱ {{ z.lieferzeit_eff }} Tg.{% if z.lieferzeit_gemessen %} ✓{% else %} (Std.){% endif %}</div>
+          </td>
           <td class="text-end" style="white-space:nowrap;">
             <strong>{{ zahl(z.menge_vorschlag) }}</strong> <span class="small text-muted">{{ z.einheit }}</span>
             <input type="hidden" form="{{ fid }}" name="menge_{{ z.artikel.id }}" value="{{ z.menge_vorschlag }}">
@@ -101,7 +118,8 @@
   {{ reichweite }}&nbsp;Tage Reichweite{% if lieferzeit %} <strong>+ {{ lieferzeit }}&nbsp;Tage Lieferzeit</strong>{% endif %},
   kommt der Artikel in den <strong>Bestellvorschlag</strong> – aber erst ab <strong>2 Lieferungen</strong>,
   sonst ist der Verbrauch zu unsicher. Die <strong>Lieferzeit</strong> sorgt dafür, dass früh genug (und etwas mehr)
-  bestellt wird, damit die Ware ankommt, bevor der Bestand knapp wird.
+  bestellt wird, damit die Ware ankommt, bevor der Bestand knapp wird. Sie wird <strong>pro Artikel aus Bestell-
+  und Lieferdatum gemessen</strong> (⏱&nbsp;… ✓); wo noch keine Messung vorliegt, gilt der Standardwert unten.
 </p>
 
 <form method="get" class="row g-2 align-items-end mb-3">
@@ -110,8 +128,8 @@
     <input type="number" name="tage" min="1" step="1" value="{{ reichweite }}" class="form-control form-control-sm" style="width:110px;">
   </div>
   <div class="col-auto">
-    <label class="form-label small mb-0" title="Wie lange die Lieferung dauert – wird in den Bestellvorschlag eingerechnet">Lieferzeit (Tage)</label>
-    <input type="number" name="lieferzeit" min="0" step="1" value="{{ lieferzeit }}" class="form-control form-control-sm" style="width:110px;">
+    <label class="form-label small mb-0" title="Standard-Lieferzeit für Artikel ohne eigene Messung – gemessene Werte (⏱ ✓) haben Vorrang">Lieferzeit Std. (Tage)</label>
+    <input type="number" name="lieferzeit" min="0" step="1" value="{{ lieferzeit }}" class="form-control form-control-sm" style="width:120px;">
   </div>
   <div class="col-auto">
     <label class="form-label small mb-0">Zeitfenster (Tage)</label>
@@ -174,11 +192,17 @@
           </td>
           <td class="small">
             {% if z.artikel.barcode %}<code>{{ z.artikel.barcode }}</code>
+            {% elif z.artikel.kein_ean %}<span class="text-muted">kein EAN</span>
             {% else %}
-              <form method="post" action="{{ url_for('lager.ean_setzen', artikel_id=z.artikel.id) }}" class="input-group input-group-sm" style="width:auto;">
-                <input type="text" name="barcode" id="ean-{{ z.artikel.id }}" class="form-control" placeholder="EAN scannen…" autocomplete="off" inputmode="numeric" style="max-width:130px;">
-                <button type="button" class="btn btn-outline-secondary cam-btn" data-target="ean-{{ z.artikel.id }}" data-label="{{ z.artikel.bezeichnung }}" title="Mit Kamera scannen">📷</button>
-              </form>
+              <div class="d-flex gap-1">
+                <form method="post" action="{{ url_for('lager.ean_setzen', artikel_id=z.artikel.id) }}" class="input-group input-group-sm" style="width:auto;">
+                  <input type="text" name="barcode" id="ean-{{ z.artikel.id }}" class="form-control" placeholder="EAN scannen…" autocomplete="off" inputmode="numeric" style="max-width:120px;">
+                  <button type="button" class="btn btn-outline-secondary cam-btn" data-target="ean-{{ z.artikel.id }}" data-label="{{ z.artikel.bezeichnung }}" title="Mit Kamera scannen">📷</button>
+                </form>
+                <form method="post" action="{{ url_for('lager.kein_ean_setzen', artikel_id=z.artikel.id) }}">
+                  <button class="btn btn-sm btn-outline-secondary" title="Dieser Artikel hat keinen Strichcode">∅ kein EAN</button>
+                </form>
+              </div>
             {% endif %}
           </td>
           <td class="text-end">{{ z.artikel.bestand if z.artikel.bestand is not none else '–' }}</td>
