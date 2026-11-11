@@ -160,6 +160,64 @@ def nach_barcode():
     return redirect(url_for("lager.neu", barcode=code))
 
 
+@bp.route("/scan-bestand")
+@login_required
+def scan_bestand():
+    """Inventur-Scan: EAN scannen -> Artikel erscheint -> gezaehlten Bestand
+    eintragen -> speichern -> direkt naechster Scan. Schneller Zaehl-Loop ohne
+    Seitenwechsel (Handscanner oder Kamera)."""
+    return render_template("lager/scan_bestand.html")
+
+
+@bp.route("/artikel-json")
+@login_required
+def artikel_json():
+    """Sucht einen Artikel nach gescanntem Code und liefert die fuer den
+    Inventur-Scan noetigen Felder als JSON. Kein Treffer -> found:false."""
+    code = (request.args.get("code") or "").strip()
+    if not code:
+        return jsonify({"found": False, "grund": "kein Code"})
+    a = lagerartikel_by_barcode(code)
+    if not a:
+        return jsonify({"found": False, "code": code})
+    return jsonify({
+        "found": True,
+        "id": a["id"],
+        "bezeichnung": a.get("bezeichnung") or "",
+        "bestand": a.get("bestand") or 0,
+        "einheit": a.get("einheit") or "Stk",
+        "lagerort": (a.get("lagerort") or "").strip(),
+        "barcode": a.get("barcode") or "",
+        "bestellnummer": a.get("bestellnummer") or "",
+    })
+
+
+@bp.route("/bestand-scan", methods=["POST"])
+@login_required
+def bestand_scan():
+    """Setzt den Bestand eines Artikels absolut (Inventur-Scan). Erwartet
+    artikel_id + bestand, antwortet als JSON fuer den Scan-Loop."""
+    artikel_id = (request.form.get("artikel_id") or "").strip()
+    artikel = lagerartikel.get(artikel_id) if artikel_id else None
+    if not artikel:
+        return jsonify({"ok": False, "fehler": "Artikel nicht gefunden."}), 404
+    neu_wert = _als_int_oder_none(request.form.get("bestand"))
+    if neu_wert is None:
+        return jsonify({"ok": False, "fehler": "Keine Menge eingegeben."}), 400
+    neu_wert = max(0, neu_wert)
+    lagerartikel.update(artikel_id, {
+        "bestand": neu_wert,
+        "bestand_stand": date.today().isoformat(),
+    })
+    return jsonify({
+        "ok": True,
+        "id": artikel_id,
+        "bezeichnung": artikel.get("bezeichnung") or "",
+        "bestand": neu_wert,
+        "einheit": artikel.get("einheit") or "Stk",
+    })
+
+
 @bp.route("/produktdaten")
 @login_required
 def produktdaten():
