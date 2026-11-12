@@ -17,12 +17,14 @@
         {{ auftraege_in_arbeit }}
         {% if auftraege_rapport_voll %}<span class="text-warning" title="{{ auftraege_rapport_voll }} Auftrag/Aufträge mit vollem 7-Tage-Rapport (noch nicht rapportiert), aber noch nicht erledigt">({{ auftraege_rapport_voll }})</span>{% endif %}
       </div>
+      {% if stunden_in_arbeit %}<div class="small text-muted" title="Noch nicht abgerechnete Stunden dieser Aufträge">{{ stunden_in_arbeit }} Std. offen</div>{% endif %}
     </a>
   </div>
   <div class="col-6 col-md-3">
     <a class="card card-body text-center text-decoration-none text-reset" href="{{ url_for('auftraege.list_auftraege', status='erledigt') }}">
       <div class="text-muted small">Aufträge erledigt</div>
       <div class="fs-3 fw-bold">{{ auftraege_erledigt }}</div>
+      {% if stunden_erledigt %}<div class="small text-muted" title="Noch nicht abgerechnete Stunden dieser Aufträge">{{ stunden_erledigt }} Std. offen</div>{% endif %}
     </a>
   </div>
   <div class="col-6 col-md-3">
@@ -45,6 +47,7 @@
           <th>Zu erledigen bis</th>
           <th>Kunde</th>
           <th>Titel</th>
+          <th class="text-end" title="Noch nicht abgerechnete Stunden">Std. offen</th>
           <th>Status</th>
           <th></th>
         </tr>
@@ -56,6 +59,7 @@
           <td>{{ r.auftrag.zu_erledigen_bis|datetime_ch or '—' }}</td>
           <td class="small">{% if r.kunde %}{{ r.kunde.name }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
           <td class="fw-semibold"><a href="{{ url_for('auftraege.detail', auftrag_id=r.auftrag.id) }}" class="text-decoration-none">{{ r.auftrag.titel }}</a></td>
+          <td class="text-end">{% if r.stunden_offen %}{{ r.stunden_offen }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
           <td><span class="badge {{ auftrag_badge.get(r.auftrag.status, 'bg-secondary') }}">{{ auftrag_status_label.get(r.auftrag.status, r.auftrag.status) }}</span></td>
           <td class="text-end"><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('auftraege.detail', auftrag_id=r.auftrag.id) }}">Öffnen</a></td>
         </tr>

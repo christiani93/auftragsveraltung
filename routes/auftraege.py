@@ -40,6 +40,7 @@ from models.repos import (
     sichtbare_kunden,
     revisionen,
     revisionen_fuer_kunde,
+    stunden_offen_fuer_auftrag,
     todo_hinzufuegen,
     todo_loeschen,
     todo_toggle,
@@ -269,6 +270,7 @@ def list_auftraege():
         "kunde": kunden_idx.get(a.get("kunde_id")),
         "revision": rev_idx.get(a.get("revision_id") or ""),
         "rapport_faellig": auftrag_rapport_faellig(a),
+        "stunden_offen": stunden_offen_fuer_auftrag(a["id"]),
     } for a in sichtbar]
     return render_template(
         "auftraege/list.html",

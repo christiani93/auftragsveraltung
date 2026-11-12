@@ -17,6 +17,7 @@ from models.repos import (
     kunden,
     leistungsschalter,
     revisionen,
+    stunden_offen_fuer_auftrag,
     wartung_status,
 )
 
@@ -54,7 +55,8 @@ def dashboard():
         return (frueheste, status_prio, (a.get("titel") or "").lower())
 
     meine_auftraege = [
-        {"auftrag": a, "kunde": kunden_idx.get(a.get("kunde_id"))}
+        {"auftrag": a, "kunde": kunden_idx.get(a.get("kunde_id")),
+         "stunden_offen": stunden_offen_fuer_auftrag(a["id"])}
         for a in sorted(
             [a for a in auftraege.list()
              if a.get("zugewiesen_an") == current_user.username

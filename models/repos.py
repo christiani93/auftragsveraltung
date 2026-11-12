@@ -1663,7 +1663,24 @@ def dashboard_data() -> Dict[str, Any]:
         "auftraege_in_arbeit": sum(1 for a in auftraege.list() if a.get("status") == "in_arbeit"),
         "auftraege_erledigt": sum(1 for a in auftraege.list() if a.get("status") == "erledigt"),
         "auftraege_rapport_voll": auftraege_rapport_voll_anzahl(),
+        # Noch nicht abgerechnete Stunden, summiert je Status — zeigt auf einen
+        # Blick, wo am meisten Stunden fuers Abrechnen aufgelaufen sind.
+        "stunden_in_arbeit": round(sum(
+            stunden_offen_fuer_auftrag(a["id"]) for a in auftraege.list()
+            if a.get("status") == "in_arbeit"), 1),
+        "stunden_erledigt": round(sum(
+            stunden_offen_fuer_auftrag(a["id"]) for a in auftraege.list()
+            if a.get("status") == "erledigt"), 1),
     }
+
+
+def stunden_offen_fuer_auftrag(auftrag_id: str) -> float:
+    """Summe der noch nicht abgerechneten Arbeitsstunden eines Auftrags — zeigt,
+    wie viele Stunden fuers Abrechnen 'aufgelaufen' sind (Prioritaet beim
+    Rapportieren: viele offene Stunden -> eher abrechnen)."""
+    return zeitsumme_h([
+        z for z in zeitbuchungen_fuer_auftrag(auftrag_id) if not z.get("abgerechnet")
+    ])
 
 
 def offene_rapport_tage_anzahl(auftrag_id: str) -> int:
