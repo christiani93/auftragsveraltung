@@ -1,6 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Lager – Bestand scannen{% endblock %}
 {% block content %}
+<style>
+  /* html5-qrcode fuegt ein <video> in #reader ein — erzwingt sichtbare Flaeche,
+     damit das Kamerabild zuverlaessig erscheint (sonst je nach Layout 0-hoch). */
+  #reader { width: 100%; }
+  #reader video { width: 100% !important; height: auto !important; display: block; border-radius: .5rem; }
+</style>
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
   <h1 class="h3 mb-0">🔢 Bestand per Scan erfassen</h1>
   <div class="d-flex gap-2 flex-wrap">
@@ -9,10 +15,10 @@
   </div>
 </div>
 
-<div class="card card-body mb-3 text-center">
-  <div id="reader" class="mx-auto mb-2" style="max-width:420px; display:none;"></div>
+<div class="card card-body mb-3">
   <button type="button" class="btn btn-primary btn-lg" id="cam-toggle">📷 Kamera starten</button>
-  <small class="text-muted mt-2">Am Regal: Kamera starten, EAN scannen — die Anzahl Verpackungen trägst du dann im Popup ein.</small>
+  <div id="reader" class="mt-3" style="max-width:420px; display:none;"></div>
+  <small class="text-muted mt-2 d-block">Am Regal: Kamera starten, EAN scannen — die Anzahl Verpackungen trägst du dann im Popup ein.</small>
 </div>
 
 <details class="mb-3">
