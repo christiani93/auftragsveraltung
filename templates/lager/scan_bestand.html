@@ -106,7 +106,11 @@
   const setzenUrl = "{{ url_for('lager.bestand_scan') }}";
 
   const modalEl = document.getElementById("bestand-modal");
-  const modal = new bootstrap.Modal(modalEl);
+  // Lazy statt beim Scriptstart: bootstrap.bundle.min.js wird in base.html erst
+  // NACH dem content-Block eingebunden -> "new bootstrap.Modal(...)" hier oben
+  // wuerde mit "bootstrap is not defined" abbrechen und JEDEN Listener in
+  // diesem Script (inkl. Kamera-Button!) verhindern.
+  function getModal() { return bootstrap.Modal.getOrCreateInstance(modalEl); }
   const mBezeichnung = document.getElementById("m-bezeichnung");
   const mInfo = document.getElementById("m-info");
   const mMitVe = document.getElementById("m-mit-ve");
@@ -171,7 +175,7 @@
       }
 
       pauseScan();
-      modal.show();
+      getModal().show();
     } catch (e) {
       alert("Suche fehlgeschlagen: " + e);
     }
@@ -240,7 +244,7 @@
       tr.appendChild(td1); tr.appendChild(td2);
       logBody.insertBefore(tr, logBody.firstChild);
       logCard.style.display = "";
-      modal.hide();
+      getModal().hide();
     } catch (e) {
       alert("Speichern fehlgeschlagen: " + e);
     }
