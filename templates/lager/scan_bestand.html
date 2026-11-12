@@ -9,49 +9,27 @@
   </div>
 </div>
 
-<div class="card card-body mb-3">
-  <form id="scan-form" class="row g-2 align-items-end" autocomplete="off">
+<div class="card card-body mb-3 text-center">
+  <div id="reader" class="mx-auto mb-2" style="max-width:420px; display:none;"></div>
+  <button type="button" class="btn btn-primary btn-lg" id="cam-toggle">📷 Kamera starten</button>
+  <small class="text-muted mt-2">Am Regal: Kamera starten, EAN scannen — die Anzahl Verpackungen trägst du dann im Popup ein.</small>
+</div>
+
+<details class="mb-3">
+  <summary class="text-muted small">Code manuell eingeben (ohne Kamera)</summary>
+  <form id="scan-form" class="row g-2 align-items-end mt-2" autocomplete="off">
     <div class="col">
-      <label class="form-label">Barcode / E-Nummer scannen</label>
-      <input type="text" id="code" class="form-control form-control-lg"
-             placeholder="Handscanner hier scannen oder Code eingeben…" autofocus autocomplete="off">
-      <small class="text-muted">EAN scannen → Artikel erscheint → gezählte Menge eintragen → Enter. Dann direkt der nächste Scan.</small>
+      <input type="text" id="code" class="form-control" placeholder="Barcode / E-Nummer…" autocomplete="off">
     </div>
     <div class="col-auto">
-      <button type="submit" class="btn btn-primary btn-lg">Suchen</button>
+      <button type="submit" class="btn btn-outline-primary">Suchen</button>
     </div>
   </form>
-</div>
+</details>
 
-<div id="treffer" class="card card-body mb-3" style="display:none;">
-  <form id="bestand-form" class="row g-3 align-items-end" autocomplete="off">
-    <input type="hidden" id="artikel-id">
-    <div class="col-12">
-      <div class="fs-5 fw-semibold" id="t-bezeichnung"></div>
-      <div class="text-muted small">
-        <span id="t-lagerort"></span>
-        <span id="t-aktuell"></span>
-      </div>
-    </div>
-    <div class="col-auto">
-      <label class="form-label">Gezählter Bestand</label>
-      <input type="number" id="bestand" class="form-control form-control-lg" style="max-width:9rem" min="0" step="1" inputmode="numeric">
-    </div>
-    <div class="col-auto">
-      <span class="fs-5 text-muted" id="t-einheit"></span>
-    </div>
-    <div class="col-auto">
-      <button type="submit" class="btn btn-success btn-lg">✓ Speichern</button>
-    </div>
-    <div class="col-auto">
-      <button type="button" class="btn btn-outline-secondary btn-lg" id="abbrechen">Abbrechen</button>
-    </div>
-  </form>
-</div>
-
-<div id="nicht-gefunden" class="alert alert-warning" style="display:none;">
-  Kein Artikel mit Code «<span id="nf-code" class="fw-semibold"></span>» gefunden.
-  <a id="nf-neu" class="alert-link" href="#">Jetzt anlegen</a>.
+<div id="nicht-gefunden" class="alert alert-warning d-flex justify-content-between align-items-center flex-wrap gap-2" style="display:none;">
+  <span>Kein Artikel mit Code «<span id="nf-code" class="fw-semibold"></span>» gefunden. <a id="nf-neu" class="alert-link" href="#">Jetzt anlegen</a>.</span>
+  <button type="button" class="btn btn-sm btn-outline-secondary" id="nf-weiter">Weiter scannen</button>
 </div>
 
 <div class="card" id="log-card" style="display:none;">
@@ -64,13 +42,54 @@
   </div>
 </div>
 
-<div class="card card-body mt-3">
-  <div class="d-flex justify-content-between align-items-center">
-    <span class="fw-semibold">Kamera-Scan (Tablet / Handy)</span>
-    <button type="button" class="btn btn-outline-primary btn-sm" id="cam-toggle">Kamera starten</button>
+{# Popup: Anzahl Verpackungen (VE) bzw. Stueckzahl eintragen #}
+<div class="modal fade" id="bestand-modal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="m-bezeichnung">Artikel</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schliessen"></button>
+      </div>
+      <div class="modal-body">
+        <div class="text-muted small mb-3" id="m-info"></div>
+
+        <div id="m-mit-ve">
+          <label class="form-label">Anzahl Verpackungen <span id="m-ve-groesse" class="text-muted"></span></label>
+          <div class="input-group input-group-lg mb-1">
+            <button type="button" class="btn btn-outline-secondary" id="m-minus">−</button>
+            <input type="number" id="m-pakete" class="form-control text-center" min="0" step="1" inputmode="numeric">
+            <button type="button" class="btn btn-outline-secondary" id="m-plus">+</button>
+          </div>
+          <div class="text-muted small">= <strong id="m-stk">0</strong> Stk</div>
+        </div>
+
+        <div id="m-ohne-ve" style="display:none;">
+          <div class="alert alert-light border small py-2 mb-2">Noch keine Verpackungseinheit (VE) hinterlegt.</div>
+          <div class="row g-2 mb-2">
+            <div class="col">
+              <label class="form-label small">Stück pro Verpackung</label>
+              <input type="number" id="m-ve-neu" class="form-control" min="1" step="1" placeholder="z.B. 100" inputmode="numeric">
+            </div>
+            <div class="col">
+              <label class="form-label small">Anzahl Verpackungen</label>
+              <input type="number" id="m-pakete2" class="form-control" min="0" step="1" inputmode="numeric">
+            </div>
+          </div>
+          <div class="text-center">
+            <a href="#" id="m-stk-direkt-link" class="small">…oder Stückzahl direkt eintragen</a>
+          </div>
+          <div id="m-stk-direkt" class="mt-2" style="display:none;">
+            <label class="form-label small">Bestand in Stück</label>
+            <input type="number" id="m-bestand" class="form-control" min="0" step="1" inputmode="numeric">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Abbrechen</button>
+        <button type="button" class="btn btn-success btn-lg" id="m-speichern">✓ Speichern</button>
+      </div>
+    </div>
   </div>
-  <div id="reader" class="mt-3" style="max-width:420px; display:none;"></div>
-  <small class="text-muted mt-2">Erkennt EAN-/Code-Barcodes über die Gerätekamera. Nach dem Erkennen wird der Artikel direkt gesucht.</small>
 </div>
 
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
@@ -78,10 +97,6 @@
 (function () {
   const scanForm = document.getElementById("scan-form");
   const codeInput = document.getElementById("code");
-  const treffer = document.getElementById("treffer");
-  const bestandForm = document.getElementById("bestand-form");
-  const bestandInput = document.getElementById("bestand");
-  const artikelId = document.getElementById("artikel-id");
   const nichtGefunden = document.getElementById("nicht-gefunden");
   const logCard = document.getElementById("log-card");
   const logBody = document.getElementById("log-body");
@@ -90,61 +105,128 @@
   const lookupUrl = "{{ url_for('lager.artikel_json') }}";
   const setzenUrl = "{{ url_for('lager.bestand_scan') }}";
 
-  function focusScan() {
-    codeInput.value = "";
-    codeInput.focus();
-  }
+  const modalEl = document.getElementById("bestand-modal");
+  const modal = new bootstrap.Modal(modalEl);
+  const mBezeichnung = document.getElementById("m-bezeichnung");
+  const mInfo = document.getElementById("m-info");
+  const mMitVe = document.getElementById("m-mit-ve");
+  const mOhneVe = document.getElementById("m-ohne-ve");
+  const mVeGroesse = document.getElementById("m-ve-groesse");
+  const mPakete = document.getElementById("m-pakete");
+  const mStk = document.getElementById("m-stk");
+  const mVeNeu = document.getElementById("m-ve-neu");
+  const mPakete2 = document.getElementById("m-pakete2");
+  const mStkDirektLink = document.getElementById("m-stk-direkt-link");
+  const mStkDirekt = document.getElementById("m-stk-direkt");
+  const mBestand = document.getElementById("m-bestand");
 
-  // Handscanner: solange kein Treffer offen ist, Fokus im Scan-Feld halten.
-  codeInput.addEventListener("blur", () => setTimeout(() => {
-    if (treffer.style.display === "none") codeInput.focus();
-  }, 100));
+  let aktuellerArtikel = null; // { id, bezeichnung, einheit, veEffektiv }
+
+  // --- Kamera pausieren/fortsetzen, damit ein Code nicht mehrfach triggert ---
+  let scanner = null;
+  function pauseScan() { if (scanner) { try { scanner.pause(true); } catch (e) {} } }
+  function resumeScan() { if (scanner) { try { scanner.resume(); } catch (e) {} } }
+
+  function refreshStk() {
+    const v = aktuellerArtikel ? aktuellerArtikel.veEffektiv : 0;
+    const p = parseInt(mPakete.value, 10) || 0;
+    mStk.textContent = (v > 0 ? p * v : 0);
+  }
 
   async function suche(code) {
     code = (code || "").trim();
     if (!code) return;
-    treffer.style.display = "none";
     nichtGefunden.style.display = "none";
     try {
       const resp = await fetch(lookupUrl + "?code=" + encodeURIComponent(code));
       const data = await resp.json();
       if (!data.found) {
+        pauseScan();
         document.getElementById("nf-code").textContent = code;
         document.getElementById("nf-neu").href = neuUrl + "?barcode=" + encodeURIComponent(code);
         nichtGefunden.style.display = "";
-        focusScan();
         return;
       }
-      artikelId.value = data.id;
-      document.getElementById("t-bezeichnung").textContent = data.bezeichnung;
-      document.getElementById("t-lagerort").textContent = data.lagerort ? ("📍 " + data.lagerort + " · ") : "";
-      document.getElementById("t-aktuell").textContent = "aktuell: " + data.bestand + " " + data.einheit;
-      document.getElementById("t-einheit").textContent = data.einheit;
-      bestandInput.value = data.bestand;
-      treffer.style.display = "";
-      bestandInput.focus();
-      bestandInput.select();
+      aktuellerArtikel = {
+        id: data.id,
+        bezeichnung: data.bezeichnung,
+        einheit: data.einheit,
+        veEffektiv: data.ve_effektiv || 0,
+      };
+      mBezeichnung.textContent = data.bezeichnung;
+      mInfo.textContent = (data.lagerort ? "📍 " + data.lagerort + " · " : "") + "aktuell: " + data.bestand + " " + data.einheit;
+
+      // Reset Popup-Felder
+      mVeNeu.value = ""; mPakete2.value = ""; mBestand.value = "";
+      mStkDirekt.style.display = "none";
+
+      if (aktuellerArtikel.veEffektiv > 0) {
+        mMitVe.style.display = ""; mOhneVe.style.display = "none";
+        mVeGroesse.textContent = "à " + aktuellerArtikel.veEffektiv + " " + data.einheit;
+        const vorschlag = Math.round(data.bestand / aktuellerArtikel.veEffektiv);
+        mPakete.value = vorschlag;
+        refreshStk();
+      } else {
+        mMitVe.style.display = "none"; mOhneVe.style.display = "";
+      }
+
+      pauseScan();
+      modal.show();
     } catch (e) {
       alert("Suche fehlgeschlagen: " + e);
-      focusScan();
     }
   }
 
   scanForm.addEventListener("submit", (e) => {
     e.preventDefault();
     suche(codeInput.value);
+    codeInput.value = "";
   });
 
-  document.getElementById("abbrechen").addEventListener("click", () => {
-    treffer.style.display = "none";
-    focusScan();
+  document.getElementById("nf-weiter").addEventListener("click", () => {
+    nichtGefunden.style.display = "none";
+    resumeScan();
   });
 
-  bestandForm.addEventListener("submit", async (e) => {
+  document.getElementById("m-minus").addEventListener("click", () => {
+    mPakete.value = Math.max(0, (parseInt(mPakete.value, 10) || 0) - 1);
+    refreshStk();
+  });
+  document.getElementById("m-plus").addEventListener("click", () => {
+    mPakete.value = (parseInt(mPakete.value, 10) || 0) + 1;
+    refreshStk();
+  });
+  mPakete.addEventListener("input", refreshStk);
+
+  mStkDirektLink.addEventListener("click", (e) => {
     e.preventDefault();
+    const zeigen = mStkDirekt.style.display === "none";
+    mStkDirekt.style.display = zeigen ? "" : "none";
+    mStkDirektLink.textContent = zeigen ? "…oder in Verpackungen zählen" : "…oder Stückzahl direkt eintragen";
+  });
+
+  modalEl.addEventListener("hidden.bs.modal", () => {
+    aktuellerArtikel = null;
+    resumeScan();
+  });
+
+  document.getElementById("m-speichern").addEventListener("click", async () => {
+    if (!aktuellerArtikel) return;
     const body = new URLSearchParams();
-    body.set("artikel_id", artikelId.value);
-    body.set("bestand", bestandInput.value);
+    body.set("artikel_id", aktuellerArtikel.id);
+
+    if (aktuellerArtikel.veEffektiv > 0) {
+      body.set("pakete", mPakete.value || "0");
+    } else if (mVeNeu.value && mPakete2.value) {
+      body.set("ve_neu", mVeNeu.value);
+      body.set("pakete", mPakete2.value);
+    } else if (mBestand.value !== "") {
+      body.set("bestand", mBestand.value);
+    } else {
+      alert("Bitte eine Menge eingeben.");
+      return;
+    }
+
     try {
       const resp = await fetch(setzenUrl, { method: "POST", body });
       const data = await resp.json();
@@ -158,8 +240,7 @@
       tr.appendChild(td1); tr.appendChild(td2);
       logBody.insertBefore(tr, logBody.firstChild);
       logCard.style.display = "";
-      treffer.style.display = "none";
-      focusScan();
+      modal.hide();
     } catch (e) {
       alert("Speichern fehlgeschlagen: " + e);
     }
@@ -168,14 +249,13 @@
   // --- Kamera ---------------------------------------------------------------
   const toggle = document.getElementById("cam-toggle");
   const reader = document.getElementById("reader");
-  let scanner = null;
 
   toggle.addEventListener("click", async () => {
     if (scanner) {
       try { await scanner.stop(); } catch (e) {}
       scanner = null;
       reader.style.display = "none";
-      toggle.textContent = "Kamera starten";
+      toggle.textContent = "📷 Kamera starten";
       return;
     }
     if (typeof Html5Qrcode === "undefined") { alert("Kamera-Scanner konnte nicht geladen werden (offline?)."); return; }
@@ -193,7 +273,7 @@
       alert("Kamera nicht verfügbar: " + e);
       scanner = null;
       reader.style.display = "none";
-      toggle.textContent = "Kamera starten";
+      toggle.textContent = "📷 Kamera starten";
     }
   });
 })();

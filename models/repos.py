@@ -678,6 +678,11 @@ def material_abrechnen(auftrag_id: str, bis_datum: Optional[str] = None,
 #   em_artikel_nr, lagerort, lieferant, einheit, bestand (int),
 #   mindestbestand (int, 0 = keine Schwelle), bestellmenge (Standard-Menge),
 #   nachbestellen (bool, manuelles Flag), notizen, erstellt_am, geaendert_am
+#   liefereinheit (LE, Stueck pro Bestelleinheit beim Lieferanten/Wuerth —
+#     fuer die Bestellmenge im Bestellvorschlag),
+#   verpackungseinheit (VE, Stueck pro Verpackung am eigenen Lager — fuer die
+#     Ist-Bestand-Zaehlung am Regal; faellt auf LE zurueck wenn leer, siehe
+#     lagerartikel_ve())
 
 def lagerartikel_sortiert() -> List[Dict[str, Any]]:
     """Alle Lagerartikel, sortiert nach Lagerort, dann Bezeichnung."""
@@ -687,6 +692,18 @@ def lagerartikel_sortiert() -> List[Dict[str, Any]]:
         (a.get("bezeichnung") or "").lower(),
     ))
     return items
+
+
+def lagerartikel_ve(a: Dict[str, Any]) -> int:
+    """Effektive Verpackungseinheit (VE = Stueck pro Verpackung, wie sie am Lager
+    gezaehlt wird) eines Artikels. Faellt auf die Liefereinheit (LE) zurueck, wenn
+    keine eigene VE gepflegt ist — bei den meisten Altartikeln (vor der VE/LE-
+    Trennung) sind beide identisch, nur wo sich Wuerths Lieferverpackung von der
+    Lager-Zaehleinheit unterscheidet, wird VE separat gesetzt. 0 = unbekannt."""
+    ve = a.get("verpackungseinheit")
+    if ve:
+        return ve
+    return a.get("liefereinheit") or 0
 
 
 def lagerartikel_by_barcode(code: str) -> Optional[Dict[str, Any]]:

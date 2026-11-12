@@ -50,8 +50,13 @@
 
     <div class="col-md-3">
       <label class="form-label">Liefereinheit (LE)</label>
-      <input type="number" name="liefereinheit" id="f-ve" class="form-control" min="1" step="1" value="{{ artikel.liefereinheit if artikel.get('liefereinheit') is not none else '' }}" placeholder="z.B. 100">
-      <small class="text-muted">Stück pro Bestelleinheit (manuell, z.B. 100). Für LE-Zählung & Bestellmenge.</small>
+      <input type="number" name="liefereinheit" id="f-le" class="form-control" min="1" step="1" value="{{ artikel.liefereinheit if artikel.get('liefereinheit') is not none else '' }}" placeholder="z.B. 100">
+      <small class="text-muted">Stück pro Bestelleinheit <strong>bei Würth/Lieferant</strong> – für die Bestellmenge im Vorschlag.</small>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Verpackungseinheit (VE)</label>
+      <input type="number" name="verpackungseinheit" id="f-ve" class="form-control" min="1" step="1" value="{{ artikel.verpackungseinheit if artikel.get('verpackungseinheit') is not none else '' }}" placeholder="falls abweichend von LE">
+      <small class="text-muted">Stück pro Verpackung <strong>am eigenen Lager</strong> – für die Zählung am Regal. Leer = gleich wie LE.</small>
     </div>
     <div class="col-md-3">
       <label class="form-label">Bestand</label>
@@ -59,9 +64,9 @@
       <small class="text-muted"><span id="bestand-pakete-info"></span><span id="bestand-pakete-hint">Ist-Bestand (Inventur).</span></small>
     </div>
     <div class="col-md-3">
-      <label class="form-label">…oder in LE zählen</label>
-      <input type="number" id="f-pakete" class="form-control" min="0" step="1" placeholder="Anzahl LE">
-      <small class="text-muted">Anzahl LE × LE-Größe → füllt den Bestand.</small>
+      <label class="form-label">…oder in VE zählen</label>
+      <input type="number" id="f-pakete" class="form-control" min="0" step="1" placeholder="Anzahl Verpackungen">
+      <small class="text-muted">Anzahl Verpackungen × VE-Größe → füllt den Bestand.</small>
     </div>
     <div class="col-md-3">
       <label class="form-label">Mindestbestand</label>
@@ -183,20 +188,27 @@
   if (barcode.value.trim() && !bezeichnung.value.trim()) { suche(true); }
   {% endif %}
 
-  // Paket-Zählung: Bestand = Pakete × Verpackungsmenge (VE); Anzeige in Paketen.
+  // Paket-Zählung: Bestand = Pakete × Verpackungseinheit (VE); Anzeige in Paketen.
+  // Ohne eigene VE wird auf die Liefereinheit (LE) zurückgefallen (meist gleich).
+  const le = document.getElementById("f-le");
   const ve = document.getElementById("f-ve");
   const bestandInput = document.getElementById("f-bestand-input");
   const pakete = document.getElementById("f-pakete");
   const info = document.getElementById("bestand-pakete-info");
-  function veVal() { return parseInt(ve.value, 10) || 0; }
+  function veVal() {
+    const v = parseInt(ve.value, 10);
+    if (v > 0) return v;
+    const l = parseInt(le.value, 10);
+    return l > 0 ? l : 0;
+  }
   function refreshInfo() {
     const v = veVal(); const b = parseInt(bestandInput.value, 10);
     if (v > 0 && !isNaN(b)) {
       const p = b / v;
-      info.textContent = "≈ " + (Math.round(p * 100) / 100) + " LE à " + v + " · ";
+      info.textContent = "≈ " + (Math.round(p * 100) / 100) + " VE à " + v + " · ";
     } else { info.textContent = ""; }
   }
-  if (ve && bestandInput && pakete && info) {
+  if (ve && le && bestandInput && pakete && info) {
     pakete.addEventListener("input", function () {
       const v = veVal();
       if (v > 0 && pakete.value !== "") { bestandInput.value = (parseInt(pakete.value, 10) || 0) * v; }
@@ -204,6 +216,7 @@
     });
     bestandInput.addEventListener("input", refreshInfo);
     ve.addEventListener("input", refreshInfo);
+    le.addEventListener("input", refreshInfo);
     refreshInfo();
   }
 })();

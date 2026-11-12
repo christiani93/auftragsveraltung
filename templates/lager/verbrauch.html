@@ -228,20 +228,21 @@
               </div>
             {% endif %}
           </td>
+          {% set ve_eff = z.artikel.verpackungseinheit or z.artikel.liefereinheit %}
           <td class="text-end">
             {{ z.artikel.bestand if z.artikel.bestand is not none else '–' }}
-            {% if z.artikel.liefereinheit and z.artikel.bestand is not none %}<div class="small text-muted">{{ (z.artikel.bestand / z.artikel.liefereinheit)|round(1) }} LE</div>{% endif %}
+            {% if ve_eff and z.artikel.bestand is not none %}<div class="small text-muted">{{ (z.artikel.bestand / ve_eff)|round(1) }} VE</div>{% endif %}
           </td>
           <td>
-            <form method="post" action="{{ url_for('lager.bestand_aendern', artikel_id=z.artikel.id) }}" class="input-group input-group-sm {% if z.artikel.liefereinheit %}mb-1{% endif %}">
+            <form method="post" action="{{ url_for('lager.bestand_aendern', artikel_id=z.artikel.id) }}" class="input-group input-group-sm {% if ve_eff %}mb-1{% endif %}">
               <input type="number" name="setzen" min="0" step="1" class="form-control text-end" placeholder="Stk" title="Gezählten Ist-Bestand in Stück eintragen (Stichtag heute)">
               <button class="btn btn-outline-info" type="submit" title="Bestand übernehmen">✓</button>
             </form>
-            {% if z.artikel.liefereinheit %}
+            {% if ve_eff %}
             <form method="post" action="{{ url_for('lager.bestand_aendern', artikel_id=z.artikel.id) }}" class="input-group input-group-sm">
-              <input type="number" name="pakete" min="0" step="1" class="form-control text-end" placeholder="LE" title="Gezählte Liefereinheiten eintragen – wird × {{ z.artikel.liefereinheit }} gerechnet">
-              <span class="input-group-text">×{{ z.artikel.liefereinheit }}</span>
-              <button class="btn btn-outline-info" type="submit" title="LE × Größe übernehmen">✓</button>
+              <input type="number" name="pakete" min="0" step="1" class="form-control text-end" placeholder="VE" title="Gezählte Verpackungen eintragen – wird × {{ ve_eff }} gerechnet">
+              <span class="input-group-text">×{{ ve_eff }}</span>
+              <button class="btn btn-outline-info" type="submit" title="VE × Größe übernehmen">✓</button>
             </form>
             {% endif %}
           </td>

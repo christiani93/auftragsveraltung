@@ -25,6 +25,7 @@ from models.repos import (
     lagerartikel_nachzubestellen,
     lagerartikel_ohne_ean,
     lagerartikel_sortiert,
+    lagerartikel_ve,
     lagerartikel_verbrauch_perioden,
     lagerlieferschein_speichern,
     lagerlieferscheine,
@@ -76,6 +77,7 @@ def _form_zu_artikel() -> dict:
         "mindestbestand": _als_int(request.form.get("mindestbestand"), 0),
         "bestellmenge": _als_int_oder_none(request.form.get("bestellmenge")),
         "liefereinheit": _als_int_oder_none(request.form.get("liefereinheit")),
+        "verpackungseinheit": _als_int_oder_none(request.form.get("verpackungseinheit")),
         "nachbestellen": request.form.get("nachbestellen") == "on",
         "kein_ean": request.form.get("kein_ean") == "on",
         "ausgelaufen": request.form.get("ausgelaufen") == "on",
@@ -163,9 +165,9 @@ def nach_barcode():
 @bp.route("/scan-bestand")
 @login_required
 def scan_bestand():
-    """Inventur-Scan: EAN scannen -> Artikel erscheint -> gezaehlten Bestand
-    eintragen -> speichern -> direkt naechster Scan. Schneller Zaehl-Loop ohne
-    Seitenwechsel (Handscanner oder Kamera)."""
+    """Inventur-Scan am Regal (primaer per Handy-Kamera): EAN scannen -> Popup
+    mit der Anzahl gezaehlter Verpackungen -> speichern -> direkt naechster
+    Scan. Schneller Zaehl-Loop ohne Seitenwechsel."""
     return render_template("lager/scan_bestand.html")
 
 
@@ -189,26 +191,43 @@ def artikel_json():
         "lagerort": (a.get("lagerort") or "").strip(),
         "barcode": a.get("barcode") or "",
         "bestellnummer": a.get("bestellnummer") or "",
+        "verpackungseinheit": a.get("verpackungseinheit") or 0,
+        "liefereinheit": a.get("liefereinheit") or 0,
+        "ve_effektiv": lagerartikel_ve(a),
     })
 
 
 @bp.route("/bestand-scan", methods=["POST"])
 @login_required
 def bestand_scan():
-    """Setzt den Bestand eines Artikels absolut (Inventur-Scan). Erwartet
-    artikel_id + bestand, antwortet als JSON fuer den Scan-Loop."""
+    """Setzt den Bestand eines Artikels (Inventur-Scan). Bevorzugt 'pakete'
+    (Anzahl Verpackungen x VE) — optional kombiniert mit 've_neu', wenn beim
+    Zaehlen gleich die Verpackungseinheit erstmalig festgelegt wird. Ohne VE
+    (weder hinterlegt noch mitgeliefert) faellt es auf 'bestand' (Stueck direkt)
+    zurueck. Antwortet als JSON fuer den Scan-Loop."""
     artikel_id = (request.form.get("artikel_id") or "").strip()
     artikel = lagerartikel.get(artikel_id) if artikel_id else None
     if not artikel:
         return jsonify({"ok": False, "fehler": "Artikel nicht gefunden."}), 404
-    neu_wert = _als_int_oder_none(request.form.get("bestand"))
+
+    updates = {}
+    ve_neu = _als_int_oder_none(request.form.get("ve_neu"))
+    if ve_neu and ve_neu > 0:
+        updates["verpackungseinheit"] = ve_neu
+
+    pakete = request.form.get("pakete")
+    ve = ve_neu or lagerartikel_ve(artikel)
+    if pakete is not None and pakete != "" and ve > 0:
+        neu_wert = _als_int(pakete, 0) * ve
+    else:
+        neu_wert = _als_int_oder_none(request.form.get("bestand"))
     if neu_wert is None:
         return jsonify({"ok": False, "fehler": "Keine Menge eingegeben."}), 400
+
     neu_wert = max(0, neu_wert)
-    lagerartikel.update(artikel_id, {
-        "bestand": neu_wert,
-        "bestand_stand": date.today().isoformat(),
-    })
+    updates["bestand"] = neu_wert
+    updates["bestand_stand"] = date.today().isoformat()
+    lagerartikel.update(artikel_id, updates)
     return jsonify({
         "ok": True,
         "id": artikel_id,
@@ -310,10 +329,10 @@ def bestand_aendern(artikel_id: str):
     delta = request.form.get("delta")
     setzen = request.form.get("setzen")
     pakete = request.form.get("pakete")
-    le = artikel.get("liefereinheit") or 0
-    if pakete is not None and pakete != "" and le > 0:
-        # Ist-Bestand in Liefereinheiten gezaehlt -> Stueck = LE-Anzahl * LE-Groesse
-        neu_wert = _als_int(pakete, 0) * le
+    ve = lagerartikel_ve(artikel)
+    if pakete is not None and pakete != "" and ve > 0:
+        # Ist-Bestand in Verpackungen gezaehlt -> Stueck = Anzahl * VE-Groesse
+        neu_wert = _als_int(pakete, 0) * ve
     elif delta is not None:
         neu_wert = aktuell + _als_int(delta, 0)
     elif setzen is not None:
@@ -340,6 +359,25 @@ def liefereinheit_setzen(artikel_id: str):
         flash(f"Liefereinheit = {le} Stück gesetzt.", "success")
     else:
         flash("Liefereinheit entfernt.", "info")
+    return redirect(request.referrer or url_for("lager.verbrauch"))
+
+
+@bp.route("/<artikel_id>/verpackungseinheit", methods=["POST"])
+@login_required
+def verpackungseinheit_setzen(artikel_id: str):
+    """Setzt die Verpackungseinheit (VE = Stueck pro Verpackung am eigenen Lager)
+    eines Artikels — z.B. inline in der Bestandskontrolle oder beim Scan-Zaehlen
+    nachgetragen, wenn noch keine hinterlegt ist. Unabhaengig von der Liefereinheit
+    (LE, siehe liefereinheit_setzen) — Wuerth liefert ggf. in einer anderen
+    Verpackungsgroesse, als am Lager gezaehlt wird."""
+    if not lagerartikel.get(artikel_id):
+        abort(404)
+    ve = _als_int_oder_none(request.form.get("verpackungseinheit"))
+    lagerartikel.update(artikel_id, {"verpackungseinheit": ve})
+    if ve:
+        flash(f"Verpackungseinheit = {ve} Stück gesetzt.", "success")
+    else:
+        flash("Verpackungseinheit entfernt.", "info")
     return redirect(request.referrer or url_for("lager.verbrauch"))
 
 
