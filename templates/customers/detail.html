@@ -162,7 +162,10 @@
 
 <div class="d-flex justify-content-between align-items-center mb-2">
   <h2 class="h5 m-0">Anlagen ({{ anlagen|length }})</h2>
-  <a class="btn btn-sm btn-primary" href="{{ url_for('installations.new_installation', kunde_id=kunde.id) }}">+ Neue Anlage</a>
+  <div class="d-flex gap-2">
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('installations.qr_labels_kunde', kunde_id=kunde.id) }}">🖨 QR-Codes drucken</a>
+    <a class="btn btn-sm btn-primary" href="{{ url_for('installations.new_installation', kunde_id=kunde.id) }}">+ Neue Anlage</a>
+  </div>
 </div>
 
 {% if anlagen %}

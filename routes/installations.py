@@ -472,3 +472,24 @@ def qr_label(teil_id: str):
         abort(404)
     anlage = anlagen.get(teil.get("anlage_id"))
     return render_template("installations/qr_label.html", teil=teil, anlage=anlage)
+
+
+@bp.route("/kunde/<kunde_id>/qr-labels")
+def qr_labels_kunde(kunde_id: str):
+    """Alle Verteilungen eines Kunden als QR-Label-Blatt — mehrere pro Druckseite."""
+    kunde = kunden.get(kunde_id)
+    if not kunde:
+        abort(404)
+    eintraege = []
+    neu_erzeugt = 0
+    for a in anlagen_fuer_kunde(kunde_id):
+        for t in anlagenteile_fuer_anlage(a["id"]):
+            if t.get("typ") != "Verteilung":
+                continue
+            if not t.get("public_token"):
+                t = anlagenteile.update(t["id"], {"public_token": secrets.token_urlsafe(16)})
+                neu_erzeugt += 1
+            eintraege.append({"teil": t, "anlage": a})
+    if neu_erzeugt:
+        flash(f"{neu_erzeugt} neue(r) öffentliche(r) Link(s) erzeugt.", "info")
+    return render_template("installations/qr_labels_kunde.html", kunde=kunde, eintraege=eintraege)

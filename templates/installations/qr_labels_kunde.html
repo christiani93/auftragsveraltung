@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="de-CH">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>QR-Labels — {{ kunde.name }}</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; padding: 1.5rem; }
+    .toolbar { margin-bottom: 1rem; display: flex; align-items: center; gap: 1rem; }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+    .label { border: 1px solid #888; border-radius: 8px; padding: 1rem; text-align: center; page-break-inside: avoid; break-inside: avoid; }
+    .label img { width: 150px; height: 150px; }
+    .label h2 { font-size: 0.95rem; margin: 0.6rem 0 0.1rem; }
+    .label .sub { color: #666; font-size: 0.8rem; margin-bottom: 0.1rem; }
+    .no-print { }
+    @media print {
+      .no-print { display: none; }
+      body { padding: 0; }
+      .grid { grid-template-columns: repeat(3, 1fr); gap: 0.5cm; }
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar no-print">
+    <h1 style="font-size:1.2rem; margin:0;">QR-Labels — {{ kunde.name }}</h1>
+    <button onclick="window.print()">Drucken</button>
+    <a href="{{ url_for('customers.detail', kunde_id=kunde.id) }}">zurück zum Kunden</a>
+  </div>
+
+  {% if not eintraege %}
+  <p class="no-print">Für diesen Kunden gibt es noch keine Verteilungen. Lege zuerst eine Anlage mit Verteilung(en) an.</p>
+  {% else %}
+  <div class="grid">
+    {% for e in eintraege %}
+    <div class="label">
+      <img src="{{ url_for('installations.qr_png', teil_id=e.teil.id) }}" alt="QR-Code">
+      <h2>{{ e.teil.bezeichnung }}</h2>
+      <div class="sub">{{ e.anlage.bezeichnung }}{% if e.anlage.standort %} ({{ e.anlage.standort }}){% endif %}</div>
+      <div class="sub">Schema &amp; Legende per Handy abrufen</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</body>
+</html>
