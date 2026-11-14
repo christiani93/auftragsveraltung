@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="de-CH">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>QR-Label — {{ teil.bezeichnung }}</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; padding: 2rem; }
+    .label { max-width: 320px; text-align: center; border: 1px solid #888; border-radius: 8px; padding: 1.5rem; }
+    .label img { width: 220px; height: 220px; }
+    .label h1 { font-size: 1.1rem; margin: 0.75rem 0 0.25rem; }
+    .label .sub { color: #666; font-size: 0.9rem; margin-bottom: 0.5rem; }
+    .no-print { margin-top: 1.5rem; }
+    @media print {
+      .no-print { display: none; }
+      body { padding: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="label">
+    <img src="{{ url_for('installations.qr_png', teil_id=teil.id) }}" alt="QR-Code">
+    <h1>{{ teil.bezeichnung }}</h1>
+    <div class="sub">
+      {{ teil.typ }}{% if anlage %} · {{ anlage.bezeichnung }}{% endif %}
+    </div>
+    <div class="sub">Schema &amp; Legende per Handy abrufen</div>
+  </div>
+  <div class="no-print">
+    <button onclick="window.print()">Drucken</button>
+  </div>
+</body>
+</html>

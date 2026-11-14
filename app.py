@@ -27,6 +27,7 @@ from routes.leistungsschalter import bp as leistungsschalter_bp
 from routes.messgeraete import bp as messgeraete_bp
 from routes.pdf_export import bp as pdf_bp
 from routes.protocols import bp as protocols_bp
+from routes.public import bp as public_bp
 from routes.revisionen import bp as revisionen_bp
 from routes.vermietung import bp as vermietung_bp
 from routes.zeit import bp as zeit_bp
@@ -118,6 +119,7 @@ def create_app() -> Flask:
     app.register_blueprint(benachrichtigungen_bp, url_prefix="/benachrichtigungen")
     app.register_blueprint(vermietung_bp, url_prefix="/vermietung")
     app.register_blueprint(lager_bp, url_prefix="/lager")
+    app.register_blueprint(public_bp, url_prefix="")
 
     from models.repos import fi_erforderlich
     app.jinja_env.globals["fi_erforderlich"] = fi_erforderlich
@@ -162,6 +164,10 @@ def create_app() -> Flask:
             return None
         # crashguard /feedback (Bug/Wunsch-Meldung) ist bewusst public
         if request.endpoint and request.endpoint.startswith("_crashguard_feedback_"):
+            return None
+        # Oeffentliche Verteilungs-Info-Seite (QR-Code am Schrank) — Zugriff nur
+        # ueber unerratbaren public_token, bewusst ohne Login
+        if request.endpoint and request.endpoint.startswith("public."):
             return None
         if not current_user.is_authenticated:
             return redirect(url_for("auth.login", next=request.path))

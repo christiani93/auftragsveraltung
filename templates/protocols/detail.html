@@ -132,6 +132,11 @@
 <div class="card">
   <div class="table-responsive">
     <table class="table table-sm table-kompakt m-0 protokoll-tabelle">
+      <colgroup>
+        {% for f in messpunkt_felder %}
+        <col style="width: {{ f.width }}px;">
+        {% endfor %}
+      </colgroup>
       <thead class="table-light">
         <tr>
           {% for g in messpunkt_gruppen %}

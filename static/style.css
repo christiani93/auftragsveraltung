@@ -78,6 +78,36 @@ textarea {
   vertical-align: middle;
 }
 
+/* Messprotokoll-Tabelle: feste Spaltenbreiten (via <colgroup>) statt
+   content-getriebenem Auto-Layout — verhindert, dass ein langer Bemerkung-Text
+   die ganze Tabelle sprengt. Zellinhalt bricht um statt die Spalte zu weiten. */
+.protokoll-tabelle {
+  table-layout: fixed;
+}
+.protokoll-tabelle td, .protokoll-tabelle th {
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+/* Erste Spalte (Datum) beim horizontalen Scrollen sichtbar halten */
+.protokoll-tabelle thead th:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background-color: var(--bs-table-bg, #f8f9fa);
+}
+.protokoll-tabelle tbody td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background-color: #fff;
+}
+@media print {
+  .protokoll-tabelle thead th:first-child,
+  .protokoll-tabelle tbody td:first-child {
+    position: static;
+  }
+}
+
 .badge-status-offen     { background-color: #6c757d; }
 .badge-status-geprueft  { background-color: #198754; }
 .badge-status-maengel   { background-color: #dc3545; }

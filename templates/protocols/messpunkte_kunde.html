@@ -29,6 +29,11 @@
   </h2>
   <div class="table-responsive">
     <table class="table table-sm table-bordered protokoll-tabelle m-0">
+      <colgroup>
+        {% for f in messpunkt_felder %}
+        <col style="width: {{ f.width }}px;">
+        {% endfor %}
+      </colgroup>
       <thead class="table-light">
         <tr>
           {% for f in messpunkt_felder %}<th class="small">{{ f.label }}</th>{% endfor %}

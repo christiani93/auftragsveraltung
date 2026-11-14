@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import io
+import secrets
 import uuid
 from datetime import date, datetime
 from pathlib import Path
@@ -32,6 +34,7 @@ bp = Blueprint("installations", __name__)
 
 # ---- Datei-Anhang fuer Anlagenteile (Foto / Legende / Schema bei Verteilungen) ----
 
+import qrcode
 from PIL import Image, ImageOps
 
 # HEIC/HEIF (iPhone-Fotos) ueber pillow-heif — wenn die Lib fehlt, gehts ohne.
@@ -431,3 +434,41 @@ def delete_teil_datei(teil_id: str, datei_id: str):
     anlagenteile.update(teil_id, {"anhang": anhang})
     flash("Datei gelöscht.", "info")
     return redirect(url_for("installations.edit_teil", teil_id=teil_id))
+
+
+# ---- Oeffentlicher Link + QR-Code (Schema/Legende ohne Login am Verteilerkasten) ----
+
+@bp.route("/teil/<teil_id>/oeffentlicher-link", methods=["POST"])
+def oeffentlicher_link(teil_id: str):
+    teil = anlagenteile.get(teil_id)
+    if not teil:
+        abort(404)
+    if request.form.get("action") == "entfernen":
+        anlagenteile.update(teil_id, {"public_token": None})
+        flash("Öffentlicher Link entfernt — der alte QR-Code funktioniert nicht mehr.", "info")
+    else:
+        anlagenteile.update(teil_id, {"public_token": secrets.token_urlsafe(16)})
+        flash("Öffentlicher Link erstellt.", "success")
+    return redirect(url_for("installations.edit_teil", teil_id=teil_id))
+
+
+@bp.route("/teil/<teil_id>/qr.png")
+def qr_png(teil_id: str):
+    teil = anlagenteile.get(teil_id)
+    if not teil or not teil.get("public_token"):
+        abort(404)
+    ziel_url = url_for("public.verteilung", token=teil["public_token"], _external=True)
+    img = qrcode.make(ziel_url)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    buf.seek(0)
+    return send_file(buf, mimetype="image/png")
+
+
+@bp.route("/teil/<teil_id>/qr-label")
+def qr_label(teil_id: str):
+    teil = anlagenteile.get(teil_id)
+    if not teil or not teil.get("public_token"):
+        abort(404)
+    anlage = anlagen.get(teil.get("anlage_id"))
+    return render_template("installations/qr_label.html", teil=teil, anlage=anlage)
